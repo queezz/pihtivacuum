@@ -11,11 +11,20 @@ function rgbToHex(rgb) {
 
 
 // Function to handle toggling fill color
-function toggleElementStatus(element, colors) {
+function toggleElementStatus(element, colors, confirmToggle) {
+    console.log(confirmToggle)
+    if (confirmToggle) {
+        const userConfirmed = confirm(`Do you want to toggle the status of ${element.id}?`);
+        if (!userConfirmed) {
+            console.log(`${element.id} toggle cancelled.`);
+            return;
+        }
+    }
     const currentFill = rgbToHex(element.style.fill || window.getComputedStyle(element).fill);
     const newFill = currentFill === colors.active ? colors.inactive : colors.active;
     element.style.fill = newFill;
     console.log(`${element.id} fill changed to: ${newFill}`);
+
 }
 
 // Function to handle showing tooltips
@@ -35,7 +44,7 @@ function attachEventListeners(elementsConfig, tooltipId) {
         return;
     }
 
-    elementsConfig.forEach(({ id, colors }) => {
+    elementsConfig.forEach(({ id, colors, confirmToggle }) => {
         const element = document.getElementById(id);
 
         if (!element) {
@@ -44,7 +53,7 @@ function attachEventListeners(elementsConfig, tooltipId) {
         }
 
         // Toggle status on click
-        element.addEventListener('click', () => toggleElementStatus(element, colors));
+        element.addEventListener('click', () => toggleElementStatus(element, colors, confirmToggle));
 
         // Tooltip on hover
         element.addEventListener('mouseenter', (event) => showTooltip(tooltip, event, id));
@@ -61,25 +70,25 @@ fetch('diagram.svg')
 
         // Define elements with their specific colors
         const elementsConfig = [
-            { id: 'GVU', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'GVD', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'GVBD', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'GVBU', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'TMPU', colors: { active: 'yellow', inactive: 'gray' } },
-            { id: 'TMPD', colors: { active: 'yellow', inactive: 'gray' } },
-            { id: 'RoughD', colors: { active: 'yellow', inactive: 'gray' } },
-            { id: 'RoughU', colors: { active: 'yellow', inactive: 'gray' } },
-            { id: 'Rough-Bypass', colors: { active: 'yellow', inactive: 'gray' } },
-            { id: 'valve_qms', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'Membrane', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'bypass-l1', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'bypass-l2', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'bypass-vcr-u', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'bypass-vcr-d', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'gasline-main', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'gasline-h', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'gasline-o', colors: { active: '#9bf08d', inactive: 'gray' } },
-            { id: 'gasline-ar', colors: { active: '#9bf08d', inactive: 'gray' } },
+            { id: 'GVU', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
+            { id: 'GVD', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
+            { id: 'GVBD', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
+            { id: 'GVBU', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
+            { id: 'TMPU', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
+            { id: 'TMPD', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
+            { id: 'RoughD', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
+            { id: 'RoughU', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
+            { id: 'Rough-Bypass', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
+            { id: 'valve_qms', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'Membrane', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'bypass-l1', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'bypass-l2', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'bypass-vcr-u', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'bypass-vcr-d', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gasline-main', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gasline-h', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gasline-o', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gasline-ar', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
 
         ];
 
