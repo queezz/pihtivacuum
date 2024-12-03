@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Diagram</title>
+    <style>
+        body {
+            background-color: rgb(220, 181, 133);
+        }
+
+        #diagram-container {
+            width: 100%;
+            max-width: 800px;
+            margin: auto;
+            border: 1px solid #250e0e;
+            overflow: hidden;
+            background-color: coral;
+        }
+
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 style="text-align: center;">PIHTI appaaratus</h1>
+    <div id="diagram-container"></div>
+    <div id="tooltip"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
