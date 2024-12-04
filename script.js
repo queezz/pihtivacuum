@@ -1,3 +1,5 @@
+let elementsConfig = []; // Declare elementsConfig globally
+
 function rgbToHex(rgb) {
     const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
     if (!match) return rgb; // Return original value if not an RGB color
@@ -14,7 +16,7 @@ function rgbToHex(rgb) {
 function toggleElementStatus(element, colors, confirmToggle) {
     console.log(confirmToggle)
     if (confirmToggle) {
-        const userConfirmed = confirm(`Do you want to toggle the status of ${element.id}?`);
+        const userConfirmed = confirm(`Confirm opening/closing of ${element.id}?`);
         if (!userConfirmed) {
             console.log(`${element.id} toggle cancelled.`);
             return;
@@ -24,6 +26,8 @@ function toggleElementStatus(element, colors, confirmToggle) {
     const newFill = currentFill === colors.active ? colors.inactive : colors.active;
     element.style.fill = newFill;
     console.log(`${element.id} fill changed to: ${newFill}`);
+    //logStatusChange(element, newFill); // Log the change
+    //saveElementStatus(elementsConfig); // Save the current status to a file
 
 }
 
@@ -59,6 +63,47 @@ function attachEventListeners(elementsConfig, tooltipId) {
         element.addEventListener('mouseenter', (event) => showTooltip(tooltip, event, id));
         element.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
     });
+}
+
+// Function to save the current status of all elements to a file
+function saveElementStatus(elementsConfig) {
+    const statusData = elementsConfig.map(({ id, colors }) => {
+        const element = document.getElementById(id);
+        const currentFill = rgbToHex(element.style.fill || window.getComputedStyle(element).fill);
+        const status = currentFill === colors.active ? 'active' : 'inactive';
+        return { id, status };
+    });
+
+    const blob = new Blob([JSON.stringify(statusData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'element_status.json';
+    link.click();
+
+    URL.revokeObjectURL(url);
+    console.log('Status saved:', statusData);
+}
+
+
+// Function to log element status changes
+function logStatusChange(element, newFill) {
+    const timestamp = new Date().toISOString();
+    const logEntry = `${timestamp} - ${element.id} changed to: ${newFill}`;
+    console.log(logEntry);
+
+    // Optionally append logs to a downloadable file
+    const logBlob = new Blob([`${logEntry}\n`], { type: 'text/plain' });
+    const logUrl = URL.createObjectURL(logBlob);
+
+    const logLink = document.createElement('a');
+    logLink.href = logUrl;
+    logLink.download = 'status_log.txt';
+    logLink.style.display = 'none'; // Hide the download link
+    document.body.appendChild(logLink);
+    logLink.click();
+    document.body.removeChild(logLink);
 }
 
 // Load the SVG dynamically
