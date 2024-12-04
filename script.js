@@ -50,6 +50,7 @@ function attachEventListeners(elementsConfig, tooltipId) {
 
     elementsConfig.forEach(({ id, colors, confirmToggle }) => {
         const element = document.getElementById(id);
+        element.style.cursor = 'pointer';
 
         if (!element) {
             console.error(`No element with ID '${id}' found in the SVG.`);
@@ -130,12 +131,34 @@ fetch('diagram.svg')
             { id: 'bypass-l2', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
             { id: 'bypass-vcr-u', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
             { id: 'bypass-vcr-d', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+
             { id: 'gasline-main', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
             { id: 'gasline-h', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
             { id: 'gasline-o', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
             { id: 'gasline-ar', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'flow-calibration-valve', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+
+
+            { id: 'gaspanel-valve-h', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gaspanel-valve-o', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gaspanel-valve-ar', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gaspanel-valve-n', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+
+            { id: 'gaspanel-valve-vent', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gaspanel-valve-pump', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gaspanel-pump-vent', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+            { id: 'gaspanel-pump', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
+
 
         ];
+
+        document.querySelectorAll('.non-clickable').forEach(element => {
+            element.style.pointerEvents = 'none';
+        });
+
+        // document.querySelectorAll('.clickable').forEach(element => {
+        //     element.style.cursor = 'pointer';
+        // });
 
         // Attach event listeners
         attachEventListeners(elementsConfig, 'tooltip');
