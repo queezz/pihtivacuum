@@ -22,14 +22,28 @@ function toggleElementStatus(element, colors, confirmToggle) {
             return;
         }
     }
+
+    // Determine the new status based on the current fill color
     const currentFill = rgbToHex(element.style.fill || window.getComputedStyle(element).fill);
-    const newFill = currentFill === colors.active ? colors.inactive : colors.active;
+    const newStatus = currentFill === colors.active ? 'inactive' : 'active';
+    const newFill = newStatus === 'active' ? colors.active : colors.inactive;
     element.style.fill = newFill;
     console.log(`${element.id} fill changed to: ${newFill}`);
-    //logStatusChange(element, newFill); // Log the change
-    //saveElementStatus(elementsConfig); // Save the current status to a file
 
+    // Send the update to the backend
+    fetch('http://127.0.0.1:5000/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: element.id, status: newStatus })
+    })
+        .then(response => response.json())
+        .then(data => console.log('Server response:', data))
+        .catch(error => console.error('Error sending data to server:', error));
 }
+
+
 
 // Function to handle showing tooltips
 function showTooltip(tooltip, event, text) {

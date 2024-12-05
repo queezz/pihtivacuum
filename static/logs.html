@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            text-align: left;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Log Data</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody id="logTableBody">
+            <!-- Rows will be populated by JavaScript -->
+        </tbody>
+    </table>
+    <script>
+        // Function to fetch and display logs
+        function fetchLogs() {
+            fetch('/logs')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('logTableBody');
+                    tableBody.innerHTML = ''; // Clear the table before adding new data
+
+                    // Loop through the logs and add new rows
+                    data.reverse().forEach(log => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                    <td>${log.timestamp}</td>
+                    <td>${log.id}</td>
+                    <td>${log.status}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => console.error('Error fetching logs:', error));
+        }
+
+        // window.onload = function () {
+        //     fetchLogs(); // Fetch and display logs on page load
+        // };
+
+        // Set up auto-refresh every 10 seconds (10000 ms)
+        setInterval(fetchLogs, 5000);
+    </script>
+
+</body>
+
+</html>
+
+
+
+<script>
+    // Fetch logs from the server
+    function fetchLogs() {
+        fetch('/logs')
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('logTableBody');
+                data.forEach(log => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                    <td>${log.timestamp}</td>
+                    <td>${log.id}</td>
+                    <td>${log.status}</td>
+                `;
+                    tableBody.appendChild(row);
+                });
+            })
+            .catch(error => console.error('Error fetching logs:', error));
+    }
+    fetchLogs();
+    // Set up auto-refresh every 10 seconds (10000 ms)
+    //setInterval(fetchLogs, 1000);
+</script>
