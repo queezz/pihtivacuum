@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, send_from_directory,render_template
 from flask_cors import CORS
 from datetime import datetime
+import os
+import json
 
 #app = Flask(__name__, static_folder='static')
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -27,6 +29,7 @@ logs = []
 @app.route('/update', methods=['POST'])
 def update_element():
     data = request.json
+    print(data)
     element_id = data.get('id')
     status = data.get('status')  # 'active' or 'inactive'
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")#.isoformat()
@@ -37,6 +40,10 @@ def update_element():
 
     # Update the state
     elements_state[element_id] = status
+
+    # Save updated state to file
+    with open(state_file_path, 'w') as f:
+        json.dump(elements_state, f, indent=4)
 
     # Log the change
     logs.append({
@@ -67,6 +74,27 @@ def get_state():
 @app.route('/navbar')
 def navbar():
     return render_template('navbar.html')
+
+# MARK: Vacuum State
+# File path where elements' states are saved
+state_file_path = 'elements_state.json'
+
+# Initialize the elements state from the file (if it exists)
+if os.path.exists(state_file_path):
+    with open(state_file_path, 'r') as f:
+        elements_state = json.load(f)
+else:
+    elements_state = {}
+
+
+# Fetch the current state of all elements
+@app.route('/elements-state', methods=['GET'])
+def get_elements_state():
+    return jsonify(elements_state)
+
+@app.route('/elements-config', methods=['GET'])
+def serve_config():
+    return send_from_directory(directory='./static', path='elementsConfig.json')
 
 
 if __name__ == '__main__':

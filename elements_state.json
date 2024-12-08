@@ -1,0 +1,20 @@
+{
+    "Membrane": "active",
+    "GVBU": "inactive",
+    "bypass-l1": "active",
+    "GVU": "inactive",
+    "RoughU": "inactive",
+    "TMPU": "inactive",
+    "gasline-h": "inactive",
+    "gasline-o": "inactive",
+    "gasline-ar": "inactive",
+    "bypass-l2": "active",
+    "gaspanel-valve-pump": "inactive",
+    "gaspanel-pump": "inactive",
+    "gaspanel-valve-h": "inactive",
+    "TMPD": "inactive",
+    "gasline-main": "active",
+    "bypass-vcr-u": "active",
+    "gaspanel-valve-o": "inactive",
+    "gaspanel-pump-vent": "active"
+}

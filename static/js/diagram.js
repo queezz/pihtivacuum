@@ -11,7 +11,6 @@ function rgbToHex(rgb) {
     return `#${hex}`;
 }
 
-
 // Function to handle toggling fill color
 function toggleElementStatus(element, colors, confirmToggle) {
     console.log(confirmToggle)
@@ -43,8 +42,6 @@ function toggleElementStatus(element, colors, confirmToggle) {
         .catch(error => console.error('Error sending data to server:', error));
 }
 
-
-
 // Function to handle showing tooltips
 function showTooltip(tooltip, event, text) {
     tooltip.style.display = 'block';
@@ -53,8 +50,8 @@ function showTooltip(tooltip, event, text) {
     tooltip.innerText = text;
 }
 
-// Function to attach event listeners to specified elements
-function attachEventListeners(elementsConfig, tooltipId) {
+// Function to attach event listeners to specified elements and set initial state
+function attachEventListeners(elementsConfig, state, tooltipId) {
     const tooltip = document.getElementById(tooltipId);
 
     if (!tooltip) {
@@ -63,20 +60,35 @@ function attachEventListeners(elementsConfig, tooltipId) {
     }
 
     elementsConfig.forEach(({ id, colors, confirmToggle }) => {
-        const element = document.getElementById(id);
-        element.style.cursor = 'pointer';
+        const elementDiv = document.getElementById(id);
 
-        if (!element) {
+        if (!elementDiv) {
             console.error(`No element with ID '${id}' found in the SVG.`);
             return;
         }
 
+        elementDiv.style.cursor = "pointer";
+
+        // Initial fill update based on loaded state (if not done before)
+        const initialStateColor =
+            state[id] && state[id].status === "active"
+                ? colors.active
+                : colors.inactive;
+
         // Toggle status on click
-        element.addEventListener('click', () => toggleElementStatus(element, colors, confirmToggle));
+        elementDiv.addEventListener("click", () =>
+            toggleElementStatus(elementDiv, colors, confirmToggle)
+        );
 
         // Tooltip on hover
-        element.addEventListener('mouseenter', (event) => showTooltip(tooltip, event, id));
-        element.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+        elementDiv.addEventListener("mouseenter", (event) =>
+            showTooltip(tooltip, event, id)
+        );
+
+        elementDiv.addEventListener("mouseleave", () => {
+            tooltip.style.display = "none";
+        });
+
     });
 }
 
@@ -84,10 +96,20 @@ function attachEventListeners(elementsConfig, tooltipId) {
 function saveElementStatus(elementsConfig) {
     const statusData = elementsConfig.map(({ id, colors }) => {
         const element = document.getElementById(id);
-        const currentFill = rgbToHex(element.style.fill || window.getComputedStyle(element).fill);
-        const status = currentFill === colors.active ? 'active' : 'inactive';
+
+        if (!element) {
+            console.error(`No element with ID '${id}' found in the SVG.`);
+            return null;
+        }
+
+        const currentFill = rgbToHex(
+            element.style.fill || window.getComputedStyle(element).fill);
+
+        const status = currentFill === colors.active ? "active" : "inactive";
+
         return { id, status };
-    });
+
+    }).filter(Boolean);  		 // Remove any null entries due to missing elements
 
     const blob = new Blob([JSON.stringify(statusData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -100,7 +122,6 @@ function saveElementStatus(elementsConfig) {
     URL.revokeObjectURL(url);
     console.log('Status saved:', statusData);
 }
-
 
 // Function to log element status changes
 function logStatusChange(element, newFill) {
@@ -121,60 +142,55 @@ function logStatusChange(element, newFill) {
     document.body.removeChild(logLink);
 }
 
-// Load the SVG dynamically
+// Function to load the SVG and update the status colors correctly
 fetch('diagram.svg')
     .then(response => response.text())
     .then(svg => {
         const container = document.getElementById('diagram-container');
         container.innerHTML = svg;
 
-        // Define elements with their specific colors
-        const elementsConfig = [
-            { id: 'GVU', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
-            { id: 'GVD', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
-            { id: 'GVBD', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
-            { id: 'GVBU', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: true },
-            { id: 'TMPU', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
-            { id: 'TMPD', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
-            { id: 'RoughD', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
-            { id: 'RoughU', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
-            { id: 'Rough-Bypass', colors: { active: 'yellow', inactive: 'gray' }, confirmToggle: true },
-            { id: 'valve_qms', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'Membrane', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'bypass-l1', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'bypass-l2', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'bypass-vcr-u', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'bypass-vcr-d', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-
-            { id: 'gasline-main', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gasline-h', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gasline-o', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gasline-ar', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'flow-calibration-valve', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-
-
-            { id: 'gaspanel-valve-h', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gaspanel-valve-o', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gaspanel-valve-ar', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gaspanel-valve-n', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-
-            { id: 'gaspanel-valve-vent', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gaspanel-valve-pump', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gaspanel-pump-vent', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-            { id: 'gaspanel-pump', colors: { active: '#9bf08d', inactive: 'gray' }, confirmToggle: false },
-
-
-        ];
-
         document.querySelectorAll('.non-clickable').forEach(element => {
             element.style.pointerEvents = 'none';
         });
 
-        // document.querySelectorAll('.clickable').forEach(element => {
-        //     element.style.cursor = 'pointer';
-        // });
+        // Fetch the configuration
+        fetch('/elements-config')
+            .then(response => response.json())
+            .then(config => {
+                elementsConfig = config;
 
-        // Attach event listeners
-        attachEventListeners(elementsConfig, 'tooltip');
+                // Fetch the current state of all elements
+                fetch('/elements-state')
+                    .then(response => response.json())
+                    .then(state => {
+                        console.log('Current elements state:', state);
+
+                        // Use the configuration to update elements' status in SVG
+                        elementsConfig.forEach(element => {
+                            const elementDiv = document.getElementById(element.id);
+                            if (!elementDiv) {
+                                console.error(`No element with ID '${element.id}' found.`);
+                                return;
+                            }
+
+                            const elementState = state[element.id];
+                            // If element state is missing, assign inactive
+                            const status = elementState ? elementState : 'inactive';
+                            const fillColor =
+                                status === 'active' ? element.colors.active : element.colors.inactive;
+                            // console.log('id:', element.id, 'state:', state[element.id], 'status', status)
+                            // Set initial fill color based on loaded state
+                            if (elementDiv.style.fill !== fillColor) {
+                                elementDiv.style.fill = fillColor;
+                                console.log(`Set initial fill for ${element.id} to: ${fillColor}`);
+                            }
+                        });
+
+                        // Attach event listeners after setting initial states with state passed as argument
+                        attachEventListeners(elementsConfig, state, 'tooltip');
+                    })
+                    .catch(error => console.error('Error fetching element states:', error));
+            })
+            .catch(error => console.error('Error fetching configuration:', error));
     })
     .catch(error => console.error('Error loading SVG:', error));
