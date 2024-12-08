@@ -1,14 +1,19 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory,render_template
 from flask_cors import CORS
 from datetime import datetime
 
-app = Flask(__name__, static_folder='static')
+#app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app) # Allow all origins
 
-# Serve the frontend
+# # Serve the frontend
+# @app.route('/')
+# def serve_frontend():
+#    return send_from_directory(app.static_folder, 'index.html')
+
 @app.route('/')
-def serve_frontend():
-    return send_from_directory(app.static_folder, 'index.html')
+def home():
+    return render_template('index.html')
 
 @app.route('/<path:path>')
 def serve_static_files(path):
@@ -42,18 +47,28 @@ def update_element():
 
     return jsonify({'message': 'State updated successfully', 'state': elements_state}), 200
 
-@app.route('/logs', methods=['GET'])
+@app.route('/logs-raw', methods=['GET'])
 def get_logs():
     return jsonify(logs)
 
-@app.route('/logs-view')
+# @app.route('/logs')
+# def serve_logs_view():
+#     return send_from_directory(app.static_folder, 'logs.html')
+
+@app.route('/logs')
 def serve_logs_view():
-    return send_from_directory(app.static_folder, 'logs.html')
+    return render_template('logs.html', logs=logs)
 
 
 @app.route('/state', methods=['GET'])
 def get_state():
     return jsonify(elements_state)
 
+@app.route('/navbar')
+def navbar():
+    return render_template('navbar.html')
+
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000,debug=True)
+

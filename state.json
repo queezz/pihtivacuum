@@ -1,0 +1,12 @@
+{
+  "Membrane": "inactive",
+  "GVBU": "active",
+  "Rough-Bypass": "active",
+  "gaspanel-valve-h": "active",
+  "gaspanel-valve-o": "active",
+  "gaspanel-valve-ar": "active",
+  "gaspanel-valve-pump": "active",
+  "GVU": "active",
+  "TMPU": "active",
+  "RoughU": "active"
+}

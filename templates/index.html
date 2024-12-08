@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block title %}PIHTI Vacuum{% endblock %}
+
+{% block content %}
+<h1 style="text-align: center;">PIHTI Vacuum</h1>
+<div id="diagram-container"></div>
+<div id="tooltip"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/diagram.js') }}"></script>
+{% endblock %}

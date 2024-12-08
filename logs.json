@@ -1,0 +1,57 @@
+[
+  {
+    "id": "Membrane",
+    "status": "active",
+    "timestamp": "2024-12-06 20:01:25"
+  },
+  {
+    "id": "Membrane",
+    "status": "inactive",
+    "timestamp": "2024-12-06 20:01:26"
+  },
+  {
+    "id": "GVBU",
+    "status": "active",
+    "timestamp": "2024-12-06 20:01:28"
+  },
+  {
+    "id": "Rough-Bypass",
+    "status": "active",
+    "timestamp": "2024-12-06 20:01:53"
+  },
+  {
+    "id": "gaspanel-valve-h",
+    "status": "active",
+    "timestamp": "2024-12-06 20:02:41"
+  },
+  {
+    "id": "gaspanel-valve-o",
+    "status": "active",
+    "timestamp": "2024-12-06 20:02:41"
+  },
+  {
+    "id": "gaspanel-valve-ar",
+    "status": "active",
+    "timestamp": "2024-12-06 20:02:42"
+  },
+  {
+    "id": "gaspanel-valve-pump",
+    "status": "active",
+    "timestamp": "2024-12-06 20:02:45"
+  },
+  {
+    "id": "GVU",
+    "status": "active",
+    "timestamp": "2024-12-06 20:03:56"
+  },
+  {
+    "id": "TMPU",
+    "status": "active",
+    "timestamp": "2024-12-06 20:03:58"
+  },
+  {
+    "id": "RoughU",
+    "status": "active",
+    "timestamp": "2024-12-06 20:03:59"
+  }
+]

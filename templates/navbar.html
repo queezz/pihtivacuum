@@ -1,0 +1,13 @@
+<!-- templates/navbar.html -->
+<div class="navbar">
+    <div class="navbar-container">
+        <div class="navbar-toggle" onclick="toggleNavbar()">
+            <span id="toggleIcon">&#9776;</span>
+        </div>
+        <ul class="navbar-items" id="navbarItems">
+            <li><a href="{{ url_for('home') }}">Vacuum</a></li>
+            <li><a href="{{ url_for('serve_logs_view') }}">Log</a></li>
+
+        </ul>
+    </div>
+</div>

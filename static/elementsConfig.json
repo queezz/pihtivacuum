@@ -1,0 +1,226 @@
+[
+    {
+        "id": "GVU",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "GVD",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "GVBD",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "GVBU",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "TMPU",
+        "colors": {
+            "active": "yellow",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "TMPD",
+        "colors": {
+            "active": "yellow",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "RoughD",
+        "colors": {
+            "active": "yellow",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "RoughU",
+        "colors": {
+            "active": "yellow",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "Rough-Bypass",
+        "colors": {
+            "active": "yellow",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "valve_qms",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "Membrane",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "bypass-l1",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "bypass-l2",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "bypass-vcr-u",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "bypass-vcr-d",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gasline-main",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gasline-h",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gasline-o",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gasline-ar",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "flow-calibration-valve",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-valve-h",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-valve-o",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-valve-ar",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-valve-n",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-valve-vent",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-valve-pump",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-pump-vent",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "gaspanel-pump",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    }
+]
