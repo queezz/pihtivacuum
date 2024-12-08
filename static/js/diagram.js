@@ -1,4 +1,5 @@
 let elementsConfig = []; // Declare elementsConfig globally
+let isInteracting = false; // Flag to track user interactions
 
 function rgbToHex(rgb) {
     const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
@@ -13,11 +14,13 @@ function rgbToHex(rgb) {
 
 // Function to handle toggling fill color
 function toggleElementStatus(element, colors, confirmToggle) {
+    isInteracting = true; // Mark interaction as active
     console.log(confirmToggle)
     if (confirmToggle) {
         const userConfirmed = confirm(`Confirm opening/closing of ${element.id}?`);
         if (!userConfirmed) {
             console.log(`${element.id} toggle cancelled.`);
+            isInteracting = false;
             return;
         }
     }
@@ -38,8 +41,14 @@ function toggleElementStatus(element, colors, confirmToggle) {
         body: JSON.stringify({ id: element.id, status: newStatus })
     })
         .then(response => response.json())
-        .then(data => console.log('Server response:', data))
-        .catch(error => console.error('Error sending data to server:', error));
+        .then(data => {
+            console.log('Server response:', data);
+            isInteracting = false;
+        })
+        .catch(error => {
+            console.error('Error sending data to server:', error);
+            isInteracting = false;
+        });
 }
 
 // Function to handle showing tooltips
@@ -142,12 +151,18 @@ function logStatusChange(element, newFill) {
     document.body.removeChild(logLink);
 }
 
+let vacuumstate = [];
 function fetchAndUpdateStates() {
+    if (isInteracting) {
+        console.log("Skipping state update during user interaction.");
+        return;
+    }
     // Fetch the current state of all elements
     fetch('/elements-state')
         .then(response => response.json())
         .then(state => {
             console.log('Current elements state:', state);
+            vacuumstate = state;
 
             // Use the configuration to update elements' status in SVG
             elementsConfig.forEach(element => {
@@ -170,9 +185,6 @@ function fetchAndUpdateStates() {
                 }
             });
 
-            // Attach event listeners after setting initial states with state passed as argument
-            attachEventListeners(elementsConfig, state, 'tooltip');
-            setInterval(fetchAndUpdateStates, 5000);
         })
         .catch(error => console.error('Error fetching element states:', error));
 }
@@ -195,6 +207,9 @@ fetch('diagram.svg')
             .then(config => {
                 elementsConfig = config;
                 fetchAndUpdateStates();
+                // Attach event listeners after setting initial states with state passed as argument
+                attachEventListeners(elementsConfig, vacuumstate, 'tooltip');
+                setInterval(fetchAndUpdateStates, 5000);
 
             })
             .catch(error => console.error('Error fetching configuration:', error));
