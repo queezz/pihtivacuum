@@ -142,6 +142,42 @@ function logStatusChange(element, newFill) {
     document.body.removeChild(logLink);
 }
 
+function fetchAndUpdateStates() {
+    // Fetch the current state of all elements
+    fetch('/elements-state')
+        .then(response => response.json())
+        .then(state => {
+            console.log('Current elements state:', state);
+
+            // Use the configuration to update elements' status in SVG
+            elementsConfig.forEach(element => {
+                const elementDiv = document.getElementById(element.id);
+                if (!elementDiv) {
+                    console.error(`No element with ID '${element.id}' found.`);
+                    return;
+                }
+
+                const elementState = state[element.id];
+                // If element state is missing, assign inactive
+                const status = elementState ? elementState : 'inactive';
+                const fillColor =
+                    status === 'active' ? element.colors.active : element.colors.inactive;
+                // console.log('id:', element.id, 'state:', state[element.id], 'status', status)
+                // Set initial fill color based on loaded state
+                if (elementDiv.style.fill !== fillColor) {
+                    elementDiv.style.fill = fillColor;
+                    console.log(`Set initial fill for ${element.id} to: ${fillColor}`);
+                }
+            });
+
+            // Attach event listeners after setting initial states with state passed as argument
+            attachEventListeners(elementsConfig, state, 'tooltip');
+            setInterval(fetchAndUpdateStates, 5000);
+        })
+        .catch(error => console.error('Error fetching element states:', error));
+}
+
+
 // Function to load the SVG and update the status colors correctly
 fetch('diagram.svg')
     .then(response => response.text())
@@ -158,38 +194,8 @@ fetch('diagram.svg')
             .then(response => response.json())
             .then(config => {
                 elementsConfig = config;
+                fetchAndUpdateStates();
 
-                // Fetch the current state of all elements
-                fetch('/elements-state')
-                    .then(response => response.json())
-                    .then(state => {
-                        console.log('Current elements state:', state);
-
-                        // Use the configuration to update elements' status in SVG
-                        elementsConfig.forEach(element => {
-                            const elementDiv = document.getElementById(element.id);
-                            if (!elementDiv) {
-                                console.error(`No element with ID '${element.id}' found.`);
-                                return;
-                            }
-
-                            const elementState = state[element.id];
-                            // If element state is missing, assign inactive
-                            const status = elementState ? elementState : 'inactive';
-                            const fillColor =
-                                status === 'active' ? element.colors.active : element.colors.inactive;
-                            // console.log('id:', element.id, 'state:', state[element.id], 'status', status)
-                            // Set initial fill color based on loaded state
-                            if (elementDiv.style.fill !== fillColor) {
-                                elementDiv.style.fill = fillColor;
-                                console.log(`Set initial fill for ${element.id} to: ${fillColor}`);
-                            }
-                        });
-
-                        // Attach event listeners after setting initial states with state passed as argument
-                        attachEventListeners(elementsConfig, state, 'tooltip');
-                    })
-                    .catch(error => console.error('Error fetching element states:', error));
             })
             .catch(error => console.error('Error fetching configuration:', error));
     })
