@@ -31,7 +31,7 @@ function toggleElementStatus(element, colors, confirmToggle) {
     console.log(`${element.id} fill changed to: ${newFill}`);
 
     // Send the update to the backend
-    fetch('http://127.0.0.1:5000/update', {
+    fetch('/update', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
