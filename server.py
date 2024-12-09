@@ -24,7 +24,8 @@ def serve_static_files(path):
 # Backend routes
 elements_state = {}
 logs = []
-
+log_file_path = 'logs.json'
+state_file_path = 'elements_state.json'
 
 @app.route('/update', methods=['POST'])
 def update_element():
@@ -52,6 +53,24 @@ def update_element():
         'timestamp': timestamp#.strftime("%Y-%m-%d %H:%M:%S")
     })
 
+    # Append log entry to the log file
+    try:
+        # Load existing logs if the file exists
+        if os.path.exists(log_file_path):
+            with open(log_file_path, 'r') as f:
+                existing_logs = json.load(f)
+        else:
+            existing_logs = []
+
+        # Append the new entry and write back
+        existing_logs.append(logs[-1])
+        with open(log_file_path, 'w') as f:
+            json.dump(existing_logs, f, indent=4)
+    except json.JSONDecodeError:
+        # Handle case where log file is corrupted or empty
+        with open(log_file_path, 'w') as f:
+            json.dump([logs[-1]], f, indent=4)
+
     return jsonify({'message': 'State updated successfully', 'state': elements_state}), 200
 
 @app.route('/logs-raw', methods=['GET'])
@@ -76,8 +95,7 @@ def navbar():
     return render_template('navbar.html')
 
 # MARK: Vacuum State
-# File path where elements' states are saved
-state_file_path = 'elements_state.json'
+
 
 # Initialize the elements state from the file (if it exists)
 if os.path.exists(state_file_path):
@@ -85,7 +103,6 @@ if os.path.exists(state_file_path):
         elements_state = json.load(f)
 else:
     elements_state = {}
-
 
 # Fetch the current state of all elements
 @app.route('/elements-state', methods=['GET'])
