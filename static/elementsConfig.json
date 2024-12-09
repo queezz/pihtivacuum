@@ -222,5 +222,77 @@
             "inactive": "gray"
         },
         "confirmToggle": false
+    },
+    {
+        "id": "bypass-absolute-gauge",
+        "colors": {
+            "active": "#6bfaff",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "bypass-ionization-gauge",
+        "colors": {
+            "active": "#ffc75e",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "upstream-single-gauge",
+        "colors": {
+            "active": "#ffc75e",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "upstream-baratron",
+        "colors": {
+            "active": "#6bfaff",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "downstream-ionization-gauge",
+        "colors": {
+            "active": "#ffc75e",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "downstream-baratron",
+        "colors": {
+            "active": "#6bfaff",
+            "inactive": "gray"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "hydrogen-bottle",
+        "colors": {
+            "active": "red",
+            "inactive": "white"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "oxygen-bottle",
+        "colors": {
+            "active": "#323f40",
+            "inactive": "white"
+        },
+        "confirmToggle": false
+    },
+    {
+        "id": "argon-bottle",
+        "colors": {
+            "active": "#cfd4d3",
+            "inactive": "white"
+        },
+        "confirmToggle": false
     }
 ]
