@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory,render_template
 from flask_cors import CORS
 from datetime import datetime
-import os
-import json
+import os, json, csv
 
 #app = Flask(__name__, static_folder='static')
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -24,8 +23,25 @@ def serve_static_files(path):
 # Backend routes
 elements_state = {}
 logs = []
-log_file_path = 'logs.json'
+#log_file_path = 'logs.json'
+log_file_path = 'logs.csv'
 state_file_path = 'elements_state.json'
+MAX_LOGS = 1000
+DISPLAY_LIMIT = 100
+
+def load_logs_from_csv(file_path):
+    """load logs from csv"""
+    logs = []
+    try:
+        with open(file_path, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # Convert timestamp back to the desired format
+                row["timestamp"] = row["timestamp"]  # If needed, parse with datetime
+                logs.append(row)
+    except FileNotFoundError:
+        print(f"Log file {file_path} not found.")
+    return logs
 
 @app.route('/update', methods=['POST'])
 def update_element():
@@ -52,26 +68,52 @@ def update_element():
         'status': status,
         'timestamp': timestamp#.strftime("%Y-%m-%d %H:%M:%S")
     })
+    #save_log_json(logs[-1],log_file_path)
+    save_log_csv(logs[-1],log_file_path)
 
-    # Append log entry to the log file
+    return jsonify({'message': 'State updated successfully', 'state': elements_state}), 200
+
+def save_log_json(log_entry,log_file_path):
+    """Load json log, append, rewrite"""
     try:
-        # Load existing logs if the file exists
         if os.path.exists(log_file_path):
             with open(log_file_path, 'r') as f:
                 existing_logs = json.load(f)
         else:
             existing_logs = []
 
-        # Append the new entry and write back
-        existing_logs.append(logs[-1])
+        existing_logs.append(log_entry)
         with open(log_file_path, 'w') as f:
             json.dump(existing_logs, f, indent=4)
     except json.JSONDecodeError:
         # Handle case where log file is corrupted or empty
         with open(log_file_path, 'w') as f:
-            json.dump([logs[-1]], f, indent=4)
+            json.dump([log_entry], f, indent=4)
 
-    return jsonify({'message': 'State updated successfully', 'state': elements_state}), 200
+
+def save_log_csv(log_entry, log_file_path):
+    """Append a log entry to a CSV file."""
+    # Ensure the log file exists and create it with headers if not
+    file_exists = os.path.exists(log_file_path)
+    try:
+        with open(log_file_path, 'a', newline='') as csvfile:
+            fieldnames = ["timestamp","id", "status"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write header only if the file is new
+            if not file_exists:
+                writer.writeheader()
+
+            # Format timestamp as string if not already formatted
+            if isinstance(log_entry.get("timestamp"), datetime):
+                log_entry["timestamp"] = log_entry["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
+
+            # Write the log entry
+            writer.writerow(log_entry)
+    except Exception as e:
+        print(f"Error saving log entry: {e}")
+
+
 
 @app.route('/logs-raw', methods=['GET'])
 def get_logs():
@@ -81,11 +123,27 @@ def get_logs():
 # def serve_logs_view():
 #     return send_from_directory(app.static_folder, 'logs.html')
 
+# @app.route('/logs')
+# def serve_logs_view():
+#     sorted_logs = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
+#     return render_template('logs.html', logs=sorted_logs)
+
 @app.route('/logs')
 def serve_logs_view():
-    sorted_logs = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
-    return render_template('logs.html', logs=sorted_logs)
+    # Load logs from CSV file
+    logs_file_path = "logs.csv"
+    logs = load_logs_from_csv(logs_file_path)
 
+    # Sort logs by timestamp, most recent first
+    sorted_logs = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
+
+    # Limit logs to the display limit
+    limited_logs = sorted_logs[:DISPLAY_LIMIT]
+
+    # Truncate the logs list to maintain size
+    logs = sorted_logs[:MAX_LOGS]
+
+    return render_template('logs.html', logs=limited_logs)
 
 
 @app.route('/state', methods=['GET'])
@@ -97,9 +155,6 @@ def navbar():
     return render_template('navbar.html')
 
 # MARK: Vacuum State
-
-
-# Initialize the elements state from the file (if it exists)
 if os.path.exists(state_file_path):
     with open(state_file_path, 'r') as f:
         elements_state = json.load(f)
