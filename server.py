@@ -83,7 +83,9 @@ def get_logs():
 
 @app.route('/logs')
 def serve_logs_view():
-    return render_template('logs.html', logs=logs)
+    sorted_logs = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
+    return render_template('logs.html', logs=sorted_logs)
+
 
 
 @app.route('/state', methods=['GET'])
