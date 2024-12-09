@@ -28,6 +28,50 @@
     display: none;
 }
 
+.log-title {
+    display: flex;
+    /* Enable flexbox layout */
+    justify-content: space-between;
+    /* Ensure space between the header and the button */
+    align-items: center;
+    /* Vertically align the items in the center */
+    text-align: center;
+    /* Center the text inside the h1 */
+}
+
+/* Basic button style for the link */
+.btn-download {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+/* Hover effect */
+.btn-download:hover {
+    background-color: #0056b3;
+}
+
+/* Focused state (when clicked or navigated via keyboard) */
+.btn-download:focus {
+    outline: none;
+    /* Remove default focus outline */
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    /* Add custom focus outline */
+}
+
+/* Optional: Active state for button press */
+.btn-download:active {
+    background-color: #004085;
+    /* Even darker blue when pressed */
+}
+
 
 table {
     width: 100%;

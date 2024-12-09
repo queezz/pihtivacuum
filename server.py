@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory,render_template
+from flask import Flask, request, jsonify, send_from_directory,render_template,send_file
 from flask_cors import CORS
 from datetime import datetime
 import os, json, csv
@@ -42,6 +42,11 @@ def load_logs_from_csv(file_path):
     except FileNotFoundError:
         print(f"Log file {file_path} not found.")
     return logs
+
+@app.route('/download_logs')
+def download_logs():
+    # Return the file as a download
+    return send_file(log_file_path, as_attachment=True)
 
 @app.route('/update', methods=['POST'])
 def update_element():
