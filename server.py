@@ -3,6 +3,18 @@ from flask_cors import CORS
 from datetime import datetime
 import os, json, csv
 
+import pandas as pd
+import plotly.express as px
+import plotly.io as pio
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
+SETTINGS_FILE = "settings.json"
+log_file_path = 'logs.csv'
+state_file_path = 'elements_state.json'
+MAX_LOGS = 1000
+DISPLAY_LIMIT = 100
+
 #app = Flask(__name__, static_folder='static')
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app) # Allow all origins
@@ -23,11 +35,22 @@ def serve_static_files(path):
 # Backend routes
 elements_state = {}
 logs = []
-#log_file_path = 'logs.json'
-log_file_path = 'logs.csv'
-state_file_path = 'elements_state.json'
-MAX_LOGS = 1000
-DISPLAY_LIMIT = 100
+
+def load_settings():
+    """Load settings from a JSON file."""
+    if not os.path.exists(SETTINGS_FILE):
+        raise FileNotFoundError(f"Settings file '{SETTINGS_FILE}' not found.")
+    
+    with open(SETTINGS_FILE, 'r') as file:
+        try:
+            settings = json.load(file)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Error parsing '{SETTINGS_FILE}': {e}")
+    
+    if 'CUDATA_DIRECTORY' not in settings:
+        raise KeyError("Missing 'CUDATA_DIRECTORY' in settings.")
+    
+    return settings['CUDATA_DIRECTORY']
 
 def load_logs_from_csv(file_path):
     """load logs from csv"""
@@ -174,6 +197,83 @@ def get_elements_state():
 @app.route('/elements-config', methods=['GET'])
 def serve_config():
     return send_from_directory(directory='./static', path='elementsConfig.json')
+
+# MARK: Plotly
+# Directory to list files from
+CUDATA_DIRECTORY = load_settings()
+
+@app.route('/plasmaplots')
+def plasmaplots():
+    # Get list of CSV files
+    files = [f for f in os.listdir(CUDATA_DIRECTORY) if f.endswith('.csv')]
+    return render_template('plasmaplots.html', files=files)
+
+@app.route('/plot', methods=['POST','GET'])
+def plot_file():
+    # Get selected file from the form
+    file_name = request.form['file']
+    file_path = os.path.join(CUDATA_DIRECTORY, file_name)
+    columns = get_cu_columns(file_path)
+    # Load data
+    df = pd.read_csv(file_path, skiprows=10,names=columns)
+
+    plot_html = generate_plot_html(df, ['Ip_c'],['Pu_c','Pd_c','Bu_c'])
+    return jsonify(plot=plot_html)
+
+
+def simple_plot():
+    columns_to_plot = ['Ip_c', 'Pu_c','Pd_c','Bu_c']
+    fig = px.line(df, x='date', y=columns_to_plot)  # Adjust columns as needed
+    fig.update_layout(
+        xaxis_title="Date",
+        yaxis_title="Signals",
+        legend_title="Signal Types",
+    )
+
+    return pio.to_html(fig, full_html=False)
+
+
+def generate_plot_html(df,columns_lin, columns_log):
+    # Create subplots with shared x-axis
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.1, 
+    )
+
+    # Add traces for the linear y-axis plot
+    for column in columns_lin:
+        fig.add_trace(
+            go.Scatter(x=df['date'], y=df[column], mode='lines', name=column),
+            row=1, col=1
+        )
+
+    # Add traces for the log y-axis plot
+    for column in columns_log:
+        fig.add_trace(
+            go.Scatter(x=df['date'], y=df[column], mode='lines', name=column),
+            row=2, col=1
+        )
+
+    # Update layout
+    fig.update_layout(
+        height=800,
+        yaxis=dict(title="Signals (Linear)", type="linear"),
+        yaxis2=dict(title="Signals (Log)", type="log",tickformat=".1e"),
+        legend=dict(title="Signals"),
+    )
+
+    return pio.to_html(fig, full_html=False)
+
+
+def get_cu_columns(file_path):
+    with open(file_path, 'r') as file:
+        for line in file:
+            if line.startswith('# Columns'):
+                columns = line.split(',', 1)[1].strip().split(', ')
+                break
+    return columns 
+
 
 
 if __name__ == '__main__':
