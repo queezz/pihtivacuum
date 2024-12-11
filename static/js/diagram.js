@@ -68,39 +68,40 @@ function attachEventListeners(elementsConfig, state, tooltipId) {
         return;
     }
 
-    elementsConfig.forEach(({ id, colors, confirmToggle }) => {
-        const elementDiv = document.getElementById(id);
+    fetch('/get_current_user')
+        .then(response => response.json())
+        .then(data => {
+            const isAuthenticated = data.is_authenticated;
 
-        if (!elementDiv) {
-            console.error(`No element with ID '${id}' found in the SVG.`);
-            return;
-        }
+            elementsConfig.forEach(({ id, colors, confirmToggle }) => {
+                const elementDiv = document.getElementById(id);
 
-        elementDiv.style.cursor = "pointer";
+                if (!elementDiv) {
+                    console.error(`No element with ID '${id}' found in the SVG.`);
+                    return;
+                }
 
-        // Initial fill update based on loaded state (if not done before)
-        const initialStateColor =
-            state[id] && state[id].status === "active"
-                ? colors.active
-                : colors.inactive;
+                elementDiv.style.cursor = isAuthenticated ? "pointer" : "not-allowed";
 
-        // Toggle status on click
-        elementDiv.addEventListener("click", () =>
-            toggleElementStatus(elementDiv, colors, confirmToggle)
-        );
+                if (isAuthenticated) {
+                    // Toggle status on click
+                    elementDiv.addEventListener("click", () =>
+                        toggleElementStatus(elementDiv, colors, confirmToggle)
+                    );
 
-        // Tooltip on hover
-        elementDiv.addEventListener("mouseenter", (event) =>
-            showTooltip(tooltip, event, id)
-        );
+                    // Tooltip on hover
+                    elementDiv.addEventListener("mouseenter", (event) =>
+                        showTooltip(tooltip, event, id)
+                    );
 
-        elementDiv.addEventListener("mouseleave", () => {
-            tooltip.style.display = "none";
-        });
-
-    });
+                    elementDiv.addEventListener("mouseleave", () => {
+                        tooltip.style.display = "none";
+                    });
+                }
+            });
+        })
+        .catch(error => console.error('Error fetching user status:', error));
 }
-
 // Function to save the current status of all elements to a file
 function saveElementStatus(elementsConfig) {
     const statusData = elementsConfig.map(({ id, colors }) => {

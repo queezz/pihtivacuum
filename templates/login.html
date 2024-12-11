@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<h1>Login</h1>
+<form id="loginForm" method="POST" action="/login" style="max-width: 400px; margin: auto;">
+    <div style="margin-bottom: 10px;">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required style="width: 100%;">
+    </div>
+    <div style="margin-bottom: 10px;">
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required style="width: 100%;">
+    </div>
+    <button type="submit" style="width: 100%;">Login</button>
+</form>
+<div id="loginStatus" style="margin-top: 20px; color: red;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // AJAX handler for login
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        fetch('/login', {
+            method: 'POST',
+            body: formData,
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message === "Login successful") {
+                    window.location.href = '/'; // Redirect to home or dashboard
+                } else {
+                    document.getElementById('loginStatus').innerText = data.message;
+                }
+            })
+            .catch(error => {
+                document.getElementById('loginStatus').innerText = 'An error occurred. Please try again.';
+                console.error('Error:', error);
+            });
+    });
+</script>
+{% endblock %}

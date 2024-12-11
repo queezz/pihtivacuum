@@ -179,9 +179,37 @@ tr:hover {
     color: #333;
 }
 
+.navbar-user {
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    padding: 0 10px;
+}
+
+.navbar-user span {
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.navbar-link {
+    text-decoration: none;
+    color: #007bff;
+    margin-left: 10px;
+}
+
+.navbar-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
 /* Media query for mobile devices */
 
 @media (max-width: 500px) {
+    .navbar-user {
+        margin-left: 20px;
+    }
+
     .navbar {
         width: 20px;
         height: 20px;

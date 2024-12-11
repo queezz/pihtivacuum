@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, send_from_directory
-from flask import render_template,send_file
+from flask import render_template,send_file, session, redirect
+from flask import url_for
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import os, json, csv
 
@@ -68,14 +70,17 @@ def download_logs():
     # Return the file as a download
     return send_file(log_file_path, as_attachment=True)
 
+# MARK: Update
 @app.route('/update', methods=['POST'])
 def update_element():
+    if 'username' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
     data = request.json
-    print(data)
+    username = session['username']
     element_id = data.get('id')
-    status = data.get('status')  # 'active' or 'inactive'
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")#.isoformat()
-    print(f"Element {element_id} status updated to {status}")
+    status = data.get('status')
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if not element_id or not status:
         return jsonify({'error': 'Invalid data'}), 400
@@ -87,13 +92,19 @@ def update_element():
     with open(state_file_path, 'w') as f:
         json.dump(elements_state, f, indent=4)
 
-    # Log the change
+    # Log the change with username
     logs.append({
+        'timestamp': timestamp,
         'id': element_id,
         'status': status,
-        'timestamp': timestamp#.strftime("%Y-%m-%d %H:%M:%S")
+        'user': username,
     })
-    save_log_csv(logs[-1],log_file_path)
+    save_log_csv({
+        "timestamp": timestamp,
+        "id": element_id,
+        "status": status,
+        "user": username
+    }, log_file_path)
 
     return jsonify({'message': 'State updated successfully', 'state': elements_state}), 200
 
@@ -103,7 +114,7 @@ def save_log_csv(log_entry, log_file_path):
     file_exists = os.path.exists(log_file_path)
     try:
         with open(log_file_path, 'a', newline='') as csvfile:
-            fieldnames = ["timestamp","id", "status"]
+            fieldnames = ["timestamp","id", "status","user"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
             # Write header only if the file is new
@@ -256,6 +267,46 @@ def download_controlunit_csv():
         return "File not found", 404
 
     return send_file(file_path, as_attachment=True, download_name=file_name)
+
+# MARK: LOGIN
+app.secret_key = 'your_secret_key'  # Replace with a secure secret key
+
+# Mock user database
+users = {
+    "KAA": generate_password_hash("plasma"),
+    "haji": generate_password_hash("raman"),
+    "hata":generate_password_hash("raman"),
+    "mino":generate_password_hash("raman"),
+    "taka":generate_password_hash("raman"),
+    "kaba":generate_password_hash("raman")
+}
+
+# Login route
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.form['username']
+    password = request.form['password']
+
+    if username in users and check_password_hash(users[username], password):
+        session['username'] = username
+        return jsonify({"message": "Login successful", "username": username}), 200
+    return jsonify({"message": "Invalid username or password"}), 401
+
+@app.route('/logout', methods=['GET'])
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login_page'))
+
+@app.route('/loginpage', methods=['GET'])
+def login_page():
+    return render_template('login.html')
+
+@app.route('/get_current_user', methods=['GET'])
+def get_current_user():
+    is_authenticated = 'username' in session
+    username = session.get('username', None)
+    return jsonify({"is_authenticated": is_authenticated, "username": username})
+
 
 
 if __name__ == '__main__':

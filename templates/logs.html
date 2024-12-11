@@ -12,6 +12,7 @@
             <th>Timestamp</th>
             <th>ID</th>
             <th>Status</th>
+            <th>User</th>
         </tr>
     </thead>
     <tbody>
@@ -23,6 +24,7 @@
                 style="background-color: {% if log.status == 'active' %}#94bf6f{% else %}#de703a{% endif %}; color: #faf7ff;">
                 {{ log.status }}
             </td>
+            <td>{{ log.user }}</td>
         </tr>
         {% endfor %}
     </tbody>
