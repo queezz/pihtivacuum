@@ -14,27 +14,49 @@
 </form>
 
 <div id="plotArea"></div>
+<div id="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     $(document).ready(function () {
+        // On page load, pre-select the last file if it exists
+        const lastFile = localStorage.getItem('lastFile');
+        if (lastFile) {
+            $('#fileDropdown').val(lastFile); // Pre-select the last file in dropdown
+        }
+
+        // Form submission handler
         $('#fileForm').on('submit', function (e) {
             e.preventDefault();
 
+            const selectedFile = $('#fileDropdown').val();
+            localStorage.setItem('lastFile', selectedFile); // Save selected file
+            fetchPlot(selectedFile);
+        });
+
+        // Function to fetch and display plot
+        function fetchPlot(file) {
+            $('#loading-overlay').show(); // Show spinner
             $.ajax({
                 url: '/plot',
                 method: 'POST',
-                data: $(this).serialize(),
+                data: { file: file },
                 success: function (response) {
-                    $('#plotArea').html(response.plot);
+                    $('#plotArea').html(response.plot); // Display plot
                 },
                 error: function (xhr, status, error) {
                     console.error('Error:', error);
+                },
+                complete: function () {
+                    $('#loading-overlay').hide(); // Hide spinner
                 }
             });
-        });
+        }
     });
 </script>
 {% endblock %}

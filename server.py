@@ -96,28 +96,9 @@ def update_element():
         'status': status,
         'timestamp': timestamp#.strftime("%Y-%m-%d %H:%M:%S")
     })
-    #save_log_json(logs[-1],log_file_path)
     save_log_csv(logs[-1],log_file_path)
 
     return jsonify({'message': 'State updated successfully', 'state': elements_state}), 200
-
-def save_log_json(log_entry,log_file_path):
-    """Load json log, append, rewrite"""
-    try:
-        if os.path.exists(log_file_path):
-            with open(log_file_path, 'r') as f:
-                existing_logs = json.load(f)
-        else:
-            existing_logs = []
-
-        existing_logs.append(log_entry)
-        with open(log_file_path, 'w') as f:
-            json.dump(existing_logs, f, indent=4)
-    except json.JSONDecodeError:
-        # Handle case where log file is corrupted or empty
-        with open(log_file_path, 'w') as f:
-            json.dump([log_entry], f, indent=4)
-
 
 def save_log_csv(log_entry, log_file_path):
     """Append a log entry to a CSV file."""
@@ -147,28 +128,12 @@ def save_log_csv(log_entry, log_file_path):
 def get_logs():
     return jsonify(logs)
 
-# @app.route('/logs')
-# def serve_logs_view():
-#     return send_from_directory(app.static_folder, 'logs.html')
-
-# @app.route('/logs')
-# def serve_logs_view():
-#     sorted_logs = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
-#     return render_template('logs.html', logs=sorted_logs)
-
 @app.route('/logs')
 def serve_logs_view():
-    # Load logs from CSV file
     logs_file_path = "logs.csv"
     logs = load_logs_from_csv(logs_file_path)
-
-    # Sort logs by timestamp, most recent first
     sorted_logs = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
-
-    # Limit logs to the display limit
     limited_logs = sorted_logs[:DISPLAY_LIMIT]
-
-    # Truncate the logs list to maintain size
     logs = sorted_logs[:MAX_LOGS]
 
     return render_template('logs.html', logs=limited_logs)
@@ -199,20 +164,17 @@ def serve_config():
     return send_from_directory(directory='./static', path='elementsConfig.json')
 
 # MARK: Plotly
-# Directory to list files from
-CUDATA_DIRECTORY = load_settings()
-
 @app.route('/plasmaplots')
 def plasmaplots():
     # Get list of CSV files
-    files = [f for f in os.listdir(CUDATA_DIRECTORY) if f.endswith('.csv')]
+    files = [f for f in os.listdir(load_settings()) if f.endswith('.csv')]
     return render_template('plasmaplots.html', files=files)
 
 @app.route('/plot', methods=['POST','GET'])
 def plot_file():
     # Get selected file from the form
     file_name = request.form['file']
-    file_path = os.path.join(CUDATA_DIRECTORY, file_name)
+    file_path = os.path.join(load_settings(), file_name)
     columns = get_cu_columns(file_path)
     # Load data
     df = pd.read_csv(file_path, skiprows=10,names=columns)

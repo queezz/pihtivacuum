@@ -39,7 +39,7 @@
     /* Center the text inside the h1 */
 }
 
-/* Basic button style for the link */
+/* Download Logs Button */
 .btn-download {
     display: inline-block;
     padding: 10px 20px;
@@ -53,12 +53,10 @@
     transition: background-color 0.3s ease;
 }
 
-/* Hover effect */
 .btn-download:hover {
     background-color: #0056b3;
 }
 
-/* Focused state (when clicked or navigated via keyboard) */
 .btn-download:focus {
     outline: none;
     /* Remove default focus outline */
@@ -66,13 +64,12 @@
     /* Add custom focus outline */
 }
 
-/* Optional: Active state for button press */
 .btn-download:active {
     background-color: #004085;
     /* Even darker blue when pressed */
 }
 
-
+/* Logs Table */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -197,5 +194,35 @@ tr:hover {
 
     .navbar-items li a {
         font-size: 20px;
+    }
+}
+
+/* Plotly loading overlay */
+#loading-overlay {
+    padding-top: 30px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
     }
 }
