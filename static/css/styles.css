@@ -69,6 +69,34 @@
     /* Even darker blue when pressed */
 }
 
+.btn-plot {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #b4cf53;
+    color: rgb(0, 0, 0);
+    text-align: center;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.btn-plot:hover {
+    background-color: #91a743;
+}
+
+.btn-plot:focus {
+    outline: none;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.btn-plot:active {
+    background-color: #004085;
+}
+
+
+
 /* Logs Table */
 table {
     width: 100%;

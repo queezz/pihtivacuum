@@ -4,15 +4,17 @@
 
 {% block content %}
 <h1>Select a CSV File to Plot</h1>
-<form id="fileForm">
-    <select name="file" id="fileDropdown">
-        {% for file in files %}
-        <option value="{{ file }}">{{ file }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit">Plot</button>
+<form id="fileForm" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <select name="file" id="fileDropdown">
+            {% for file in files %}
+            <option value="{{ file }}">{{ file }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn-plot">Plot</button>
+    </div>
+    <button type="button" id="downloadBtn" class="btn-download">Download CSV</button>
 </form>
-
 <div id="plotArea"></div>
 <div id="loading-overlay" style="display: none;">
     <div class="spinner"></div>
@@ -22,6 +24,7 @@
 
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
     $(document).ready(function () {
         // On page load, pre-select the last file if it exists
@@ -57,6 +60,17 @@
                 }
             });
         }
+
+        // Download button handling
+        $('#downloadBtn').on('click', function () {
+            const selectedFile = $('#fileDropdown').val();
+            if (!selectedFile) {
+                alert('No file selected.');
+                return;
+            }
+            window.location.href = '/download_controlunit_csv?file=' + encodeURIComponent(selectedFile);
+
+        });
     });
 </script>
 {% endblock %}

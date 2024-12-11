@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify, send_from_directory,render_template,send_file
+from flask import Flask, request, jsonify, send_from_directory
+from flask import render_template,send_file
 from flask_cors import CORS
 from datetime import datetime
 import os, json, csv
@@ -166,8 +167,22 @@ def serve_config():
 # MARK: Plotly
 @app.route('/plasmaplots')
 def plasmaplots():
-    # Get list of CSV files
     files = [f for f in os.listdir(load_settings()) if f.endswith('.csv')]
+    
+    # Assuming file format: cu_YYYYMMDD_HHMMSS.csv
+    def parse_datetime_from_filename(fname):
+        # Extract 'YYYYMMDD_HHMMSS'
+        # Filename structure: cu_20230509_174857.csv
+        # Positions:          012345678901234567890
+        #                    cu_20230509_174857.csv
+        # datetime substring:    20230509_174857
+        datetime_str = fname[3:3+15]
+        # Parse datetime
+        return datetime.strptime(datetime_str, "%Y%m%d_%H%M%S")
+    
+    # Sort files by parsed datetime
+    files.sort(key=parse_datetime_from_filename, reverse=True)  # reverse=True for newest first
+    
     return render_template('plasmaplots.html', files=files)
 
 @app.route('/plot', methods=['POST','GET'])
@@ -181,18 +196,6 @@ def plot_file():
 
     plot_html = generate_plot_html(df, ['Ip_c'],['Pu_c','Pd_c','Bu_c'])
     return jsonify(plot=plot_html)
-
-
-def simple_plot():
-    columns_to_plot = ['Ip_c', 'Pu_c','Pd_c','Bu_c']
-    fig = px.line(df, x='date', y=columns_to_plot)  # Adjust columns as needed
-    fig.update_layout(
-        xaxis_title="Date",
-        yaxis_title="Signals",
-        legend_title="Signal Types",
-    )
-
-    return pio.to_html(fig, full_html=False)
 
 
 def generate_plot_html(df,columns_lin, columns_log):
@@ -236,6 +239,18 @@ def get_cu_columns(file_path):
                 break
     return columns 
 
+@app.route('/download_controlunit_csv', methods=['GET'])
+def download_controlunit_csv():
+    file_name = request.args.get('file')
+    if not file_name:
+        return "No file specified", 400
+
+    file_path = os.path.join(load_settings(), file_name)
+
+    if not os.path.isfile(file_path):
+        return "File not found", 404
+
+    return send_file(file_path, as_attachment=True, download_name=file_name)
 
 
 if __name__ == '__main__':
