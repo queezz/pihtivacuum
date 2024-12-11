@@ -6,3 +6,5 @@ logs.csv
 settings.json
 nohup.out
 last_plot.html
+secret.key
+users.json

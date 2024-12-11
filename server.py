@@ -3,6 +3,7 @@ from flask import render_template,send_file, session, redirect
 from flask import url_for
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
+from cryptography.fernet import Fernet
 from datetime import datetime
 import os, json, csv
 
@@ -269,17 +270,46 @@ def download_controlunit_csv():
     return send_file(file_path, as_attachment=True, download_name=file_name)
 
 # MARK: LOGIN
-app.secret_key = 'your_secret_key'  # Replace with a secure secret key
+app.secret_key = 'app secret key'
+USERS_FILE_ENCRYPTED = "users.json.enc"
+DECRYPTED_FILE_TEMP = "users.json"
 
-# Mock user database
-users = {
-    "KAA": generate_password_hash("plasma"),
-    "haji": generate_password_hash("raman"),
-    "hata":generate_password_hash("raman"),
-    "mino":generate_password_hash("raman"),
-    "taka":generate_password_hash("raman"),
-    "kaba":generate_password_hash("raman")
-}
+def load_key():
+    try:
+        with open("secret.key", "rb") as key_file:
+            key = key_file.read()
+            return key
+    except FileNotFoundError:
+        raise ValueError("Key file 'secret.key' not found. Please generate it first.")
+
+
+def decrypt_users_file():
+    key = load_key()
+    fernet = Fernet(key)
+
+    with open(USERS_FILE_ENCRYPTED, "rb") as encrypted_file:
+        encrypted_data = encrypted_file.read()
+
+    decrypted_data = fernet.decrypt(encrypted_data)
+
+    with open(DECRYPTED_FILE_TEMP, "wb") as decrypted_file:
+        decrypted_file.write(decrypted_data)
+
+def load_users():
+    # Decrypt the file
+    decrypt_users_file()
+
+    # Load users
+    with open(DECRYPTED_FILE_TEMP, "r") as file:
+        users = json.load(file)
+
+    # Clean up: optionally delete the temporary decrypted file
+    os.remove(DECRYPTED_FILE_TEMP)
+
+    return users
+
+# Load the users at startup
+users = load_users()
 
 # Login route
 @app.route('/login', methods=['POST'])
