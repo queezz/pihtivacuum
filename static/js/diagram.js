@@ -161,7 +161,7 @@ function fetchAndUpdateStates() {
     fetch('/elements-state')
         .then(response => response.json())
         .then(state => {
-            console.log('Current elements state:', state);
+            // console.log('Current elements state:', state);
             vacuumstate = state;
 
             // Use the configuration to update elements' status in SVG
@@ -181,7 +181,7 @@ function fetchAndUpdateStates() {
                 // Set initial fill color based on loaded state
                 if (elementDiv.style.fill !== fillColor) {
                     elementDiv.style.fill = fillColor;
-                    console.log(`Set initial fill for ${element.id} to: ${fillColor}`);
+                    // console.log(`Set initial fill for ${element.id} to: ${fillColor}`);
                 }
             });
 

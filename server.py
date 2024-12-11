@@ -15,15 +15,11 @@ log_file_path = 'logs.csv'
 state_file_path = 'elements_state.json'
 MAX_LOGS = 1000
 DISPLAY_LIMIT = 100
+LAST_PLOT_FILE = "last_plot.html"
+last_plot_html = None 
 
-#app = Flask(__name__, static_folder='static')
 app = Flask(__name__, static_folder='static', static_url_path='/static')
-CORS(app) # Allow all origins
-
-# # Serve the frontend
-# @app.route('/')
-# def serve_frontend():
-#    return send_from_directory(app.static_folder, 'index.html')
+CORS(app) 
 
 @app.route('/')
 def home():
@@ -180,16 +176,32 @@ def plasmaplots():
 
 @app.route('/plot', methods=['POST','GET'])
 def plot_file():
-    # Get selected file from the form
+    global last_plot_html
     file_name = request.form['file']
     file_path = os.path.join(load_settings(), file_name)
     columns = get_cu_columns(file_path)
-    # Load data
     df = pd.read_csv(file_path, skiprows=10,names=columns)
-
     plot_html = generate_plot_html(df, ['Ip_c'],['Pu_c','Pd_c','Bu_c'])
+    last_plot_html = plot_html
+    with open(LAST_PLOT_FILE, 'w', encoding='utf-8') as f:
+        f.write(plot_html)
     return jsonify(plot=plot_html)
 
+@app.route('/get_last_plot', methods=['GET'])
+def get_last_plot():
+    global last_plot_html
+    if last_plot_html:
+        print("last plot in memory")
+        return jsonify({'plot': last_plot_html})
+    try:
+        # Fallback to disk if the variable is not set
+        with open(LAST_PLOT_FILE, 'r', encoding='utf-8') as f:
+            return jsonify({'plot': f.read()})
+    except FileNotFoundError:
+        return jsonify({'plot': '<p>No plot available. Please generate one.</p>'}), 404
+    except Exception as e:
+        print(f"Error reading last plot: {e}")
+        return jsonify({'plot': f'<p>Error loading plot: {e}</p>'}), 500
 
 def generate_plot_html(df,columns_lin, columns_log):
     # Create subplots with shared x-axis
