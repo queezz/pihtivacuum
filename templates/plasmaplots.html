@@ -15,10 +15,17 @@
     </div>
     <button type="button" id="downloadBtn" class="btn-download">Download CSV</button>
 </form>
-<div id="plotArea"></div>
+<div id="plotArea">
+
+    <div id="plotPlaceholder" style="text-align: center; padding: 50px; font-size: 1.2em;">
+        Fetching last plot...
+    </div>
+
+</div>
 <div id="loading-overlay" style="display: none;">
     <div class="spinner"></div>
 </div>
+
 
 {% endblock %}
 
