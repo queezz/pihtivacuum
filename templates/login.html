@@ -14,30 +14,37 @@
         <input type="password" id="password" name="password" required style="width: 100%;">
     </div>
     <button type="submit" style="width: 100%;">Login</button>
+    <div id="loginStatus" style="color: red; display: none; margin-top:10px; margin-bottom: 10px;  text-align: center;">
+    </div>
 </form>
-<div id="loginStatus" style="margin-top: 20px; color: red;"></div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // AJAX handler for login
     document.getElementById('loginForm').addEventListener('submit', function (e) {
         e.preventDefault();
+
         const formData = new FormData(e.target);
+
         fetch('/login', {
             method: 'POST',
             body: formData,
         })
             .then(response => response.json())
             .then(data => {
+                const statusDiv = document.getElementById('loginStatus');
                 if (data.message === "Login successful") {
                     window.location.href = '/'; // Redirect to home or dashboard
                 } else {
-                    document.getElementById('loginStatus').innerText = data.message;
+                    statusDiv.style.display = "block";
+                    statusDiv.innerText = data.message;
                 }
             })
             .catch(error => {
-                document.getElementById('loginStatus').innerText = 'An error occurred. Please try again.';
+                const statusDiv = document.getElementById('loginStatus');
+                statusDiv.style.display = "block";
+                statusDiv.innerText = 'An error occurred. Please try again.';
                 console.error('Error:', error);
             });
     });
