@@ -8,3 +8,5 @@ nohup.out
 last_plot.html
 secret.key
 users.json
+
+.DS_Store

@@ -213,7 +213,7 @@ def get_last_plot():
         return jsonify({'plot': '<p>No plot available. Please generate one.</p>'}), 404
     except Exception as e:
         print(f"Error reading last plot: {e}")
-        return jsonify({'plot': f'<p>Error loading plot: {e}</p>'}), 500
+        return jsonify({'plot': f'<p>Error fetching last plot, plot something first?: {e}</p>'}), 500
 
 def generate_plot_html(df,columns_lin, columns_log):
     # Create subplots with shared x-axis

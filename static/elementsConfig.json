@@ -294,5 +294,13 @@
             "inactive": "white"
         },
         "confirmToggle": false
+    },
+    {
+        "id": "helium-bottle",
+        "colors": {
+            "active": "#cfd4d3",
+            "inactive": "white"
+        },
+        "confirmToggle": false
     }
 ]
