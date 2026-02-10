@@ -506,9 +506,23 @@ tr:hover {
     color: #666;
 }
 
-.no-settings-message {
-    text-align: center;
-    padding: 2rem;
-    font-size: 1.2em;
-    color: #333;
+/* Instructional notice when logger data path is not configured (Plots / Data page) */
+.ui-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  background: #fffbe6;
+  border: 1px solid #f2e2a6;
+  border-left: 5px solid #e6c24a;
+
+  color: #4d3f00;
+  padding: 12px 16px;
+  border-radius: 6px;
+
+  max-width: 760px;
+  margin: 20px auto;
+
+  font-size: 0.95rem;
+  line-height: 1.4;
 }

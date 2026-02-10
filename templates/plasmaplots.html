@@ -3,6 +3,16 @@
 {% block title %}Plasma Plots{% endblock %}
 
 {% block content %}
+{% if not data_path_configured %}
+<div class="ui-notice">
+  <span class="ui-notice-icon">ℹ️</span>
+  <div class="ui-notice-text">
+    <strong>No data directory configured</strong><br>
+    To view plots or download data, specify the logger data path
+    on the Control Unit Raspberry Pi.
+  </div>
+</div>
+{% endif %}
 <h1>Select a CSV File to Plot</h1>
 <form id="fileForm" style="display: flex; justify-content: space-between; align-items: center;">
     <div>

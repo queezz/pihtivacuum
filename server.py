@@ -264,20 +264,21 @@ def serve_config():
 # MARK: Plotly
 @app.route('/plasmaplots')
 def plasmaplots():
+    data_path_configured = False
+    files = []
     try:
         data_dir = load_settings()
+        if os.path.isdir(data_dir):
+            data_path_configured = True
+            files = [f for f in os.listdir(data_dir) if f.endswith('.csv') and f.startswith('cu_')]
+            def parse_datetime_from_filename(fname):
+                datetime_str = fname[3:3+15]  # Extract the datetime part: YYYYMMDD_HHMMSS
+                return datetime.strptime(datetime_str, "%Y%m%d_%H%M%S")
+            files.sort(key=parse_datetime_from_filename, reverse=True)
     except (FileNotFoundError, KeyError):
-        return render_template('plasmaplots_no_settings.html'), 200
+        pass
 
-    files = [f for f in os.listdir(data_dir) if f.endswith('.csv') and f.startswith('cu_')]
-
-    def parse_datetime_from_filename(fname):
-        datetime_str = fname[3:3+15]  # Extract the datetime part: YYYYMMDD_HHMMSS
-        return datetime.strptime(datetime_str, "%Y%m%d_%H%M%S")
-
-    files.sort(key=parse_datetime_from_filename, reverse=True)
-
-    return render_template('plasmaplots.html', files=files)
+    return render_template('plasmaplots.html', files=files, data_path_configured=data_path_configured)
 
 
 @app.route('/plot', methods=['POST','GET'])
