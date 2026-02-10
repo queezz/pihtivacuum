@@ -296,22 +296,32 @@ tr:hover {
 
 .history-layout {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     gap: 20px;
     align-items: flex-start;
+}
+
+/* Left column: SVG + calendar stacked */
+.history-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 0 0 auto;
 }
 
 .history-diagram {
     flex: 0 0 auto;
 }
 
-.history-panel {
+/* Right column: timeline alongside SVG */
+.history-timeline-panel {
     flex: 1 1 300px;
     min-width: 280px;
 }
 
 .history-calendar-wrapper {
-    margin-bottom: 16px;
+    flex: 0 0 auto;
 }
 
 .history-calendar-nav {
@@ -393,8 +403,24 @@ tr:hover {
     text-align: center;
 }
 
-.history-panel h2 {
+.history-timeline-panel h2 {
     margin-top: 0;
+}
+
+/* Mobile: stack SVG, calendar, timeline */
+@media (max-width: 768px) {
+    .history-layout {
+        flex-direction: column;
+    }
+
+    .history-left {
+        order: 1;
+    }
+
+    .history-timeline-panel {
+        order: 2;
+        min-width: 0;
+    }
 }
 
 .history-hint {

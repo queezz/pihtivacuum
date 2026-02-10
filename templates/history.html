@@ -8,11 +8,11 @@
     <a href="{{ url_for('download_logs') }}" class="btn-download">Download Logs (CSV)</a>
 </h1>
 <div class="history-layout">
-    <div class="history-diagram">
-        <div id="diagram-container"></div>
-        <div id="tooltip"></div>
-    </div>
-    <div class="history-panel">
+    <div class="history-left">
+        <div class="history-diagram">
+            <div id="diagram-container"></div>
+            <div id="tooltip"></div>
+        </div>
         <div class="history-calendar-wrapper">
             <div class="history-calendar-nav">
                 <button type="button" id="calendar-prev" aria-label="Previous month">&larr;</button>
@@ -24,6 +24,8 @@
             </div>
             <div id="calendar-grid" class="history-calendar-grid"></div>
         </div>
+    </div>
+    <div class="history-timeline-panel">
         <h2>Timeline</h2>
         <p class="history-hint">Click an event to see the diagram state at that moment.</p>
         <div id="history-timeline-content">
