@@ -219,17 +219,6 @@ def save_log_csv(log_entry, log_file_path):
 def get_logs():
     return jsonify(logs)
 
-@app.route('/logs')
-def serve_logs_view():
-    logs_file_path = "logs.csv"
-    logs = load_logs_from_csv(logs_file_path)
-    sorted_logs = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
-    limited_logs = sorted_logs[:DISPLAY_LIMIT]
-    logs = sorted_logs[:MAX_LOGS]
-
-    return render_template('logs.html', logs=limited_logs)
-
-
 @app.route('/state', methods=['GET'])
 def get_state():
     return jsonify(elements_state)

@@ -20,7 +20,8 @@
         const ul = document.getElementById('history-events');
         if (!ul) return;
         ul.innerHTML = '';
-        events.forEach((e, idx) => {
+        [...events].reverse().forEach((e, displayIdx) => {
+            const idx = events.length - 1 - displayIdx;
             const li = document.createElement('li');
             li.className = 'history-event' + (selectedIdx === idx ? ' selected' : '');
             li.dataset.idx = idx;

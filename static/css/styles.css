@@ -284,6 +284,16 @@ tr:hover {
 }
 
 /* History layout */
+.history-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-title .btn-download {
+    flex-shrink: 0;
+}
+
 .history-layout {
     display: flex;
     flex-wrap: wrap;
@@ -324,6 +334,7 @@ tr:hover {
     border-radius: 4px;
     margin-bottom: 6px;
     cursor: pointer;
+    user-select: none;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;

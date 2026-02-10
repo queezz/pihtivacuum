@@ -4,7 +4,9 @@
 
 {% block content %}
 <script>window.historyMode = true;</script>
-<h1 style="text-align: center;">History</h1>
+<h1 class="history-title" style="text-align: center;">History
+    <a href="{{ url_for('download_logs') }}" class="btn-download">Download Logs (CSV)</a>
+</h1>
 <div class="history-layout">
     <div class="history-diagram">
         <div id="diagram-container"></div>
