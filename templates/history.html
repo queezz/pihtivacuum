@@ -17,13 +17,19 @@
             <div class="history-calendar-nav">
                 <button type="button" id="calendar-prev" aria-label="Previous month">&larr;</button>
                 <span id="calendar-month-label"></span>
-                <button type="button" id="calendar-next" aria-label="Next month">&rarr;</button>
+                <div class="calendar-nav-right">
+                    <button type="button" id="calendar-today">Today</button>
+                    <button type="button" id="calendar-next" aria-label="Next month">&rarr;</button>
+                </div>
             </div>
             <div id="calendar-grid" class="history-calendar-grid"></div>
         </div>
         <h2>Timeline</h2>
         <p class="history-hint">Click an event to see the diagram state at that moment.</p>
-        <ul id="history-events" class="history-events"></ul>
+        <div id="history-timeline-content">
+            <ul id="history-events" class="history-events"></ul>
+            <p id="history-no-events" class="history-no-events" style="display:none;">No events on this day</p>
+        </div>
     </div>
 </div>
 {% endblock %}
