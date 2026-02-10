@@ -135,12 +135,25 @@ def load_history_events(file_path=None):
 def state_at_index(events, state_now, idx):
     """
     Reconstruct diagram state at history index `idx` by reverse-applying
-    later events. Returns {id: bool}.
+    later events. Log entries are absolute state assignments; we restore
+    the previous value (prev), not toggle. Returns {id: bool}.
     """
     state = dict(state_now)
-    for i in range(idx + 1, len(events)):
+    # Precompute prev[i] = state of event[i].id before this event (from last prior modification)
+    last_by_id = {}
+    prev = [None] * len(events)
+    for i in range(len(events)):
+        pid = events[i]["id"]
+        prev[i] = last_by_id.get(pid)
+        last_by_id[pid] = events[i]["state"]
+    # Reverse replay: undo each event after idx by restoring prev (most recent first)
+    for i in range(len(events) - 1, idx, -1):
         e = events[i]
-        state[e["id"]] = not e["state"]
+        rid = e["id"]
+        if prev[i] is not None:
+            state[rid] = prev[i]
+        else:
+            state[rid] = False
     return state
 
 
