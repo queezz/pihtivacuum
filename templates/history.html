@@ -13,6 +13,14 @@
         <div id="tooltip"></div>
     </div>
     <div class="history-panel">
+        <div class="history-calendar-wrapper">
+            <div class="history-calendar-nav">
+                <button type="button" id="calendar-prev" aria-label="Previous month">&larr;</button>
+                <span id="calendar-month-label"></span>
+                <button type="button" id="calendar-next" aria-label="Next month">&rarr;</button>
+            </div>
+            <div id="calendar-grid" class="history-calendar-grid"></div>
+        </div>
         <h2>Timeline</h2>
         <p class="history-hint">Click an event to see the diagram state at that moment.</p>
         <ul id="history-events" class="history-events"></ul>
