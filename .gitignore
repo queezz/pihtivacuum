@@ -9,4 +9,7 @@ last_plot.html
 secret.key
 users.json
 
+pihtivacuum_server.egg-info/
+*.egg-info/
+
 .DS_Store

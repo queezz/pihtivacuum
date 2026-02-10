@@ -4,11 +4,21 @@ Interactive vacuum diagram for PIHTI
 ## SVG settings
 Elements are named ins `diagram.svg` and element interactions are defined in `static/elementsConfig.json`
 
-## Start server
-Simply run `server.py`:
+## Install and run
+
+Install the project (from the project root):
+
+```bash
+pip install .
 ```
+
+Start the server:
+
+```bash
 python server.py
 ```
+
+(Or run `server.py` directly without installing: `python server.py`)
 
 ## Add user
 ```bash
