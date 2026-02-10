@@ -59,44 +59,59 @@ function showTooltip(tooltip, event, text) {
     tooltip.innerText = text;
 }
 
-// Function to attach event listeners to specified elements and set initial state
+// Function to attach event listeners. Uses delegation; no per-element handlers.
+// In history mode: SVG is fully non-interactive (pointer-events: none).
 function attachEventListeners(elementsConfig, state, tooltipId) {
-    const tooltip = document.getElementById(tooltipId);
-
-    if (!tooltip) {
-        console.error(`No tooltip element with ID '${tooltipId}' found.`);
+    if (window.historyMode) {
+        const container = document.getElementById('diagram-container');
+        if (container) container.style.pointerEvents = 'none';
         return;
+    }
+
+    const tooltip = document.getElementById(tooltipId);
+    if (!tooltip) return;
+
+    const configById = {};
+    elementsConfig.forEach(c => { configById[c.id] = c; });
+
+    function findConfiguredElement(el, root) {
+        let cur = el;
+        while (cur && cur !== root) {
+            if (cur.id && configById[cur.id]) return cur;
+            cur = cur.parentElement;
+        }
+        return null;
     }
 
     fetch('/get_current_user')
         .then(response => response.json())
         .then(data => {
             const isAuthenticated = data.is_authenticated;
+            const container = document.getElementById('diagram-container');
+            if (!container) return;
 
-            elementsConfig.forEach(({ id, colors, confirmToggle }) => {
-                const elementDiv = document.getElementById(id);
+            elementsConfig.forEach(({ id }) => {
+                const el = document.getElementById(id);
+                if (el) el.style.cursor = isAuthenticated ? "pointer" : "not-allowed";
+            });
 
-                if (!elementDiv) {
-                    console.error(`No element with ID '${id}' found in the SVG.`);
-                    return;
-                }
+            if (!isAuthenticated) return;
 
-                elementDiv.style.cursor = isAuthenticated ? "pointer" : "not-allowed";
+            container.addEventListener("click", (e) => {
+                const target = findConfiguredElement(e.target, container);
+                if (!target) return;
+                const config = configById[target.id];
+                toggleElementStatus(target, config.colors, config.confirmToggle);
+            });
 
-                if (isAuthenticated) {
-                    // Toggle status on click
-                    elementDiv.addEventListener("click", () =>
-                        toggleElementStatus(elementDiv, colors, confirmToggle)
-                    );
+            container.addEventListener("mouseover", (e) => {
+                const target = findConfiguredElement(e.target, container);
+                if (target) showTooltip(tooltip, e, target.id);
+            });
 
-                    // Tooltip on hover
-                    elementDiv.addEventListener("mouseenter", (event) =>
-                        showTooltip(tooltip, event, id)
-                    );
-
-                    elementDiv.addEventListener("mouseleave", () => {
-                        tooltip.style.display = "none";
-                    });
+            container.addEventListener("mouseout", (e) => {
+                if (!e.relatedTarget || !container.contains(e.relatedTarget)) {
+                    tooltip.style.display = "none";
                 }
             });
         })
@@ -195,7 +210,12 @@ fetch('/static/diagram.svg')
     .then(response => response.text())
     .then(svg => {
         const container = document.getElementById('diagram-container');
+        if (!container) return;
         container.innerHTML = svg;
+
+        if (window.historyMode) {
+            container.style.pointerEvents = 'none';
+        }
 
         document.querySelectorAll('.non-clickable').forEach(element => {
             element.style.pointerEvents = 'none';

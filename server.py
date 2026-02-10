@@ -181,6 +181,11 @@ def update_element():
     if not element_id or not status:
         return jsonify({'error': 'Invalid data'}), 400
 
+    # Idempotency guard: no-op if requested state equals current state
+    current = elements_state.get(element_id, "inactive")
+    if current == status:
+        return jsonify({'message': 'State unchanged', 'state': elements_state}), 200
+
     # Update the state
     elements_state[element_id] = status
 
