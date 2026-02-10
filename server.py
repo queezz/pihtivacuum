@@ -28,6 +28,40 @@ CORS(app)
 def home():
     return render_template('index.html')
 
+
+# History routes (before catch-all so /history/* is not served as static)
+@app.route('/history')
+def serve_history_view():
+    return render_template('history.html')
+
+
+@app.route('/history/events', methods=['GET'])
+def get_history_events():
+    """Return parsed log events as JSON for history timeline."""
+    events = load_history_events()
+    payload = [
+        {
+            "ts": e["ts"].strftime("%Y-%m-%d %H:%M:%S"),
+            "id": e["id"],
+            "state": e["state"],
+            "user": e["user"],
+        }
+        for e in events
+    ]
+    return jsonify(payload)
+
+
+@app.route('/history/state/<int:idx>', methods=['GET'])
+def get_history_state(idx):
+    """Return reconstructed diagram state at history index idx."""
+    events = load_history_events()
+    if idx < 0 or idx >= len(events):
+        return jsonify({"error": "Invalid index"}), 400
+    state_now = elements_state_to_bool(elements_state)
+    reconstructed = state_at_index(events, state_now, idx)
+    return jsonify({"index": idx, "state": reconstructed})
+
+
 @app.route('/<path:path>')
 def serve_static_files(path):
     return send_from_directory(app.static_folder, path)
@@ -65,6 +99,54 @@ def load_logs_from_csv(file_path):
     except FileNotFoundError:
         print(f"Log file {file_path} not found.")
     return logs
+
+
+# MARK: History (reverse state replay)
+def load_history_events(file_path=None):
+    """
+    Load logs.csv and return events as list of:
+    {"ts": datetime, "id": str, "state": bool, "user": str}
+    Order preserved as in file (chronological).
+    """
+    path = file_path or log_file_path
+    events = []
+    try:
+        with open(path, "r") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                ts_str = row.get("timestamp", "")
+                try:
+                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    ts = datetime.min
+                status = (row.get("status", "inactive") or "inactive").strip().lower()
+                state = status == "active"
+                events.append({
+                    "ts": ts,
+                    "id": row.get("id", ""),
+                    "state": state,
+                    "user": row.get("user", ""),
+                })
+    except FileNotFoundError:
+        pass
+    return events
+
+
+def state_at_index(events, state_now, idx):
+    """
+    Reconstruct diagram state at history index `idx` by reverse-applying
+    later events. Returns {id: bool}.
+    """
+    state = dict(state_now)
+    for i in range(idx + 1, len(events)):
+        e = events[i]
+        state[e["id"]] = not e["state"]
+    return state
+
+
+def elements_state_to_bool(d):
+    """Convert {id: 'active'|'inactive'} to {id: bool}."""
+    return {k: (v == "active") for k, v in d.items()}
 
 @app.route('/download_logs')
 def download_logs():

@@ -153,46 +153,45 @@ function logStatusChange(element, newFill) {
 }
 
 let vacuumstate = [];
+
+/**
+ * Apply a state dict to the SVG diagram. State format: { id: 'active'|'inactive' }.
+ * Reuses existing coloring logic; does not mutate elementsConfig.
+ * Exposed on window for history replay.
+ */
+function applyState(state) {
+    if (!elementsConfig || elementsConfig.length === 0) return;
+    elementsConfig.forEach(element => {
+        const elementDiv = document.getElementById(element.id);
+        if (!elementDiv) return;
+        const status = (state[element.id] === 'active' || state[element.id] === true)
+            ? 'active'
+            : 'inactive';
+        const fillColor = status === 'active' ? element.colors.active : element.colors.inactive;
+        elementDiv.style.fill = fillColor;
+    });
+}
+
 function fetchAndUpdateStates() {
     if (isInteracting) {
         console.log("Skipping state update during user interaction.");
         return;
     }
-    // Fetch the current state of all elements
     fetch('/elements-state')
         .then(response => response.json())
         .then(state => {
-            // console.log('Current elements state:', state);
             vacuumstate = state;
-
-            // Use the configuration to update elements' status in SVG
-            elementsConfig.forEach(element => {
-                const elementDiv = document.getElementById(element.id);
-                if (!elementDiv) {
-                    console.error(`No element with ID '${element.id}' found.`);
-                    return;
-                }
-
-                const elementState = state[element.id];
-                // If element state is missing, assign inactive
-                const status = elementState ? elementState : 'inactive';
-                const fillColor =
-                    status === 'active' ? element.colors.active : element.colors.inactive;
-                // console.log('id:', element.id, 'state:', state[element.id], 'status', status)
-                // Set initial fill color based on loaded state
-                if (elementDiv.style.fill !== fillColor) {
-                    elementDiv.style.fill = fillColor;
-                    // console.log(`Set initial fill for ${element.id} to: ${fillColor}`);
-                }
-            });
-
+            applyState(state);
         })
         .catch(error => console.error('Error fetching element states:', error));
 }
 
 
+// Expose applyState for history replay
+window.applyState = applyState;
+
 // Function to load the SVG and update the status colors correctly
-fetch('diagram.svg')
+fetch('/static/diagram.svg')
     .then(response => response.text())
     .then(svg => {
         const container = document.getElementById('diagram-container');
@@ -208,10 +207,10 @@ fetch('diagram.svg')
             .then(config => {
                 elementsConfig = config;
                 fetchAndUpdateStates();
-                // Attach event listeners after setting initial states with state passed as argument
                 attachEventListeners(elementsConfig, vacuumstate, 'tooltip');
-                setInterval(fetchAndUpdateStates, 5000);
-
+                if (!window.historyMode) {
+                    setInterval(fetchAndUpdateStates, 5000);
+                }
             })
             .catch(error => console.error('Error fetching configuration:', error));
     })

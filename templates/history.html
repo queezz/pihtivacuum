@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}History — PIHTI Vacuum{% endblock %}
+
+{% block content %}
+<script>window.historyMode = true;</script>
+<h1 style="text-align: center;">History</h1>
+<div class="history-layout">
+    <div class="history-diagram">
+        <div id="diagram-container"></div>
+        <div id="tooltip"></div>
+    </div>
+    <div class="history-panel">
+        <h2>Timeline</h2>
+        <p class="history-hint">Click an event to see the diagram state at that moment.</p>
+        <ul id="history-events" class="history-events"></ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/diagram.js') }}"></script>
+<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+{% endblock %}
