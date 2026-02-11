@@ -1,6 +1,23 @@
 # Interactive Vacuum
 Interactive vacuum diagram for PIHTI
 
+## Contents
+
+- [SVG settings](#svg-settings)
+- [Install and run](#install-and-run)
+- [User Management (Lightweight Access Control)](#-user-management-lightweight-access-control)
+  - [Files involved](#-files-involved)
+  - [First-Time Setup (New Machine)](#-first-time-setup-new-machine)
+  - [Add or Update a User](#-add-or-update-a-user)
+  - [Encrypt Users File](#-encrypt-users-file-before-syncing-to-github)
+  - [Decrypt Users File](#-decrypt-users-file-after-pulling-from-github)
+  - [Typical Workflow](#-typical-workflow)
+  - [Notes](#-notes)
+  - [Quick CLI (manage_users)](#-quick-cli-manage_users)
+- [venv](#venv)
+
+---
+
 ## SVG settings
 Elements are named in `diagram.svg` and element interactions are defined in `static/elementsConfig.json`
 
@@ -87,6 +104,8 @@ users.json
 ```
 
 Passwords are stored hashed using Werkzeug.
+
+⚠️ **Important:** The server reads from `users.json.enc`. After adding a user, run `encrypt` so the server can authenticate the new user. No server restart needed.
 
 ---
 

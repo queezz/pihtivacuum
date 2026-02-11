@@ -404,11 +404,14 @@ def load_users():
     return users
 
 
-users = load_users()
+def get_users():
+    """Load users from encrypted file (fresh read each login)."""
+    return load_users()
 
 
 @app.route("/login", methods=["POST"])
 def login():
+    users = get_users()
     username = request.form["username"]
     password = request.form["password"]
     if username in users and check_password_hash(users[username], password):
