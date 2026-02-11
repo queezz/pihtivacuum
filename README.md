@@ -4,7 +4,8 @@ Interactive vacuum diagram for PIHTI
 ## Contents
 
 - [SVG settings](#svg-settings)
-- [Install and run](#install-and-run)
+- [Virtual Environment](#venv)
+- [Running the Server](#running-the-server)
 - [User Management](#user-management-lightweight-access-control)
   - [Files involved](#files-involved)
   - [First-Time Setup](#first-time-setup-new-machine)
@@ -14,52 +15,107 @@ Interactive vacuum diagram for PIHTI
   - [Typical Workflow](#typical-workflow)
   - [Notes](#notes)
   - [Quick CLI](#quick-cli-manage_users)
-- [venv](#venv)
 
 ---
 
 ## <a id="svg-settings"></a>SVG settings
 Elements are named in `diagram.svg` and element interactions are defined in `static/elementsConfig.json`
 
-## <a id="install-and-run"></a>Install and run
+---
 
-Install the project (from the project root):
+# <a id="venv"></a>🐍 Virtual Environment (Required)
+
+We install PIHTI into a dedicated virtual environment.
+
+We use a virtual environment to isolate dependencies and avoid breaking system Python. This keeps your OS clean and prevents version conflicts.
+
+**Create venv**
+
+Linux / macOS / Raspberry Pi:
+
+```bash
+python3 -m venv ~/.venvs/pihti
+```
+
+Windows PowerShell:
+
+```powershell
+python -m venv "$HOME/.venvs/pihti"
+```
+
+**Activate venv**
+
+Linux / macOS / Raspberry Pi:
+
+```bash
+source ~/.venvs/pihti/bin/activate
+```
+
+Windows PowerShell:
+
+```powershell
+& $env:USERPROFILE\.venvs\pihti\Scripts\Activate.ps1
+```
+
+After activation you should see `(pihti)` in your terminal prompt.
+
+**Install PIHTI** (inside activated venv)
+
+From the project root:
 
 ```bash
 pip install .
 ```
 
-Or editable install for development:
+For development:
 
 ```bash
 pip install -e .
 ```
 
-Start the server:
-
-```bash
-pihti run
-```
-
-Or with `python -m`:
+**Quick Run** (after activation, from project root):
 
 ```bash
 python -m pihti run
 ```
 
-**Run in background (Linux / Raspberry Pi):**
+**Remove venv** (only if needed)
+
+Linux/macOS:
 
 ```bash
-pihti run --nohup
+rm -rf ~/.venvs/pihti
 ```
 
-This uses real `nohup` and appends output to `pihti.log`. The process survives terminal close.
+Windows PowerShell:
+
+```powershell
+Remove-Item -Recurse -Force $env:USERPROFILE\.venvs\pihti
+```
+
+---
+
+## <a id="running-the-server"></a>🚀 Running the Server
+
+Run from the **project root** (where `pyproject.toml` lives). The server reads `settings.json`, `logs.csv`, etc. from the current directory.
+
+```bash
+python -m pihti run
+```
+
+**Background mode (Linux / Raspberry Pi):**
+
+```bash
+python -m pihti run --nohup
+```
+
+Output appends to `pihti.log`. The process survives terminal close.
 
 Optional host/port:
 
 ```bash
-pihti run --host 0.0.0.0 --port 5000
-pihti run --nohup --port 8000
+python -m pihti run --host 0.0.0.0 --port 5000
+python -m pihti run --nohup --port 8000
 ```
 
 ---
@@ -216,22 +272,4 @@ python -m pihti.hash_passwords <username> <password>
 python -m pihti.encrypt_users generate_key
 python -m pihti.encrypt_users encrypt users.json users.json.enc
 python -m pihti.encrypt_users decrypt users.json.enc users.json
-```
-
----
-
-# <a id="venv"></a>venv
-
-Create
-```
-python -m venv "$HOME/.venvs/pihti"
-```
-activate
-```
-& $env:USERPROFILE\.venvs\pihti\Scripts\Activate.ps1
-```
-
-delete, only if you need to re-install venv:
-```powershell
-Remove-Item -Recurse -Force $env:USERPROFILE\.venvs\pihti
 ```

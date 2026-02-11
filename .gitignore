@@ -1,4 +1,5 @@
 private/
+build/
 
 elements_state.json
 logs.json
