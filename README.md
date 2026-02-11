@@ -28,3 +28,19 @@ python hash_passwords.py admin newpassword
 ```bash
 python encrypt_users.py encrypt users.json users.json.enc
 ```
+
+# venv
+
+Create
+```
+python -m venv "$HOME/.venvs/pihti"
+```
+activate
+```
+& $env:USERPROFILE\.venvs\pihti\Scripts\Activate.ps1
+```
+
+delete, only if you need to re-install venv:
+```powershell
+Remove-Item -Recurse -Force $env:USERPROFILE\.venvs\pihti
+```
