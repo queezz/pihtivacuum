@@ -18,10 +18,10 @@ Interactive vacuum diagram for PIHTI
 
 ---
 
-## SVG settings
+## <a id="svg-settings"></a>SVG settings
 Elements are named in `diagram.svg` and element interactions are defined in `static/elementsConfig.json`
 
-## Install and run
+## <a id="install-and-run"></a>Install and run
 
 Install the project (from the project root):
 
@@ -43,7 +43,7 @@ python -m pihti
 
 ---
 
-# 👤 User Management (Lightweight Access Control)
+# <a id="user-management-lightweight-access-control"></a>👤 User Management (Lightweight Access Control)
 
 This project uses a simple user system:
 
@@ -54,7 +54,7 @@ This project uses a simple user system:
 
 ---
 
-## 📁 Files involved
+## <a id="files-involved"></a>📁 Files involved
 
 | File             | Purpose                                |
 | ---------------- | -------------------------------------- |
@@ -64,7 +64,7 @@ This project uses a simple user system:
 
 ---
 
-## 🔐 First-Time Setup (New Machine)
+## <a id="first-time-setup-new-machine"></a>🔐 First-Time Setup (New Machine)
 
 ### 1️⃣ Generate encryption key
 
@@ -83,7 +83,7 @@ Copy it manually to any machine that needs access.
 
 ---
 
-## 👤 Add or Update a User
+## <a id="add-or-update-a-user"></a>👤 Add or Update a User
 
 This hashes the password automatically.
 
@@ -109,7 +109,7 @@ Passwords are stored hashed using Werkzeug.
 
 ---
 
-## 🔒 Encrypt Users File (Before Syncing to GitHub)
+## <a id="encrypt-users-file-before-syncing-to-github"></a>🔒 Encrypt Users File (Before Syncing to GitHub)
 
 ```bash
 python -m pihti.encrypt_users encrypt users.json users.json.enc
@@ -131,7 +131,7 @@ rm users.json
 
 ---
 
-## 🔓 Decrypt Users File (After Pulling from GitHub)
+## <a id="decrypt-users-file-after-pulling-from-github"></a>🔓 Decrypt Users File (After Pulling from GitHub)
 
 Make sure `secret.key` exists locally.
 
@@ -147,7 +147,7 @@ You can now:
 
 ---
 
-## 🔁 Typical Workflow
+## <a id="typical-workflow"></a>🔁 Typical Workflow
 
 ### On your main machine
 
@@ -168,7 +168,7 @@ decrypt
 
 ---
 
-## 🧠 Notes
+## <a id="notes"></a>🧠 Notes
 
 * This system is designed for **convenience**, not strong security.
 * Anyone with `secret.key` can decrypt users.
@@ -177,7 +177,7 @@ decrypt
 
 ---
 
-## 🛠️ Quick CLI (manage_users)
+## <a id="quick-cli-manage_users"></a>🛠️ Quick CLI (manage_users)
 
 One-command wrapper for common tasks:
 
@@ -199,7 +199,7 @@ python -m pihti.encrypt_users decrypt users.json.enc users.json
 
 ---
 
-# venv
+# <a id="venv"></a>venv
 
 Create
 ```
