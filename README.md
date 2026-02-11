@@ -2,7 +2,7 @@
 Interactive vacuum diagram for PIHTI
 
 ## SVG settings
-Elements are named ins `diagram.svg` and element interactions are defined in `static/elementsConfig.json`
+Elements are named in `diagram.svg` and element interactions are defined in `static/elementsConfig.json`
 
 ## Install and run
 
@@ -12,21 +12,25 @@ Install the project (from the project root):
 pip install .
 ```
 
+Or editable install for development:
+
+```bash
+pip install -e .
+```
+
 Start the server:
 
 ```bash
-python server.py
+python -m pihti
 ```
-
-(Or run `server.py` directly without installing: `python server.py`)
 
 ## Add user
 ```bash
-python hash_passwords.py admin newpassword
+python -m pihti.hash_passwords admin newpassword
 ```
 
 ```bash
-python encrypt_users.py encrypt users.json users.json.enc
+python -m pihti.encrypt_users encrypt users.json users.json.enc
 ```
 
 # venv
