@@ -16,6 +16,9 @@ dependencies = [
     "cryptography",
 ]
 
+[project.scripts]
+pihti = "pihti.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["pihti*"]

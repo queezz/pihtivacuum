@@ -1,6 +1,6 @@
-"""Entry point for python -m pihti.server."""
+"""Entry point for python -m pihti."""
 
-from pihti.server import main
+from pihti.cli import main
 
 if __name__ == "__main__":
     main()

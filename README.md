@@ -38,7 +38,28 @@ pip install -e .
 Start the server:
 
 ```bash
-python -m pihti
+pihti run
+```
+
+Or with `python -m`:
+
+```bash
+python -m pihti run
+```
+
+**Run in background (Linux / Raspberry Pi):**
+
+```bash
+pihti run --nohup
+```
+
+This uses real `nohup` and appends output to `pihti.log`. The process survives terminal close.
+
+Optional host/port:
+
+```bash
+pihti run --host 0.0.0.0 --port 5000
+pihti run --nohup --port 8000
 ```
 
 ---

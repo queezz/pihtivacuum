@@ -5,6 +5,7 @@ logs.json
 logs.csv
 settings.json
 nohup.out
+pihti.log
 last_plot.html
 secret.key
 users.json
