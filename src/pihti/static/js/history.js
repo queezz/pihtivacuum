@@ -120,6 +120,15 @@
             renderCalendar();
         });
         document.getElementById('calendar-today')?.addEventListener('click', goToToday);
+        document.getElementById('calendar-toggle')?.addEventListener('click', () => {
+            const wrapper = document.getElementById('calendar-wrapper');
+            const btn = document.getElementById('calendar-toggle');
+            if (wrapper && btn) {
+                wrapper.classList.toggle('collapsed');
+                btn.textContent = wrapper.classList.contains('collapsed') ? '\u25B6' : '\u25BC';
+                btn.setAttribute('aria-label', wrapper.classList.contains('collapsed') ? 'Expand calendar' : 'Collapse calendar');
+            }
+        });
     }
 
     function renderList() {

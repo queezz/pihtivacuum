@@ -4,17 +4,22 @@
 
 {% block content %}
 <script>window.historyMode = true;</script>
-<h1 class="history-title" style="text-align: center;">History
-    <a href="{{ url_for('download_logs') }}" class="btn-download">Download Logs (CSV)</a>
-</h1>
+<div class="history-page">
+<div class="history-scroll-area">
+    <div class="history-header-sticky">
+        <h1 class="history-title" style="text-align: center;">History
+            <a href="{{ url_for('download_logs') }}" class="btn-download">Download Logs (CSV)</a>
+        </h1>
+    </div>
 <div class="history-layout">
     <div class="history-left">
         <div class="history-diagram">
             <div id="diagram-container"></div>
             <div id="tooltip"></div>
         </div>
-        <div class="history-calendar-wrapper">
+        <div class="history-calendar-wrapper" id="calendar-wrapper">
             <div class="history-calendar-nav">
+                <button type="button" id="calendar-toggle" class="calendar-toggle" aria-label="Toggle calendar">&#9660;</button>
                 <button type="button" id="calendar-prev" aria-label="Previous month">&larr;</button>
                 <span id="calendar-month-label"></span>
                 <div class="calendar-nav-right">
@@ -22,7 +27,9 @@
                     <button type="button" id="calendar-next" aria-label="Next month">&rarr;</button>
                 </div>
             </div>
-            <div id="calendar-grid" class="history-calendar-grid"></div>
+            <div class="history-calendar-body" id="calendar-body">
+                <div id="calendar-grid" class="history-calendar-grid"></div>
+            </div>
         </div>
     </div>
     <div class="history-timeline-panel">
@@ -33,6 +40,8 @@
             <p id="history-no-events" class="history-no-events" style="display:none;">No events on this day</p>
         </div>
     </div>
+</div>
+</div>
 </div>
 {% endblock %}
 
