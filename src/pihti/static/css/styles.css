@@ -213,15 +213,32 @@ tr:hover {
 /* Media query for mobile devices */
 
 @media (max-width: 500px) {
-    .navbar-user {
-        margin-left: 20px;
+    .navbar {
+        width: 100%;
+        min-height: 50px;
+        padding: 10px 16px;
+        box-sizing: border-box;
     }
 
-    .navbar {
-        width: 20px;
-        height: 20px;
-        padding: 20px;
-        padding-top: 10px;
+    .navbar-container {
+        position: relative;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /* Center hostinfo in the navbar (out of flex flow) */
+    .navbar-hostinfo {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        margin: 0;
+        pointer-events: none;
+    }
+
+    /* Login/user pinned to the right */
+    .navbar-user {
+        margin-left: auto;
+        flex-shrink: 0;
     }
 
     .navbar-logo {
