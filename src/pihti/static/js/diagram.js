@@ -59,7 +59,7 @@ function showTooltip(tooltip, event, text) {
     tooltip.innerText = text;
 }
 
-// Function to attach event listeners. Uses delegation; no per-element handlers.
+// Function to attach event listeners. Click uses delegation; hover uses mouseenter/mouseleave per element so the tooltip hides as soon as the pointer leaves that element (or its group).
 // In history mode: SVG is fully non-interactive (pointer-events: none).
 function attachEventListeners(elementsConfig, state, tooltipId) {
     if (window.historyMode) {
@@ -92,7 +92,14 @@ function attachEventListeners(elementsConfig, state, tooltipId) {
 
             elementsConfig.forEach(({ id }) => {
                 const el = document.getElementById(id);
-                if (el) el.style.cursor = isAuthenticated ? "pointer" : "not-allowed";
+                if (!el) return;
+                el.style.cursor = isAuthenticated ? "pointer" : "not-allowed";
+                if (!isAuthenticated) return;
+                // mouseenter/mouseleave so tooltip hides when leaving this element (e.g. to another SVG child), not only when leaving the whole SVG
+                el.addEventListener("mouseenter", (e) => showTooltip(tooltip, e, id));
+                el.addEventListener("mouseleave", () => {
+                    tooltip.style.display = "none";
+                });
             });
 
             if (!isAuthenticated) return;
@@ -102,17 +109,6 @@ function attachEventListeners(elementsConfig, state, tooltipId) {
                 if (!target) return;
                 const config = configById[target.id];
                 toggleElementStatus(target, config.colors, config.confirmToggle);
-            });
-
-            container.addEventListener("mouseover", (e) => {
-                const target = findConfiguredElement(e.target, container);
-                if (target) showTooltip(tooltip, e, target.id);
-            });
-
-            container.addEventListener("mouseout", (e) => {
-                if (!e.relatedTarget || !container.contains(e.relatedTarget)) {
-                    tooltip.style.display = "none";
-                }
             });
         })
         .catch(error => console.error('Error fetching user status:', error));
