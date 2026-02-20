@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask import render_template, send_file, session, redirect
 from flask import url_for
 from flask_cors import CORS
+
+from pihti.utils.hostinfo import get_hostinfo
 from werkzeug.security import check_password_hash
 from cryptography.fernet import Fernet
 from datetime import datetime
@@ -31,6 +33,11 @@ app = Flask(
     template_folder=os.path.join(PKG_DIR, "templates"),
 )
 CORS(app)
+
+
+@app.context_processor
+def inject_hostinfo():
+    return dict(hostinfo=get_hostinfo())
 
 
 @app.route("/")

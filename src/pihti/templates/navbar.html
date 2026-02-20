@@ -10,6 +10,9 @@
             <li><a href="{{ url_for('serve_history_view') }}">History</a></li>
             <li><a href="{{ url_for('plasmaplots') }}">Plot</a></li>
         </ul>
+        <div class="navbar-hostinfo">
+            {{ hostinfo.hostname_local }} · {{ hostinfo.ip }}
+        </div>
         <div class="navbar-user">
             {% if session.get('username') %}
             <span>{{ session['username'] }}</span>
