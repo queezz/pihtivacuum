@@ -9,6 +9,8 @@ Interactive vacuum diagram for PIHTI
 - [🐍 Virtual Environment (Required)](#-virtual-environment-required)
   - [🚀 Running the Server](#-running-the-server)
   - [ 🍓 Raspberry Pi service deployment](#--raspberry-pi-service-deployment)
+  - [mDNS / .local hostname (Raspberry Pi access)](#mdns-local-hostname-raspberry-pi-access)
+    - [If .local does not work](#if-local-does-not-work)
   - [🔄 Updating the running service](#-updating-the-running-service)
 - [👤 User Management (Lightweight Access Control)](#-user-management-lightweight-access-control)
   - [📁 Files involved](#-files-involved)
@@ -180,6 +182,38 @@ sudo rm /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+---
+
+## <a id="mdns-local-hostname-raspberry-pi-access"></a>mDNS / .local hostname (Raspberry Pi access)
+
+**How it works:** mDNS (multicast DNS) lets devices on the same LAN resolve hostnames like `raspberrypi.local` without a central DNS server. On Raspberry Pi OS, **Avahi** provides this: it listens for multicast queries on UDP 5353 and responds with the Pi’s hostname and IP. Other devices can then reach the Pi by name (e.g. `http://raspberrypi.local:5000`).
+
+**Raspberry Pi setup (Avahi):**
+
+```bash
+sudo apt update
+sudo apt install avahi-daemon
+sudo systemctl enable avahi-daemon
+sudo systemctl start avahi-daemon
+```
+
+Check status: `systemctl status avahi-daemon`. Many Raspberry Pi images already have Avahi enabled.
+
+**Windows requirements:**
+
+- **Network profile** must be **Private** (not Public). Discovery and multicast typically only work on Private networks.
+- **Bonjour** (or equivalent mDNS responder) must be installed and running. Install [Bonjour for Windows](https://support.apple.com/kb/DL999) if `.local` resolution fails.
+- **Firewall** must allow **UDP 5353** (inbound/outbound) for mDNS.
+
+**Note:** Windows mDNS is often unreliable on managed networks (corporate, university, etc.). Multicast may be blocked or overridden by DNS; treat `.local` as best-effort on such networks.
+
+### <a id="if-local-does-not-work"></a>If .local does not work
+
+- **Recommended fallback:** Use the Pi’s **direct IP** (from your router’s DHCP client list or from `ip addr` / `hostname -I` on the Pi). Example: `http://192.168.1.42:5000`.
+- **Alternative:** Add a static entry to the **Windows hosts file** (`C:\Windows\System32\drivers\etc\hosts`, edit as Administrator), e.g. `192.168.1.42  raspberrypi.local`, so the hostname still works even when mDNS does not.
+
+**.local is a convenience feature.** Do not rely on it for scripts, automation, or repeatable experiments. Prefer static IP, DHCP reservation, or direct IP in those cases.
 
 ---
 
