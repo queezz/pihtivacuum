@@ -8,7 +8,8 @@ Interactive vacuum diagram for PIHTI
   - [SVG settings](#svg-settings)
 - [🐍 Virtual Environment (Required)](#-virtual-environment-required)
   - [🚀 Running the Server](#-running-the-server)
-  - [Raspberry Pi service deployment](#raspberry-pi-service-deployment)
+  - [ 🍓 Raspberry Pi service deployment](#--raspberry-pi-service-deployment)
+  - [🔄 Updating the running service](#-updating-the-running-service)
 - [👤 User Management (Lightweight Access Control)](#-user-management-lightweight-access-control)
   - [📁 Files involved](#-files-involved)
   - [🔐 First-Time Setup (New Machine)](#-first-time-setup-new-machine)
@@ -125,8 +126,7 @@ python -m pihti run --nohup --port 8000
 ```
 
 ---
-
-## Raspberry Pi service deployment
+## <a id="raspberry-pi-service-deployment"></a> 🍓 Raspberry Pi service deployment
 
 **Copy service file**
 
@@ -165,6 +165,46 @@ sudo apt install nginx
 sudo cp deploy/nginx-pihti.conf /etc/nginx/sites-available/pihti
 sudo ln -s /etc/nginx/sites-available/pihti /etc/nginx/sites-enabled/
 sudo rm /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+---
+
+## 🔄 Updating the running service
+
+After pulling new changes from Git, what you need to do depends on what changed.
+
+**1️⃣ Python source code, templates, static files**
+
+```bash
+git pull
+sudo systemctl restart pihti
+```
+
+**2️⃣ Python dependencies changed (pyproject.toml)**
+
+```bash
+git pull
+source ~/.venvs/pihti/bin/activate
+pip install -e .
+sudo systemctl restart pihti
+```
+
+**3️⃣ Service file changed (deploy/pihti.service)**
+
+```bash
+git pull
+sudo cp deploy/pihti.service /etc/systemd/system/pihti.service
+sudo systemctl daemon-reload
+sudo systemctl restart pihti
+```
+
+**4️⃣ nginx config changed (deploy/nginx-pihti.conf)**
+
+```bash
+git pull
+sudo cp deploy/nginx-pihti.conf /etc/nginx/sites-available/pihti
 sudo nginx -t
 sudo systemctl reload nginx
 ```
