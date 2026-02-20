@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/pihti
+WorkingDirectory=/home/pi/pihtivacuum
 ExecStart=/home/pi/.venvs/pihti/bin/python -m pihti run
 Restart=always
 RestartSec=3

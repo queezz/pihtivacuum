@@ -129,9 +129,21 @@ python -m pihti run --nohup --port 8000
 ## <a id="raspberry-pi-service-deployment"></a> 🍓 Raspberry Pi service deployment
 
 **Copy service file**
+`pihti.service` needs to know 
 
+1. where the repo is on the RasPi
+2. which venv to use
+Currently, that is as below:
+
+```
+WorkingDirectory=/home/pi/pihtivacuum
+ExecStart=/home/pi/.venvs/pihti/bin/python -m pihti run
+```
+Now let's start the service.
+
+The server repo lives in `/home/pi/pihtivacuum`:
 ```bash
-cd /path/to/pihti-repo
+cd /home/pi/pihtivacuum
 sudo cp deploy/pihti.service /etc/systemd/system/pihti.service
 ```
 
