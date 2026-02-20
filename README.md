@@ -3,18 +3,24 @@ Interactive vacuum diagram for PIHTI
 
 ## Contents
 
-- [SVG settings](#svg-settings)
-- [Virtual Environment](#venv)
-- [Running the Server](#running-the-server)
-- [User Management](#user-management-lightweight-access-control)
-  - [Files involved](#files-involved)
-  - [First-Time Setup](#first-time-setup-new-machine)
-  - [Add or Update a User](#add-or-update-a-user)
-  - [Encrypt Users File](#encrypt-users-file-before-syncing-to-github)
-  - [Decrypt Users File](#decrypt-users-file-after-pulling-from-github)
-  - [Typical Workflow](#typical-workflow)
-  - [Notes](#notes)
-  - [Quick CLI](#quick-cli-manage_users)
+- [Interactive Vacuum](#interactive-vacuum)
+  - [Contents](#contents)
+  - [SVG settings](#svg-settings)
+- [🐍 Virtual Environment (Required)](#-virtual-environment-required)
+  - [🚀 Running the Server](#-running-the-server)
+  - [Raspberry Pi service deployment](#raspberry-pi-service-deployment)
+- [👤 User Management (Lightweight Access Control)](#-user-management-lightweight-access-control)
+  - [📁 Files involved](#-files-involved)
+  - [🔐 First-Time Setup (New Machine)](#-first-time-setup-new-machine)
+    - [1️⃣ Generate encryption key](#1️⃣-generate-encryption-key)
+  - [👤 Add or Update a User](#-add-or-update-a-user)
+  - [🔒 Encrypt Users File (Before Syncing to GitHub)](#-encrypt-users-file-before-syncing-to-github)
+  - [🔓 Decrypt Users File (After Pulling from GitHub)](#-decrypt-users-file-after-pulling-from-github)
+  - [🔁 Typical Workflow](#-typical-workflow)
+    - [On your main machine](#on-your-main-machine)
+    - [On another machine](#on-another-machine)
+  - [🧠 Notes](#-notes)
+  - [🛠️ Quick CLI (manage\_users)](#️-quick-cli-manage_users)
 
 ---
 
@@ -116,6 +122,51 @@ Optional host/port:
 ```bash
 python -m pihti run --host 0.0.0.0 --port 5000
 python -m pihti run --nohup --port 8000
+```
+
+---
+
+## Raspberry Pi service deployment
+
+**Copy service file**
+
+```bash
+cd /path/to/pihti-repo
+sudo cp deploy/pihti.service /etc/systemd/system/pihti.service
+```
+
+**Enable and start service**
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable pihti
+sudo systemctl start pihti
+```
+
+**Check status and logs**
+
+```bash
+systemctl status pihti
+journalctl -u pihti -f
+```
+
+**Stop / restart service**
+
+```bash
+sudo systemctl stop pihti
+sudo systemctl restart pihti
+```
+
+**(Optional) nginx reverse proxy**
+
+```bash
+cd /path/to/pihti-repo
+sudo apt install nginx
+sudo cp deploy/nginx-pihti.conf /etc/nginx/sites-available/pihti
+sudo ln -s /etc/nginx/sites-available/pihti /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 ---

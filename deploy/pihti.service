@@ -1,0 +1,15 @@
+[Unit]
+Description=PIHTI Flask Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/pihti
+ExecStart=/home/pi/.venvs/pihti/bin/python -m pihti run
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
