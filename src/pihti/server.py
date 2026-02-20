@@ -42,13 +42,13 @@ def inject_hostinfo():
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("index.html", hostinfo=get_hostinfo())
 
 
 # History routes (before catch-all so /history/* is not served as static)
 @app.route("/history")
 def serve_history_view():
-    return render_template("history.html")
+    return render_template("history.html", hostinfo=get_hostinfo())
 
 
 @app.route("/history/events", methods=["GET"])
@@ -295,7 +295,10 @@ def plasmaplots():
         pass
 
     return render_template(
-        "plasmaplots.html", files=files, data_path_configured=data_path_configured
+        "plasmaplots.html",
+        files=files,
+        data_path_configured=data_path_configured,
+        hostinfo=get_hostinfo(),
     )
 
 
@@ -435,7 +438,7 @@ def logout():
 
 @app.route("/loginpage", methods=["GET"])
 def login_page():
-    return render_template("login.html")
+    return render_template("login.html", hostinfo=get_hostinfo())
 
 
 @app.route("/get_current_user", methods=["GET"])
