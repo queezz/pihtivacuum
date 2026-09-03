@@ -2,6 +2,18 @@
     padding-top: 30px;
 }
 
+:root {
+    --pihti-navbar-height: 50px;
+    --pihti-page-margin: 8px;
+    --pihti-home-top-gap: 20px;
+    --pihti-red: #8c0c0c;
+    --pihti-ink: #241b1b;
+    --pihti-muted: #6f6662;
+    --pihti-line: #cfc6bd;
+    --pihti-paper: #f7f4ef;
+    --pihti-warning: #a3281d;
+}
+
 #diagram-container {
     width: 100%;
     max-width: 830px;
@@ -151,6 +163,338 @@ tr:hover {
 .navbar-logo {
     font-weight: bold;
     font-size: 30px;
+}
+
+/* Vacuum operator guide. The authored SVG and the rest of the site retain their
+   existing visual language; these rules only use the spare width around it. */
+.vacuum-shell {
+    box-sizing: border-box;
+    width: calc(100% - 24px);
+    max-width: 1420px;
+    margin: 0 auto;
+    padding-top: var(--pihti-home-top-gap);
+    display: grid;
+    grid-template-columns: minmax(210px, 250px) minmax(0, 830px) minmax(220px, 270px);
+    gap: 22px;
+}
+
+.vacuum-main {
+    min-width: 0;
+}
+
+.vacuum-main h1 {
+    margin: 0 0 18px;
+    text-align: center;
+}
+
+.vacuum-rail {
+    align-self: start;
+    position: sticky;
+    top: calc(var(--pihti-navbar-height) + var(--pihti-page-margin));
+    max-height: calc(100vh - var(--pihti-navbar-height) - 24px);
+    overflow: auto;
+    box-sizing: border-box;
+    border: 1px solid var(--pihti-line);
+    border-top: 4px solid var(--pihti-red);
+    background: var(--pihti-paper);
+    color: var(--pihti-ink);
+}
+
+.rail-section {
+    padding: 16px;
+}
+
+.rail-section + .rail-section,
+.guide-step-list,
+.guide-boundary {
+    border-top: 1px solid var(--pihti-line);
+}
+
+.rail-eyebrow,
+.eyebrow {
+    margin: 0 0 5px;
+    color: var(--pihti-red);
+    font-size: 0.7rem;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+}
+
+.vacuum-rail h2 {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+}
+
+.line-mode-status {
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    border-left: 4px solid var(--pihti-red);
+    background: white;
+    font-weight: bold;
+}
+
+.line-mode-options,
+.operation-choices {
+    display: grid;
+    gap: 8px;
+}
+
+.line-mode-options button,
+.operation-choice,
+.drawer-tabs button,
+.quiet-button,
+.identity-card button,
+.drawer-close {
+    border: 1px solid #8f847c;
+    border-radius: 4px;
+    background: white;
+    color: var(--pihti-ink);
+    padding: 9px 11px;
+    font: inherit;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.line-mode-options button:hover,
+.operation-choice:hover,
+.drawer-tabs button:hover,
+.quiet-button:hover,
+.identity-card button:hover,
+.drawer-close:hover {
+    background: #eee8e0;
+}
+
+.line-mode-options button[aria-pressed="true"],
+.operation-choice[aria-pressed="true"] {
+    border-color: var(--pihti-red);
+    background: #f1ded8;
+    color: #691010;
+}
+
+.line-mode-options button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+}
+
+.line-mode-options button:focus-visible,
+.operation-choice:focus-visible,
+.drawer-tabs button:focus-visible,
+.quiet-button:focus-visible,
+.drawer-close:focus-visible,
+.identity-card button:focus-visible,
+.identity-card select:focus-visible {
+    outline: 3px solid #e18a35;
+    outline-offset: 2px;
+}
+
+.rail-note,
+.guide-summary,
+.guide-boundary,
+.identity-note,
+.form-status {
+    color: var(--pihti-muted);
+    font-size: 0.83rem;
+    line-height: 1.35;
+}
+
+.rail-note {
+    min-height: 2.25em;
+    margin: 10px 0 0;
+}
+
+.guide-summary {
+    margin: 0 0 12px;
+}
+
+.guide-alert {
+    margin: 0;
+    padding: 12px 16px;
+    border-top: 1px solid #dfaaa3;
+    border-bottom: 1px solid #dfaaa3;
+    background: #fff0ed;
+    color: var(--pihti-warning);
+    font-weight: bold;
+    line-height: 1.35;
+}
+
+.guide-step-list {
+    margin: 0;
+    padding: 12px 16px 12px 42px;
+}
+
+.guide-step-list li {
+    padding: 7px 5px;
+    color: var(--pihti-muted);
+}
+
+.guide-step-list li.current {
+    color: var(--pihti-ink);
+    font-weight: bold;
+}
+
+.guide-step-list li.complete {
+    color: #426237;
+}
+
+.guide-step-list small {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.68rem;
+    font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.guide-boundary {
+    margin: 0;
+    padding: 14px 16px;
+}
+
+.operation-marker {
+    pointer-events: none;
+}
+
+.operation-marker circle {
+    fill: #f3e3bd;
+    stroke: #2b211f;
+    stroke-width: 3;
+}
+
+.operation-marker text {
+    fill: #241b1b;
+    font: bold 16px sans-serif;
+}
+
+.operation-marker.current circle {
+    fill: #e0513e;
+    stroke: white;
+    stroke-width: 4;
+}
+
+.operation-marker.current text {
+    fill: white;
+}
+
+.operation-marker.complete circle {
+    fill: #7cab64;
+}
+
+.drawer-tabs,
+.drawer-close,
+.drawer-backdrop {
+    display: none;
+}
+
+.identity-shell {
+    width: min(430px, calc(100% - 32px));
+    margin: 70px auto 0;
+}
+
+.identity-shell h1 {
+    margin-top: 0;
+}
+
+.identity-card {
+    display: grid;
+    gap: 12px;
+    padding: 22px;
+    border: 1px solid var(--pihti-line);
+    border-top: 4px solid var(--pihti-red);
+    background: var(--pihti-paper);
+}
+
+.identity-card label {
+    font-weight: bold;
+}
+
+.identity-card select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px;
+    border: 1px solid #8f847c;
+    background: white;
+    color: var(--pihti-ink);
+    font: inherit;
+}
+
+.identity-card p {
+    margin: 0;
+}
+
+.read-link {
+    color: var(--pihti-red);
+    text-align: center;
+}
+
+@media (max-width: 1179px) {
+    .vacuum-shell {
+        display: block;
+        max-width: 860px;
+    }
+
+    .drawer-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .vacuum-rail {
+        display: none;
+        position: fixed;
+        top: var(--pihti-navbar-height);
+        bottom: 0;
+        z-index: 10001;
+        width: min(360px, 88vw);
+        max-height: none;
+        border-top-width: 4px;
+        box-shadow: 0 0 28px rgba(0, 0, 0, 0.24);
+    }
+
+    .vacuum-rail-left {
+        left: 0;
+    }
+
+    .vacuum-rail-right {
+        right: 0;
+    }
+
+    .vacuum-rail.drawer-open {
+        display: block;
+    }
+
+    .drawer-close {
+        display: block;
+        margin: 10px 10px 0 auto;
+    }
+
+    .drawer-backdrop {
+        position: fixed;
+        inset: var(--pihti-navbar-height) 0 0;
+        z-index: 10000;
+        width: 100%;
+        height: auto;
+        border: 0;
+        background: rgba(0, 0, 0, 0.36);
+    }
+
+    .drawer-backdrop:not([hidden]) {
+        display: block;
+    }
+}
+
+@media (max-width: 500px) {
+    .vacuum-shell {
+        width: 100%;
+    }
+
+    .vacuum-main h1 {
+        font-size: 1.55rem;
+    }
+
+    .drawer-tabs button {
+        padding: 8px 5px;
+        font-size: 0.86rem;
+    }
 }
 
 .navbar-version {

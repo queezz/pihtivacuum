@@ -6,7 +6,7 @@ import csv
 import json
 import os
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
@@ -28,8 +28,6 @@ from flask import (
     url_for,
 )
 from plotly.subplots import make_subplots
-from werkzeug.security import check_password_hash
-
 from pihti import __version__
 from pihti.utils.hostinfo import get_hostinfo
 
@@ -54,6 +52,14 @@ def _boolean_env(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _operator_timeout() -> timedelta:
+    try:
+        hours = float(os.environ.get("PIHTI_OPERATOR_TIMEOUT_HOURS", "12"))
+    except ValueError:
+        hours = 12
+    return timedelta(hours=max(1, hours))
 
 
 def _load_or_create_session_secret() -> bytes:
@@ -132,7 +138,7 @@ def state_at_index(events: list[dict], state_now: dict[str, bool], idx: int) -> 
     return state
 
 
-def _load_users(app: Flask) -> dict[str, str]:
+def _load_operator_names(app: Flask) -> list[str]:
     inline_key = os.environ.get("PIHTI_USERS_KEY")
     key = (
         inline_key.encode("ascii")
@@ -149,21 +155,22 @@ def _load_users(app: Flask) -> dict[str, str]:
         for name, password_hash in users.items()
     ):
         raise RuntimeError("The encrypted users file has an invalid structure.")
-    return users
+    return sorted(users, key=str.casefold)
 
 
-def login_required(view):
+def operator_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if "username" not in session:
             wants_json = (
                 request.accept_mimetypes.best == "application/json"
+                or request.is_json
                 or request.path.startswith("/download")
                 or request.path.startswith("/history/")
             )
             if wants_json:
-                return jsonify({"error": "Unauthorized"}), 401
-            return redirect(url_for("login_page", next=request.path))
+                return jsonify({"error": "Operator identity required"}), 428
+            return redirect(url_for("identity_page", next=request.path))
         return view(*args, **kwargs)
 
     return wrapped
@@ -221,10 +228,14 @@ def create_app(test_config: dict | None = None) -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Strict",
         SESSION_COOKIE_SECURE=_boolean_env("PIHTI_COOKIE_SECURE"),
+        PERMANENT_SESSION_LIFETIME=_operator_timeout(),
+        SESSION_REFRESH_EACH_REQUEST=False,
         MAX_CONTENT_LENGTH=64 * 1024,
         SETTINGS_FILE=_env_path("PIHTI_SETTINGS_FILE", runtime_root / "settings.json"),
         LOG_FILE=runtime_root / "logs.csv",
         STATE_FILE=runtime_root / "elements_state.json",
+        OPERATION_CONTEXT_FILE=runtime_root / "operation_context.json",
+        OPERATION_CONTEXT_LOG_FILE=runtime_root / "operation_context_log.csv",
         LAST_PLOT_FILE=runtime_root / "last_plot.html",
         ELEMENTS_CONFIG_FILE=PKG_DIR / "static" / "elementsConfig.json",
         USERS_FILE_ENCRYPTED=_env_path(
@@ -245,8 +256,11 @@ def create_app(test_config: dict | None = None) -> Flask:
     valid_elements = {
         item["id"] for item in element_config if isinstance(item, dict) and "id" in item
     }
-    users_cache: dict[str, str] | None = None
+    operators_cache: list[str] | None = None
     last_plot_html: str | None = None
+
+    def touch_operator() -> None:
+        session["last_activity"] = datetime.now().isoformat(timespec="seconds")
 
     def load_settings() -> Path:
         if app.config.get("CUDATA_DIRECTORY"):
@@ -309,12 +323,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         return render_template("index.html")
 
     @app.route("/history")
-    @login_required
     def serve_history_view():
         return render_template("history.html")
 
     @app.route("/history/events")
-    @login_required
     def get_history_events():
         events = load_history_events(Path(app.config["LOG_FILE"]))
         return jsonify(
@@ -330,7 +342,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         )
 
     @app.route("/history/state/<int:idx>")
-    @login_required
     def get_history_state(idx):
         events = load_history_events(Path(app.config["LOG_FILE"]))
         if idx < 0 or idx >= len(events):
@@ -339,7 +350,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         return jsonify({"index": idx, "state": state_at_index(events, state_now, idx)})
 
     @app.route("/update", methods=["POST"])
-    @login_required
+    @operator_required
     def update_element():
         data = request.get_json(silent=True) or {}
         element_id = data.get("id")
@@ -348,6 +359,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             return jsonify({"error": "Invalid element or status"}), 400
         if elements_state.get(element_id, "inactive") == status:
             return jsonify({"message": "State unchanged", "state": elements_state})
+
+        touch_operator()
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         elements_state[element_id] = status
@@ -365,12 +378,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         return jsonify({"message": "State updated successfully", "state": elements_state})
 
     @app.route("/download_logs")
-    @login_required
     def download_logs():
         return send_file(Path(app.config["LOG_FILE"]), as_attachment=True)
 
     @app.route("/logs-raw")
-    @login_required
     def get_logs():
         return jsonify(logs)
 
@@ -386,6 +397,50 @@ def create_app(test_config: dict | None = None) -> Flask:
     def serve_config():
         return send_from_directory(directory=app.static_folder, path="elementsConfig.json")
 
+    @app.route("/operation-guides")
+    def serve_operation_guides():
+        return send_from_directory(directory=app.static_folder, path="operationGuides.json")
+
+    @app.route("/operation-context", methods=["GET", "POST"])
+    def operation_context():
+        context_file = Path(app.config["OPERATION_CONTEXT_FILE"])
+        context = _load_json(
+            context_file,
+            {"line_mode": "unknown", "updated_at": None, "updated_by": None},
+        )
+        if request.method == "GET":
+            return jsonify(context)
+        if "username" not in session:
+            return jsonify({"error": "Operator identity required"}), 428
+        data = request.get_json(silent=True) or {}
+        mode = data.get("line_mode")
+        if mode not in {"membrane", "open", "boron"}:
+            return jsonify({"error": "Invalid line configuration"}), 400
+        if context.get("line_mode") == mode:
+            return jsonify(context)
+        touch_operator()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        context = {
+            "line_mode": mode,
+            "updated_at": timestamp,
+            "updated_by": session["username"],
+        }
+        context_file.parent.mkdir(parents=True, exist_ok=True)
+        context_file.write_text(json.dumps(context, indent=4) + "\n", encoding="utf-8")
+        context_log = Path(app.config["OPERATION_CONTEXT_LOG_FILE"])
+        context_log.parent.mkdir(parents=True, exist_ok=True)
+        exists = context_log.exists()
+        with context_log.open("a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(
+                csvfile, fieldnames=["timestamp", "line_mode", "user"]
+            )
+            if not exists:
+                writer.writeheader()
+            writer.writerow(
+                {"timestamp": timestamp, "line_mode": mode, "user": session["username"]}
+            )
+        return jsonify(context)
+
     @app.route("/navbar")
     def navbar():
         return render_template("navbar.html")
@@ -395,7 +450,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         return jsonify({"name": "pihti", "version": __version__})
 
     @app.route("/plasmaplots")
-    @login_required
     def plasmaplots():
         try:
             files = available_cu_files()
@@ -408,7 +462,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         )
 
     @app.route("/plot", methods=["POST"])
-    @login_required
     def plot_file():
         nonlocal last_plot_html
         file_path = resolve_cu_file(request.form.get("file"))
@@ -423,7 +476,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         return jsonify(plot=last_plot_html)
 
     @app.route("/get_last_plot")
-    @login_required
     def get_last_plot():
         if last_plot_html:
             return jsonify({"plot": last_plot_html})
@@ -431,44 +483,70 @@ def create_app(test_config: dict | None = None) -> Flask:
             plot = Path(app.config["LAST_PLOT_FILE"]).read_text(encoding="utf-8")
             return jsonify({"plot": plot})
         except FileNotFoundError:
-            return jsonify({"plot": "<p>No plot available. Please generate one.</p>"}), 404
+            return jsonify({"plot": "<p>No plot available. Please generate one.</p>"})
 
     @app.route("/download_controlunit_csv")
-    @login_required
     def download_controlunit_csv():
         file_path = resolve_cu_file(request.args.get("file"))
         return send_file(file_path, as_attachment=True, download_name=file_path.name)
 
+    def available_operators() -> list[str]:
+        nonlocal operators_cache
+        if operators_cache is None:
+            operators_cache = _load_operator_names(app)
+        return operators_cache
+
+    @app.route("/api/identify", methods=["POST"])
     @app.route("/login", methods=["POST"])
-    def login():
-        nonlocal users_cache
+    def choose_operator():
         try:
-            if users_cache is None:
-                users_cache = _load_users(app)
+            operators = available_operators()
         except (FileNotFoundError, RuntimeError):
-            current_app.logger.exception("Authentication configuration is unavailable")
-            return jsonify({"message": "Authentication is not configured on this machine."}), 503
-        username = request.form.get("username", "")
-        password = request.form.get("password", "")
-        if username in users_cache and check_password_hash(users_cache[username], password):
+            current_app.logger.exception("Operator identities are unavailable")
+            return jsonify({"message": "Operator identities are not configured on this machine."}), 503
+        data = request.get_json(silent=True) or request.form
+        username = str(data.get("username", ""))
+        if username in operators:
             session.clear()
+            session.permanent = True
             session["username"] = username
-            return jsonify({"message": "Login successful", "username": username})
-        return jsonify({"message": "Invalid username or password"}), 401
+            touch_operator()
+            return jsonify(
+                {"status": "accepted", "message": "Operator selected", "username": username}
+            )
+        return jsonify({"message": "Operator identity not found"}), 404
 
     @app.route("/logout")
     def logout():
         session.clear()
-        return redirect(url_for("login_page"))
+        return redirect(url_for("identity_page"))
 
+    @app.route("/identify")
+    def identity_page():
+        try:
+            operators = available_operators()
+            unavailable = False
+        except (FileNotFoundError, RuntimeError):
+            current_app.logger.exception("Operator identities are unavailable")
+            operators = []
+            unavailable = True
+        return render_template(
+            "identify.html", operators=operators, identities_unavailable=unavailable
+        )
+
+    @app.route("/login", methods=["GET"])
     @app.route("/loginpage")
-    def login_page():
-        return render_template("login.html")
+    def legacy_login_page():
+        return redirect(url_for("identity_page"))
 
     @app.route("/get_current_user")
     def get_current_user():
         return jsonify(
-            {"is_authenticated": "username" in session, "username": session.get("username")}
+            {
+                "is_authenticated": "username" in session,
+                "is_identified": "username" in session,
+                "username": session.get("username"),
+            }
         )
 
     @app.route("/<path:path>")

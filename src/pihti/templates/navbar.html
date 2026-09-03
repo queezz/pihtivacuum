@@ -22,9 +22,9 @@
         <div class="navbar-user">
             {% if session.get('username') %}
             <span>{{ session['username'] }}</span>
-            <a href="{{ url_for('logout') }}" class="navbar-link">Logout</a>
+            <a href="{{ url_for('identity_page') }}" class="navbar-link">Switch operator</a>
             {% else %}
-            <a href="{{ url_for('login_page') }}" class="navbar-link">Login</a>
+            <a href="{{ url_for('identity_page') }}" class="navbar-link">Choose operator</a>
             {% endif %}
         </div>
     </div>

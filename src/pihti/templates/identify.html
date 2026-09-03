@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Choose operator · PIHTI{% endblock %}
+
+{% block content %}
+<main class="identity-shell">
+    <p class="eyebrow">PIHTI DIAGRAM</p>
+    <h1>Who is operating?</h1>
+    <form id="identity-form" class="identity-card">
+        <label for="operator-name">Operator</label>
+        <select id="operator-name" name="username" required {% if not operators %}disabled{% endif %}>
+            {% for operator in operators %}
+            <option value="{{ operator }}">{{ operator }}</option>
+            {% else %}
+            <option>No operator identities configured</option>
+            {% endfor %}
+        </select>
+        <p class="identity-note">This choice labels diagram changes. It does not control access. It expires after 12 hours without a diagram change.</p>
+        <button type="submit" {% if not operators %}disabled{% endif %}>Continue</button>
+        <p id="identity-status" class="form-status" role="status">
+            {% if identities_unavailable %}Operator identities are unavailable on this machine.{% endif %}
+        </p>
+        <a class="read-link" href="{{ url_for('home') }}">View the diagram without choosing an operator</a>
+    </form>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/identity.js') }}"></script>
+{% endblock %}

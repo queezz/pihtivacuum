@@ -1,0 +1,93 @@
+{
+    "prototype": true,
+    "guides": [
+        {
+            "id": "vent-plasma",
+            "label": "Vent Plasma",
+            "summary": "Prepare the plasma vessel for the apparatus vent procedure.",
+            "steps": [
+                {
+                    "targetId": "upstream-single-gauge",
+                    "desiredStatus": "inactive",
+                    "action": "Turn off the plasma ionization gauge.",
+                    "markerOffset": [22, -20]
+                },
+                {
+                    "targetId": "bypass-ionization-gauge",
+                    "desiredStatus": "inactive",
+                    "action": "Turn off the bypass ionization gauge.",
+                    "markerOffset": [22, -20]
+                },
+                {
+                    "targetId": "GVU",
+                    "desiredStatus": "inactive",
+                    "action": "Close the plasma gate valve before venting.",
+                    "markerOffset": [30, 0]
+                },
+                {
+                    "targetId": "valve_qms",
+                    "desiredStatus": "inactive",
+                    "action": "Close the valve between the plasma vessel and QMS.",
+                    "markerOffset": [-28, 0]
+                },
+                {
+                    "targetId": "upstream-baratron",
+                    "manual": true,
+                    "action": "Verify pressure on the physical instruments, then follow the apparatus vent procedure.",
+                    "markerOffset": [24, 18]
+                }
+            ],
+            "alerts": [
+                {
+                    "when": [{"id": "upstream-single-gauge", "status": "active"}],
+                    "text": "The plasma ionization gauge is marked on. Turn it off first."
+                },
+                {
+                    "when": [{"id": "TMPU", "status": "active"}, {"id": "GVU", "status": "active"}],
+                    "text": "TMPU is marked running. Close the plasma gate first."
+                }
+            ]
+        },
+        {
+            "id": "vent-qms",
+            "label": "Vent QMS",
+            "summary": "Prepare the QMS vessel for the apparatus vent procedure.",
+            "steps": [
+                {
+                    "targetId": "downstream-ionization-gauge",
+                    "desiredStatus": "inactive",
+                    "action": "Turn off the QMS ionization gauge.",
+                    "markerOffset": [24, -18]
+                },
+                {
+                    "targetId": "GVD",
+                    "desiredStatus": "inactive",
+                    "action": "Close the QMS gate valve before venting.",
+                    "markerOffset": [30, 0]
+                },
+                {
+                    "targetId": "valve_qms",
+                    "desiredStatus": "inactive",
+                    "action": "Close the valve between QMS and the plasma vessel.",
+                    "markerOffset": [-28, 0]
+                },
+                {
+                    "targetId": "downstream-baratron",
+                    "manual": true,
+                    "action": "Verify pressure on the physical instruments, then follow the apparatus vent procedure.",
+                    "markerOffset": [24, 18]
+                }
+            ],
+            "alerts": [
+                {
+                    "when": [{"id": "downstream-ionization-gauge", "status": "active"}],
+                    "text": "The QMS ionization gauge is marked on. Turn it off first."
+                },
+                {
+                    "when": [{"id": "TMPD", "status": "active"}, {"id": "GVD", "status": "active"}],
+                    "text": "TMPD is marked running. Close the QMS gate first."
+                }
+            ]
+        }
+    ]
+}
