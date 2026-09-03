@@ -11,7 +11,7 @@ def main():
         print(
             "Usage: python -m pihti.manage_users <generate_key|add|hash_passwords|encrypt|decrypt> [args...]"
         )
-        print("  generate_key         Create secret.key")
+        print("  generate_key         Create the private machine users key")
         print("  add <user> <pw>      Add/update user (hashes password)")
         print("  hash_passwords <user> <pw>  Same as add")
         print("  encrypt              users.json -> users.json.enc")

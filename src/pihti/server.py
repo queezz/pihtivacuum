@@ -1,455 +1,493 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask import render_template, send_file, session, redirect
-from flask import url_for
-from flask_cors import CORS
+"""PIHTI interactive vacuum diagram server."""
 
-from pihti.utils.hostinfo import get_hostinfo
-from werkzeug.security import check_password_hash
-from cryptography.fernet import Fernet
-from datetime import datetime
-import os
-import json
+from __future__ import annotations
+
 import csv
+import json
+import os
+import secrets
+from datetime import datetime
+from functools import wraps
+from pathlib import Path
 
 import pandas as pd
-import plotly.io as pio
-from plotly.subplots import make_subplots
 import plotly.graph_objects as go
-
-# Paths relative to package directory for templates/static; CWD for runtime data
-PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-SETTINGS_FILE = "settings.json"
-log_file_path = "logs.csv"
-state_file_path = "elements_state.json"
-MAX_LOGS = 1000
-DISPLAY_LIMIT = 100
-LAST_PLOT_FILE = "last_plot.html"
-last_plot_html = None
-
-app = Flask(
-    __name__,
-    static_folder=os.path.join(PKG_DIR, "static"),
-    static_url_path="/static",
-    template_folder=os.path.join(PKG_DIR, "templates"),
+import plotly.io as pio
+from cryptography.fernet import Fernet, InvalidToken
+from flask import (
+    Flask,
+    abort,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    send_from_directory,
+    session,
+    url_for,
 )
-CORS(app)
+from plotly.subplots import make_subplots
+from werkzeug.security import check_password_hash
+
+from pihti import __version__
+from pihti.utils.hostinfo import get_hostinfo
 
 
-@app.context_processor
-def inject_hostinfo():
-    return dict(hostinfo=get_hostinfo())
+PKG_DIR = Path(__file__).resolve().parent
+MAX_LOGS = 1000
 
 
-@app.route("/")
-def home():
-    return render_template("index.html", hostinfo=get_hostinfo())
+def _default_private_dir() -> Path:
+    if local_app_data := os.environ.get("LOCALAPPDATA"):
+        return Path(local_app_data) / "pihti-diagram"
+    return Path.home() / ".config" / "pihti-diagram"
 
 
-# History routes (before catch-all so /history/* is not served as static)
-@app.route("/history")
-def serve_history_view():
-    return render_template("history.html", hostinfo=get_hostinfo())
+def _env_path(name: str, default: Path) -> Path:
+    value = os.environ.get(name)
+    return Path(value).expanduser() if value else default
 
 
-@app.route("/history/events", methods=["GET"])
-def get_history_events():
-    """Return parsed log events as JSON for history timeline."""
-    events = load_history_events()
-    payload = [
-        {
-            "ts": e["ts"].strftime("%Y-%m-%d %H:%M:%S"),
-            "id": e["id"],
-            "state": e["state"],
-            "user": e["user"],
-        }
-        for e in events
-    ]
-    return jsonify(payload)
+def _boolean_env(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-@app.route("/history/state/<int:idx>", methods=["GET"])
-def get_history_state(idx):
-    """Return reconstructed diagram state at history index idx."""
-    events = load_history_events()
-    if idx < 0 or idx >= len(events):
-        return jsonify({"error": "Invalid index"}), 400
-    state_now = elements_state_to_bool(elements_state)
-    reconstructed = state_at_index(events, state_now, idx)
-    return jsonify({"index": idx, "state": reconstructed})
-
-
-@app.route("/<path:path>")
-def serve_static_files(path):
-    return send_from_directory(app.static_folder, path)
-
-
-# Backend routes
-elements_state = {}
-logs = []
-
-
-def load_settings():
-    """Load settings from a JSON file."""
-    if not os.path.exists(SETTINGS_FILE):
-        raise FileNotFoundError(f"Settings file '{SETTINGS_FILE}' not found.")
-
-    with open(SETTINGS_FILE, "r") as file:
-        try:
-            settings = json.load(file)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Error parsing '{SETTINGS_FILE}': {e}")
-
-    if "CUDATA_DIRECTORY" not in settings:
-        raise KeyError("Missing 'CUDATA_DIRECTORY' in settings.")
-
-    return settings["CUDATA_DIRECTORY"]
-
-
-def load_logs_from_csv(file_path):
-    """load logs from csv"""
-    logs = []
+def _load_or_create_session_secret() -> bytes:
+    if inline_secret := os.environ.get("PIHTI_SESSION_SECRET"):
+        return inline_secret.encode("utf-8")
+    key_file = _env_path(
+        "PIHTI_SESSION_KEY_FILE", _default_private_dir() / "session.key"
+    )
     try:
-        with open(file_path, "r") as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                row["timestamp"] = row["timestamp"]
-                logs.append(row)
+        return key_file.read_bytes()
     except FileNotFoundError:
-        print(f"Log file {file_path} not found.")
-    return logs
+        key_file.parent.mkdir(parents=True, exist_ok=True)
+        key_file.write_bytes(secrets.token_bytes(32))
+        key_file.chmod(0o600)
+        return key_file.read_bytes()
 
 
-# MARK: History (reverse state replay)
-def load_history_events(file_path=None):
-    """
-    Load logs.csv and return events as list of:
-    {"ts": datetime, "id": str, "state": bool, "user": str}
-    Order preserved as in file (chronological).
-    """
-    path = file_path or log_file_path
+def _load_json(path: Path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return default
+
+
+def load_logs_from_csv(file_path: Path) -> list[dict[str, str]]:
+    try:
+        with file_path.open("r", newline="", encoding="utf-8") as csvfile:
+            return list(csv.DictReader(csvfile))
+    except FileNotFoundError:
+        return []
+
+
+def save_log_csv(log_entry: dict[str, str], file_path: Path) -> None:
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_exists = file_path.exists()
+    with file_path.open("a", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=["timestamp", "id", "status", "user"])
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(log_entry)
+
+
+def load_history_events(file_path: Path) -> list[dict]:
     events = []
-    try:
-        with open(path, "r") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                ts_str = row.get("timestamp", "")
-                try:
-                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-                except ValueError:
-                    ts = datetime.min
-                status = (row.get("status", "inactive") or "inactive").strip().lower()
-                state = status == "active"
-                events.append(
-                    {
-                        "ts": ts,
-                        "id": row.get("id", ""),
-                        "state": state,
-                        "user": row.get("user", ""),
-                    }
-                )
-    except FileNotFoundError:
-        pass
+    for row in load_logs_from_csv(file_path):
+        try:
+            timestamp = datetime.strptime(row.get("timestamp", ""), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            timestamp = datetime.min
+        events.append(
+            {
+                "ts": timestamp,
+                "id": row.get("id", ""),
+                "state": (row.get("status", "inactive") or "inactive").strip().lower()
+                == "active",
+                "user": row.get("user", ""),
+            }
+        )
     return events
 
 
-def state_at_index(events, state_now, idx):
-    """
-    Reconstruct diagram state at history index `idx` by reverse-applying
-    later events. Log entries are absolute state assignments; we restore
-    the previous value (prev), not toggle. Returns {id: bool}.
-    """
+def state_at_index(events: list[dict], state_now: dict[str, bool], idx: int) -> dict[str, bool]:
+    """Reconstruct absolute element state after event ``idx``."""
     state = dict(state_now)
-    last_by_id = {}
-    prev = [None] * len(events)
-    for i in range(len(events)):
-        pid = events[i]["id"]
-        prev[i] = last_by_id.get(pid)
-        last_by_id[pid] = events[i]["state"]
-    for i in range(len(events) - 1, idx, -1):
-        e = events[i]
-        rid = e["id"]
-        if prev[i] is not None:
-            state[rid] = prev[i]
-        else:
-            state[rid] = False
+    last_by_id: dict[str, bool] = {}
+    previous: list[bool | None] = [None] * len(events)
+    for event_idx, event in enumerate(events):
+        element_id = event["id"]
+        previous[event_idx] = last_by_id.get(element_id)
+        last_by_id[element_id] = event["state"]
+    for event_idx in range(len(events) - 1, idx, -1):
+        event = events[event_idx]
+        state[event["id"]] = (
+            previous[event_idx] if previous[event_idx] is not None else False
+        )
     return state
 
 
-def elements_state_to_bool(d):
-    """Convert {id: 'active'|'inactive'} to {id: bool}."""
-    return {k: (v == "active") for k, v in d.items()}
-
-
-@app.route("/download_logs")
-def download_logs():
-    return send_file(log_file_path, as_attachment=True)
-
-
-# MARK: Update
-@app.route("/update", methods=["POST"])
-def update_element():
-    if "username" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.json
-    username = session["username"]
-    element_id = data.get("id")
-    status = data.get("status")
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    if not element_id or not status:
-        return jsonify({"error": "Invalid data"}), 400
-
-    current = elements_state.get(element_id, "inactive")
-    if current == status:
-        return jsonify({"message": "State unchanged", "state": elements_state}), 200
-
-    elements_state[element_id] = status
-
-    with open(state_file_path, "w") as f:
-        json.dump(elements_state, f, indent=4)
-
-    logs.append(
-        {"timestamp": timestamp, "id": element_id, "status": status, "user": username}
+def _load_users(app: Flask) -> dict[str, str]:
+    inline_key = os.environ.get("PIHTI_USERS_KEY")
+    key = (
+        inline_key.encode("ascii")
+        if inline_key
+        else Path(app.config["USERS_KEY_FILE"]).read_bytes().strip()
     )
-    save_log_csv(
-        {"timestamp": timestamp, "id": element_id, "status": status, "user": username},
-        log_file_path,
-    )
-
-    return jsonify({"message": "State updated successfully", "state": elements_state}), 200
-
-
-def save_log_csv(log_entry, log_file_path):
-    """Append a log entry to a CSV file."""
-    file_exists = os.path.exists(log_file_path)
+    encrypted_data = Path(app.config["USERS_FILE_ENCRYPTED"]).read_bytes()
     try:
-        with open(log_file_path, "a", newline="") as csvfile:
-            fieldnames = ["timestamp", "id", "status", "user"]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            if not file_exists:
-                writer.writeheader()
-            if isinstance(log_entry.get("timestamp"), datetime):
-                log_entry["timestamp"] = log_entry["timestamp"].strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-            writer.writerow(log_entry)
-    except Exception as e:
-        print(f"Error saving log entry: {e}")
+        users = json.loads(Fernet(key).decrypt(encrypted_data).decode("utf-8"))
+    except (InvalidToken, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError("The encrypted users file or its key is invalid.") from exc
+    if not isinstance(users, dict) or not all(
+        isinstance(name, str) and isinstance(password_hash, str)
+        for name, password_hash in users.items()
+    ):
+        raise RuntimeError("The encrypted users file has an invalid structure.")
+    return users
 
 
-@app.route("/logs-raw", methods=["GET"])
-def get_logs():
-    return jsonify(logs)
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "username" not in session:
+            wants_json = (
+                request.accept_mimetypes.best == "application/json"
+                or request.path.startswith("/download")
+                or request.path.startswith("/history/")
+            )
+            if wants_json:
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for("login_page", next=request.path))
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
-@app.route("/state", methods=["GET"])
-def get_state():
-    return jsonify(elements_state)
-
-
-@app.route("/navbar")
-def navbar():
-    return render_template("navbar.html")
-
-
-# MARK: Vacuum State
-if os.path.exists(state_file_path):
-    with open(state_file_path, "r") as f:
-        elements_state = json.load(f)
-else:
-    elements_state = {}
-
-
-@app.route("/elements-state", methods=["GET"])
-def get_elements_state():
-    return jsonify(elements_state)
-
-
-@app.route("/elements-config", methods=["GET"])
-def serve_config():
-    return send_from_directory(directory=app.static_folder, path="elementsConfig.json")
-
-
-# MARK: Plotly
-@app.route("/plasmaplots")
-def plasmaplots():
-    data_path_configured = False
-    files = []
+def parse_datetime_from_filename(file_name: str) -> datetime:
     try:
-        data_dir = load_settings()
-        if os.path.isdir(data_dir):
-            data_path_configured = True
-            files = [
-                f
-                for f in os.listdir(data_dir)
-                if f.endswith(".csv") and f.startswith("cu_")
-            ]
-
-            def parse_datetime_from_filename(fname):
-                datetime_str = fname[3 : 3 + 15]
-                return datetime.strptime(datetime_str, "%Y%m%d_%H%M%S")
-
-            files.sort(key=parse_datetime_from_filename, reverse=True)
-    except (FileNotFoundError, KeyError):
-        pass
-
-    return render_template(
-        "plasmaplots.html",
-        files=files,
-        data_path_configured=data_path_configured,
-        hostinfo=get_hostinfo(),
-    )
+        return datetime.strptime(file_name[3:18], "%Y%m%d_%H%M%S")
+    except ValueError:
+        return datetime.min
 
 
-@app.route("/plot", methods=["POST", "GET"])
-def plot_file():
-    global last_plot_html
-    file_name = request.form["file"]
-    file_path = os.path.join(load_settings(), file_name)
-    columns = get_cu_columns(file_path)
-    df = pd.read_csv(file_path, skiprows=10, names=columns)
-    plot_html = generate_plot_html(df, ["Ip_c"], ["Pu_c", "Pd_c", "Bu_c"])
-    last_plot_html = plot_html
-    with open(LAST_PLOT_FILE, "w", encoding="utf-8") as f:
-        f.write(plot_html)
-    return jsonify(plot=plot_html)
+def get_cu_columns(file_path: Path) -> list[str]:
+    with file_path.open("r", encoding="utf-8") as file:
+        for line in file:
+            if line.startswith("# Columns"):
+                return line.split(",", 1)[1].strip().split(", ")
+    raise ValueError(f"No '# Columns' header found in {file_path.name}.")
 
 
-@app.route("/get_last_plot", methods=["GET"])
-def get_last_plot():
-    global last_plot_html
-    if last_plot_html:
-        print("last plot in memory")
-        return jsonify({"plot": last_plot_html})
-    try:
-        with open(LAST_PLOT_FILE, "r", encoding="utf-8") as f:
-            return jsonify({"plot": f.read()})
-    except FileNotFoundError:
-        return jsonify({"plot": "<p>No plot available. Please generate one.</p>"}), 404
-    except Exception as e:
-        print(f"Error reading last plot: {e}")
-        return jsonify(
-            {"plot": f"<p>Error fetching last plot, plot something first?: {e}</p>"}
-        ), 500
-
-
-def generate_plot_html(df, columns_lin, columns_log):
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.1,
-    )
-    for column in columns_lin:
-        fig.add_trace(
-            go.Scatter(x=df["date"], y=df[column], mode="lines", name=column),
+def generate_plot_html(dataframe, columns_linear, columns_log):
+    figure = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
+    for column in columns_linear:
+        figure.add_trace(
+            go.Scatter(x=dataframe["date"], y=dataframe[column], mode="lines", name=column),
             row=1,
             col=1,
         )
     for column in columns_log:
-        fig.add_trace(
-            go.Scatter(x=df["date"], y=df[column], mode="lines", name=column),
+        figure.add_trace(
+            go.Scatter(x=dataframe["date"], y=dataframe[column], mode="lines", name=column),
             row=2,
             col=1,
         )
-    fig.update_layout(
+    figure.update_layout(
         height=800,
-        yaxis=dict(title="Signals (Linear)", type="linear"),
-        yaxis2=dict(title="Signals (Log)", type="log", tickformat=".1e"),
-        legend=dict(title="Signals"),
+        yaxis={"title": "Signals (Linear)", "type": "linear"},
+        yaxis2={"title": "Signals (Log)", "type": "log", "tickformat": ".1e"},
+        legend={"title": "Signals"},
     )
-    return pio.to_html(fig, full_html=False)
+    return pio.to_html(figure, full_html=False)
 
 
-def get_cu_columns(file_path):
-    with open(file_path, "r") as file:
-        for line in file:
-            if line.startswith("# Columns"):
-                columns = line.split(",", 1)[1].strip().split(", ")
-                break
-    return columns
+def create_app(test_config: dict | None = None) -> Flask:
+    runtime_root = _env_path("PIHTI_DATA_ROOT", Path.cwd()).resolve()
+    supplied_secret = (test_config or {}).get("SECRET_KEY")
+    app = Flask(
+        __name__,
+        static_folder=str(PKG_DIR / "static"),
+        static_url_path="/static",
+        template_folder=str(PKG_DIR / "templates"),
+    )
+    app.config.from_mapping(
+        SECRET_KEY=supplied_secret or _load_or_create_session_secret(),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Strict",
+        SESSION_COOKIE_SECURE=_boolean_env("PIHTI_COOKIE_SECURE"),
+        MAX_CONTENT_LENGTH=64 * 1024,
+        SETTINGS_FILE=_env_path("PIHTI_SETTINGS_FILE", runtime_root / "settings.json"),
+        LOG_FILE=runtime_root / "logs.csv",
+        STATE_FILE=runtime_root / "elements_state.json",
+        LAST_PLOT_FILE=runtime_root / "last_plot.html",
+        ELEMENTS_CONFIG_FILE=PKG_DIR / "static" / "elementsConfig.json",
+        USERS_FILE_ENCRYPTED=_env_path(
+            "PIHTI_USERS_FILE", runtime_root / "users.json.enc"
+        ),
+        USERS_KEY_FILE=_env_path(
+            "PIHTI_USERS_KEY_FILE", _default_private_dir() / "users.key"
+        ),
+        CUDATA_DIRECTORY=os.environ.get("PIHTI_CUDATA_DIRECTORY"),
+    )
+    if test_config:
+        app.config.update(test_config)
+
+    state_file = Path(app.config["STATE_FILE"])
+    elements_state: dict[str, str] = _load_json(state_file, {})
+    logs = load_logs_from_csv(Path(app.config["LOG_FILE"]))[-MAX_LOGS:]
+    element_config = _load_json(Path(app.config["ELEMENTS_CONFIG_FILE"]), [])
+    valid_elements = {
+        item["id"] for item in element_config if isinstance(item, dict) and "id" in item
+    }
+    users_cache: dict[str, str] | None = None
+    last_plot_html: str | None = None
+
+    def load_settings() -> Path:
+        if app.config.get("CUDATA_DIRECTORY"):
+            directory = Path(app.config["CUDATA_DIRECTORY"])
+        else:
+            settings = _load_json(Path(app.config["SETTINGS_FILE"]), {})
+            directory_value = settings.get("CUDATA_DIRECTORY")
+            if not directory_value:
+                raise RuntimeError(
+                    "Set PIHTI_CUDATA_DIRECTORY or CUDATA_DIRECTORY in the local settings file."
+                )
+            directory = Path(directory_value)
+        if not directory.is_dir():
+            raise RuntimeError("The configured control-unit data directory is unavailable.")
+        return directory.resolve()
+
+    def available_cu_files() -> list[str]:
+        return sorted(
+            (
+                path.name
+                for path in load_settings().iterdir()
+                if path.is_file()
+                and path.name.startswith("cu_")
+                and path.suffix.lower() == ".csv"
+            ),
+            key=parse_datetime_from_filename,
+            reverse=True,
+        )
+
+    def resolve_cu_file(file_name: str | None) -> Path:
+        if (
+            not file_name
+            or Path(file_name).name != file_name
+            or file_name not in available_cu_files()
+        ):
+            abort(404)
+        return load_settings() / file_name
+
+    @app.context_processor
+    def inject_page_context():
+        return {"hostinfo": get_hostinfo(), "app_version": __version__}
+
+    @app.before_request
+    def reject_cross_origin_writes():
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            origin = request.headers.get("Origin")
+            if origin and origin.rstrip("/") != request.host_url.rstrip("/"):
+                abort(403)
+
+    @app.after_request
+    def security_headers(response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+
+    @app.route("/")
+    def home():
+        return render_template("index.html")
+
+    @app.route("/history")
+    @login_required
+    def serve_history_view():
+        return render_template("history.html")
+
+    @app.route("/history/events")
+    @login_required
+    def get_history_events():
+        events = load_history_events(Path(app.config["LOG_FILE"]))
+        return jsonify(
+            [
+                {
+                    "ts": event["ts"].strftime("%Y-%m-%d %H:%M:%S"),
+                    "id": event["id"],
+                    "state": event["state"],
+                    "user": event["user"],
+                }
+                for event in events
+            ]
+        )
+
+    @app.route("/history/state/<int:idx>")
+    @login_required
+    def get_history_state(idx):
+        events = load_history_events(Path(app.config["LOG_FILE"]))
+        if idx < 0 or idx >= len(events):
+            return jsonify({"error": "Invalid index"}), 400
+        state_now = {key: value == "active" for key, value in elements_state.items()}
+        return jsonify({"index": idx, "state": state_at_index(events, state_now, idx)})
+
+    @app.route("/update", methods=["POST"])
+    @login_required
+    def update_element():
+        data = request.get_json(silent=True) or {}
+        element_id = data.get("id")
+        status = data.get("status")
+        if element_id not in valid_elements or status not in {"active", "inactive"}:
+            return jsonify({"error": "Invalid element or status"}), 400
+        if elements_state.get(element_id, "inactive") == status:
+            return jsonify({"message": "State unchanged", "state": elements_state})
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        elements_state[element_id] = status
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(json.dumps(elements_state, indent=4) + "\n", encoding="utf-8")
+        log_entry = {
+            "timestamp": timestamp,
+            "id": element_id,
+            "status": status,
+            "user": session["username"],
+        }
+        logs.append(log_entry)
+        del logs[:-MAX_LOGS]
+        save_log_csv(log_entry, Path(app.config["LOG_FILE"]))
+        return jsonify({"message": "State updated successfully", "state": elements_state})
+
+    @app.route("/download_logs")
+    @login_required
+    def download_logs():
+        return send_file(Path(app.config["LOG_FILE"]), as_attachment=True)
+
+    @app.route("/logs-raw")
+    @login_required
+    def get_logs():
+        return jsonify(logs)
+
+    @app.route("/state")
+    def get_state():
+        return jsonify(elements_state)
+
+    @app.route("/elements-state")
+    def get_elements_state():
+        return jsonify(elements_state)
+
+    @app.route("/elements-config")
+    def serve_config():
+        return send_from_directory(directory=app.static_folder, path="elementsConfig.json")
+
+    @app.route("/navbar")
+    def navbar():
+        return render_template("navbar.html")
+
+    @app.route("/version")
+    def version():
+        return jsonify({"name": "pihti", "version": __version__})
+
+    @app.route("/plasmaplots")
+    @login_required
+    def plasmaplots():
+        try:
+            files = available_cu_files()
+            configured = True
+        except RuntimeError:
+            files = []
+            configured = False
+        return render_template(
+            "plasmaplots.html", files=files, data_path_configured=configured
+        )
+
+    @app.route("/plot", methods=["POST"])
+    @login_required
+    def plot_file():
+        nonlocal last_plot_html
+        file_path = resolve_cu_file(request.form.get("file"))
+        columns = get_cu_columns(file_path)
+        dataframe = pd.read_csv(file_path, skiprows=10, names=columns)
+        last_plot_html = generate_plot_html(
+            dataframe, ["Ip_c"], ["Pu_c", "Pd_c", "Bu_c"]
+        )
+        plot_path = Path(app.config["LAST_PLOT_FILE"])
+        plot_path.parent.mkdir(parents=True, exist_ok=True)
+        plot_path.write_text(last_plot_html, encoding="utf-8")
+        return jsonify(plot=last_plot_html)
+
+    @app.route("/get_last_plot")
+    @login_required
+    def get_last_plot():
+        if last_plot_html:
+            return jsonify({"plot": last_plot_html})
+        try:
+            plot = Path(app.config["LAST_PLOT_FILE"]).read_text(encoding="utf-8")
+            return jsonify({"plot": plot})
+        except FileNotFoundError:
+            return jsonify({"plot": "<p>No plot available. Please generate one.</p>"}), 404
+
+    @app.route("/download_controlunit_csv")
+    @login_required
+    def download_controlunit_csv():
+        file_path = resolve_cu_file(request.args.get("file"))
+        return send_file(file_path, as_attachment=True, download_name=file_path.name)
+
+    @app.route("/login", methods=["POST"])
+    def login():
+        nonlocal users_cache
+        try:
+            if users_cache is None:
+                users_cache = _load_users(app)
+        except (FileNotFoundError, RuntimeError):
+            current_app.logger.exception("Authentication configuration is unavailable")
+            return jsonify({"message": "Authentication is not configured on this machine."}), 503
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+        if username in users_cache and check_password_hash(users_cache[username], password):
+            session.clear()
+            session["username"] = username
+            return jsonify({"message": "Login successful", "username": username})
+        return jsonify({"message": "Invalid username or password"}), 401
+
+    @app.route("/logout")
+    def logout():
+        session.clear()
+        return redirect(url_for("login_page"))
+
+    @app.route("/loginpage")
+    def login_page():
+        return render_template("login.html")
+
+    @app.route("/get_current_user")
+    def get_current_user():
+        return jsonify(
+            {"is_authenticated": "username" in session, "username": session.get("username")}
+        )
+
+    @app.route("/<path:path>")
+    def serve_static_files(path):
+        return send_from_directory(app.static_folder, path)
+
+    return app
 
 
-@app.route("/download_controlunit_csv", methods=["GET"])
-def download_controlunit_csv():
-    file_name = request.args.get("file")
-    if not file_name:
-        return "No file specified", 400
-    file_path = os.path.join(load_settings(), file_name)
-    if not os.path.isfile(file_path):
-        return "File not found", 404
-    return send_file(file_path, as_attachment=True, download_name=file_name)
-
-
-# MARK: LOGIN
-app.secret_key = "app secret key"
-USERS_FILE_ENCRYPTED = "users.json.enc"
-DECRYPTED_FILE_TEMP = "users.json"
-
-
-def load_key():
-    try:
-        with open("secret.key", "rb") as key_file:
-            return key_file.read()
-    except FileNotFoundError:
-        raise ValueError("Key file 'secret.key' not found. Please generate it first.")
-
-
-def decrypt_users_file():
-    key = load_key()
-    fernet = Fernet(key)
-    with open(USERS_FILE_ENCRYPTED, "rb") as encrypted_file:
-        encrypted_data = encrypted_file.read()
-    decrypted_data = fernet.decrypt(encrypted_data)
-    with open(DECRYPTED_FILE_TEMP, "wb") as decrypted_file:
-        decrypted_file.write(decrypted_data)
-
-
-def load_users():
-    decrypt_users_file()
-    with open(DECRYPTED_FILE_TEMP, "r") as file:
-        users = json.load(file)
-    os.remove(DECRYPTED_FILE_TEMP)
-    return users
-
-
-def get_users():
-    """Load users from encrypted file (fresh read each login)."""
-    return load_users()
-
-
-@app.route("/login", methods=["POST"])
-def login():
-    users = get_users()
-    username = request.form["username"]
-    password = request.form["password"]
-    if username in users and check_password_hash(users[username], password):
-        session["username"] = username
-        return jsonify({"message": "Login successful", "username": username}), 200
-    return jsonify({"message": "Invalid username or password"}), 401
-
-
-@app.route("/logout", methods=["GET"])
-def logout():
-    session.pop("username", None)
-    return redirect(url_for("login_page"))
-
-
-@app.route("/loginpage", methods=["GET"])
-def login_page():
-    return render_template("login.html", hostinfo=get_hostinfo())
-
-
-@app.route("/get_current_user", methods=["GET"])
-def get_current_user():
-    is_authenticated = "username" in session
-    username = session.get("username", None)
-    return jsonify({"is_authenticated": is_authenticated, "username": username})
+app = create_app()
 
 
 def main():
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    host = os.environ.get("PIHTI_HOST", "127.0.0.1")
+    port = int(os.environ.get("PIHTI_PORT", "5000"))
+    debug = _boolean_env("PIHTI_DEBUG")
+    if debug and host not in {"127.0.0.1", "localhost", "::1"}:
+        raise SystemExit("PIHTI_DEBUG may only be used on a loopback host.")
+    app.run(host=host, port=port, debug=debug)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,16 @@
     on the Control Unit Raspberry Pi.
   </div>
 </div>
+{% elif not files %}
+<div class="ui-notice">
+  <span class="ui-notice-icon">ℹ️</span>
+  <div class="ui-notice-text">
+    <strong>No control-unit CSV files found</strong><br>
+    The configured directory contains no files beginning with <code>cu_</code>.
+  </div>
+</div>
 {% endif %}
+{% if files %}
 <h1>Select a CSV File to Plot</h1>
 <form id="fileForm" style="display: flex; justify-content: space-between; align-items: center;">
     <div>
@@ -25,6 +34,7 @@
     </div>
     <button type="button" id="downloadBtn" class="btn-download">Download CSV</button>
 </form>
+{% endif %}
 <div id="plotArea">
 
     <div id="plotPlaceholder" style="text-align: center; padding: 50px; font-size: 1.2em;">
@@ -40,7 +50,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<script src="/static/js/plasmaplots.js"></script>
+<script src="{{ url_for('static', filename='js/plasmaplots.js') }}"></script>
 {% endblock %}

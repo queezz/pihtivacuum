@@ -1,10 +1,14 @@
 <!-- templates/navbar.html -->
 <div class="navbar">
     <div class="navbar-container">
-        <div class="navbar-logo"><a href="{{ url_for('home') }}">PIHTI</a></div>
-        <div class="navbar-toggle" onclick="toggleNavbar()">
-            <span id="toggleIcon">&#9776;</span>
+        <div class="navbar-logo">
+            <a href="{{ url_for('home') }}">PIHTI</a>
+            <span class="navbar-version" title="PIHTI release">v{{ app_version }}</span>
         </div>
+        <button class="navbar-toggle" type="button" aria-label="Open navigation"
+                aria-controls="navbarItems" aria-expanded="false">
+            <span id="toggleIcon" aria-hidden="true">&#9776;</span>
+        </button>
         <ul class="navbar-items" id="navbarItems">
             <li><a href="{{ url_for('home') }}">Vacuum</a></li>
             <li><a href="{{ url_for('serve_history_view') }}">History</a></li>

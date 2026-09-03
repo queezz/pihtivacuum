@@ -1,39 +1,49 @@
 """Utility to generate Fernet keys and encrypt/decrypt user files."""
 
+import os
+from pathlib import Path
+
 from cryptography.fernet import Fernet
 
 
-def generate_key():
+def key_path() -> Path:
+    if configured := os.environ.get("PIHTI_USERS_KEY_FILE"):
+        return Path(configured).expanduser()
+    if local_app_data := os.environ.get("LOCALAPPDATA"):
+        return Path(local_app_data) / "pihti-diagram" / "users.key"
+    return Path.home() / ".config" / "pihti-diagram" / "users.key"
+
+
+def generate_key(force=False):
     """Generate and save a valid Fernet key."""
-    key = Fernet.generate_key()
-    with open("secret.key", "wb") as key_file:
-        key_file.write(key)
-    print("Key generated and saved as 'secret.key'.")
+    destination = key_path()
+    if destination.exists() and not force:
+        raise FileExistsError("A users key already exists; refusing to overwrite it.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(Fernet.generate_key())
+    destination.chmod(0o600)
+    print("Users key generated in private application storage.")
 
 
 def load_key():
-    return open("secret.key", "rb").read()
+    return key_path().read_bytes().strip()
 
 
 def encrypt_file(input_file, output_file):
     key = load_key()
     fernet = Fernet(key)
-    with open(input_file, "rb") as file:
-        file_data = file.read()
+    file_data = Path(input_file).read_bytes()
     encrypted_data = fernet.encrypt(file_data)
-    with open(output_file, "wb") as file:
-        file.write(encrypted_data)
+    Path(output_file).write_bytes(encrypted_data)
     print(f"File '{input_file}' encrypted as '{output_file}'.")
 
 
 def decrypt_file(input_file, output_file):
     key = load_key()
     fernet = Fernet(key)
-    with open(input_file, "rb") as file:
-        encrypted_data = file.read()
+    encrypted_data = Path(input_file).read_bytes()
     decrypted_data = fernet.decrypt(encrypted_data)
-    with open(output_file, "wb") as file:
-        file.write(decrypted_data)
+    Path(output_file).write_bytes(decrypted_data)
     print(f"File '{input_file}' decrypted as '{output_file}'.")
 
 

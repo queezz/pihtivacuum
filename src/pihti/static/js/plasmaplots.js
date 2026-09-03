@@ -1,131 +1,81 @@
-$(document).ready(function () {
-    const plotKey = 'lastPlotHtml'; // Key for indexedDB
-    const dbName = 'PlotCache';
-    const storeName = 'plots';
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('fileForm');
+    const dropdown = document.getElementById('fileDropdown');
+    const downloadButton = document.getElementById('downloadBtn');
+    const plotArea = document.getElementById('plotArea');
+    const loadingOverlay = document.getElementById('loading-overlay');
 
-    // IndexedDB helper functions
-    function openDatabase() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(dbName, 1);
-            request.onupgradeneeded = function () {
-                const db = request.result;
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName, { keyPath: 'key' });
-                }
-            };
-            request.onsuccess = function () {
-                resolve(request.result);
-            };
-            request.onerror = function () {
-                reject(request.error);
-            };
-        });
+    function setLoading(isLoading) {
+        if (loadingOverlay) loadingOverlay.style.display = isLoading ? 'flex' : 'none';
     }
 
-    function savePlotToDB(key, plotHtml) {
-        return openDatabase().then(db => {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(storeName, 'readwrite');
-                const store = tx.objectStore(storeName);
-                store.put({ key: key, plot: plotHtml });
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
-        });
-    }
-
-    function loadPlotFromDB(key) {
-        return openDatabase().then(db => {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(storeName, 'readonly');
-                const store = tx.objectStore(storeName);
-                const request = store.get(key);
-                request.onsuccess = () => resolve(request.result?.plot || null);
-                request.onerror = () => reject(request.error);
-            });
-        });
-    }
-
-    // Load the last plot from indexedDB on page load
-    loadPlotFromDB(plotKey)
-        .then(cachedPlot => {
-            if (cachedPlot) {
-                $('#plotArea').html(cachedPlot);
-            } else {
-                fetchLastPlot();
+    function installPlotHtml(html) {
+        if (!plotArea) return;
+        plotArea.innerHTML = html;
+        plotArea.querySelectorAll('script').forEach(oldScript => {
+            const script = document.createElement('script');
+            for (const attribute of oldScript.attributes) {
+                script.setAttribute(attribute.name, attribute.value);
             }
-        })
-        .catch(error => console.error('Error loading plot from DB:', error));
-
-    // Function to fetch the last plot from the server
-    function fetchLastPlot() {
-        $('#loading-overlay').show(); // Show spinner
-        $.ajax({
-            url: '/get_last_plot',
-            method: 'GET',
-            success: function (response) {
-                const plotHtml = response.plot;
-                $('#plotArea').html(plotHtml); // Display plot
-                savePlotToDB(plotKey, plotHtml).catch(err =>
-                    console.error('Error saving plot to DB:', err)
-                );
-            },
-            error: function (xhr, status, error) {
-                console.error('Error fetching the last plot:', error);
-                $('#plotArea').html('<p>Error loading plot.</p>');
-            },
-            complete: function () {
-                $('#loading-overlay').hide(); // Hide spinner
-            }
+            script.textContent = oldScript.textContent;
+            oldScript.replaceWith(script);
         });
     }
 
-    // On page load, pre-select the last file if it exists
-    const lastFile = localStorage.getItem('lastFile');
-    if (lastFile) {
-        $('#fileDropdown').val(lastFile); // Pre-select the last file in dropdown
+    async function fetchLastPlot() {
+        setLoading(true);
+        try {
+            const response = await fetch('/get_last_plot');
+            const payload = await response.json();
+            if (response.ok || response.status === 404) {
+                installPlotHtml(payload.plot || '<p>No plot available. Please generate one.</p>');
+                return;
+            }
+            throw new Error(payload.error || `Request failed (${response.status})`);
+        } catch (error) {
+            console.error('Unable to load the last plot:', error);
+            installPlotHtml('<p>The last plot could not be loaded.</p>');
+        } finally {
+            setLoading(false);
+        }
     }
 
-    // Form submission handler
-    $('#fileForm').on('submit', function (e) {
-        e.preventDefault();
+    async function fetchPlot(file) {
+        setLoading(true);
+        try {
+            const body = new URLSearchParams({file});
+            const response = await fetch('/plot', {method: 'POST', body});
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+            installPlotHtml(payload.plot);
+        } catch (error) {
+            console.error('Unable to generate the plot:', error);
+            alert('Failed to generate the selected plot.');
+        } finally {
+            setLoading(false);
+        }
+    }
 
-        const selectedFile = $('#fileDropdown').val();
-        localStorage.setItem('lastFile', selectedFile); // Save selected file
+    if (dropdown) {
+        const lastFile = localStorage.getItem('lastFile');
+        if (lastFile && Array.from(dropdown.options).some(option => option.value === lastFile)) {
+            dropdown.value = lastFile;
+        }
+    }
+
+    form?.addEventListener('submit', event => {
+        event.preventDefault();
+        const selectedFile = dropdown?.value;
+        if (!selectedFile) return;
+        localStorage.setItem('lastFile', selectedFile);
         fetchPlot(selectedFile);
     });
 
-    // Function to fetch and display a new plot
-    function fetchPlot(file) {
-        $('#loading-overlay').show(); // Show spinner
-        $.ajax({
-            url: '/plot',
-            method: 'POST',
-            data: { file: file },
-            success: function (response) {
-                const plotHtml = response.plot;
-                $('#plotArea').html(plotHtml); // Display plot
-                savePlotToDB(plotKey, plotHtml).catch(err =>
-                    console.error('Error saving plot to DB:', err)
-                );
-            },
-            error: function (xhr, status, error) {
-                console.error('Error fetching plot:', error);
-                alert('Failed to load plot.');
-            },
-            complete: function () {
-                $('#loading-overlay').hide(); // Hide spinner
-            }
-        });
-    }
-
-    // Download button handling
-    $('#downloadBtn').on('click', function () {
-        const selectedFile = $('#fileDropdown').val();
-        if (!selectedFile) {
-            alert('No file selected.');
-            return;
-        }
-        window.location.href = '/download_controlunit_csv?file=' + encodeURIComponent(selectedFile);
+    downloadButton?.addEventListener('click', () => {
+        const selectedFile = dropdown?.value;
+        if (!selectedFile) return;
+        window.location.href = `/download_controlunit_csv?file=${encodeURIComponent(selectedFile)}`;
     });
+
+    fetchLastPlot();
 });

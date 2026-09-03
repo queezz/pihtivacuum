@@ -1,6 +1,8 @@
 # Interactive Vacuum
 Interactive vacuum diagram for PIHTI
 
+Current application release: **0.2.0**. The same version is visible in the navigation bar and at `/version`.
+
 ## Contents
 
 - [Interactive Vacuum](#interactive-vacuum)
@@ -112,20 +114,13 @@ Run from the **project root** (where `pyproject.toml` lives). The server reads `
 python -m pihti run
 ```
 
-**Background mode (Linux / Raspberry Pi):**
-
-```bash
-python -m pihti run --nohup
-```
-
-Output appends to `pihti.log`. The process survives terminal close.
-
 Optional host/port:
 
 ```bash
 python -m pihti run --host 0.0.0.0 --port 5000
-python -m pihti run --nohup --port 8000
 ```
+
+The default bind is loopback (`127.0.0.1`). Use the checked-in systemd unit for a Raspberry Pi service; local long-running and scratch instances belong in Fleet Lab rather than a background shell.
 
 ---
 ## <a id="raspberry-pi-service-deployment"></a> 🍓 Raspberry Pi service deployment
@@ -274,7 +269,7 @@ This project uses a simple user system:
 | ---------------- | -------------------------------------- |
 | `users.json`     | Plain user database (hashed passwords) |
 | `users.json.enc` | Encrypted version (safe to sync)       |
-| `secret.key`     | Local encryption key (DO NOT COMMIT)   |
+| private `users.key` | Local encryption key outside the repository (DO NOT COMMIT) |
 
 ---
 
@@ -286,11 +281,7 @@ This project uses a simple user system:
 python -m pihti.encrypt_users generate_key
 ```
 
-This creates:
-
-```
-secret.key
-```
+This creates the key in private application storage (`%LOCALAPPDATA%\pihti-diagram\users.key` on Windows or `~/.config/pihti-diagram/users.key` elsewhere). Set `PIHTI_USERS_KEY_FILE` to use another private location.
 
 ⚠️ **Never commit this file.**
 Copy it manually to any machine that needs access.
@@ -333,7 +324,7 @@ Now you can safely:
 
 * Commit `users.json.enc`
 * Do NOT commit `users.json`
-* Do NOT commit `secret.key`
+* Do NOT commit or sync the private users key
 
 Optional: delete plaintext file after encryption:
 
@@ -347,7 +338,7 @@ rm users.json
 
 ## <a id="decrypt-users-file-after-pulling-from-github"></a>🔓 Decrypt Users File (After Pulling from GitHub)
 
-Make sure `secret.key` exists locally.
+Make sure the private users key exists locally.
 
 ```bash
 python -m pihti.encrypt_users decrypt users.json.enc users.json
@@ -376,7 +367,7 @@ commit .enc
 
 ```
 pull
-copy secret.key manually
+copy the private users key manually
 decrypt
 ```
 
@@ -385,9 +376,9 @@ decrypt
 ## <a id="notes"></a>🧠 Notes
 
 * This system is designed for **convenience**, not strong security.
-* Anyone with `secret.key` can decrypt users.
+* Anyone with the private users key can decrypt users.
 * Passwords are hashed — they are never stored in plaintext.
-* If `secret.key` is lost, encrypted files cannot be recovered.
+* If the private users key is lost, encrypted files cannot be recovered.
 
 ---
 
@@ -396,7 +387,7 @@ decrypt
 One-command wrapper for common tasks:
 
 ```bash
-python -m pihti.manage_users generate_key       # Create secret.key
+python -m pihti.manage_users generate_key       # Create the private users key
 python -m pihti.manage_users add <user> <pw>   # Add/update user
 python -m pihti.manage_users encrypt           # users.json -> users.json.enc
 python -m pihti.manage_users decrypt           # users.json.enc -> users.json
