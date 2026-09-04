@@ -39,6 +39,19 @@ Addresses stay in each machine's own local configuration, never in a portable
 repository. PIHTI Log already keeps this project's addresses that way
 (`diagram_urls` in its machine-local config).
 
+## Built (0.7.0, 2026-09-04)
+
+`GET /api/health` answers `{service, version, status, detail}` with the
+detail "diagram changed N min ago" or "no diagram changes recorded yet";
+`GET /api/neighbours` returns this service plus the two neighbours as rows
+`{alias, name, url, state, version, detail}` in ControlUnit's five states
+(`ok`, `degraded`, `down`, `unreachable`, `not configured`), probed
+server-side with a two-second timeout and a ten-second cache, exactly as
+`controlunit/web/neighbours.py` does; the Services tab renders them. Neighbour
+addresses live only in the machine-local settings file (`NEIGHBOURS` key) or
+`PIHTI_NEIGHBOURS`. On the Pi the diagram answers at port 5000, ControlUnit's
+web view at 4187; PIHTI Log serves from the office PC at 4310.
+
 ## Invariants this project keeps
 
 - **No service depends on another to run.** A neighbour that is down is shown

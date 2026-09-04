@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Services · PIHTI{% endblock %}
+
+{% block content %}
+<div class="page">
+    <aside class="rail rail-left" id="services-controls" aria-label="Services controls">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card">
+            <h2 class="rail-label">Check</h2>
+            <button type="button" id="services-refresh" style="width: 100%;">Ask again now</button>
+            <p class="muted" id="services-checked" style="margin-top: 10px; margin-bottom: 0;">Not checked yet.</p>
+        </section>
+    </aside>
+
+    <main class="page-main">
+        <div class="rail-toggles" aria-label="Side panels">
+            <button type="button" data-drawer="services-controls" aria-controls="services-controls" aria-expanded="false">Check</button>
+            <button type="button" data-drawer="services-context" aria-controls="services-context" aria-expanded="false">About</button>
+        </div>
+        {% if not configured %}
+        <p class="notice" style="margin-bottom: 16px;"><strong>This machine has not been told where the other two services live.</strong> Add a <code>NEIGHBOURS</code> object to the local settings file in the data root, for example <code>{"pihti-log": "http://host:4310", "controlunit": "http://host:4187"}</code>, and reload.</p>
+        {% endif %}
+        <div id="services-board" class="services" aria-live="polite"></div>
+    </main>
+
+    <aside class="rail rail-right" id="services-context" aria-label="About the ensemble">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card">
+            <h2 class="rail-label">The ensemble</h2>
+            <p class="muted">Three PIHTI surfaces run side by side: this diagram, the PIHTI Log journal, and the ControlUnit acquisition. Each one carries this tab, so from any of them you can reach the other two.</p>
+            <p class="muted">No service depends on another to run. Each row is what this machine could learn just now: <strong>ok</strong>, <strong>degraded</strong> or <strong>down</strong> is what the service said of itself; <strong>unreachable</strong> means nothing answered from here within two seconds; <strong>not configured</strong> means this machine was never told the address.</p>
+            <p class="muted" style="margin-bottom: 0;">Start a stopped service on its own machine with the <code>lab</code> line shown on its card.</p>
+        </section>
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/services.js') }}"></script>
+{% endblock %}

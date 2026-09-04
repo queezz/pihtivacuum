@@ -4,6 +4,7 @@
         <a class="tab" href="{{ url_for('home') }}" {% if active_nav == 'home' %}aria-current="page"{% endif %}>Vacuum</a>
         <a class="tab" href="{{ url_for('serve_history_view') }}" {% if active_nav == 'serve_history_view' %}aria-current="page"{% endif %}>History</a>
         <a class="tab" href="{{ url_for('plasmaplots') }}" {% if active_nav == 'plasmaplots' %}aria-current="page"{% endif %}>Plot</a>
+        <a class="tab" href="{{ url_for('services') }}" {% if active_nav == 'services' %}aria-current="page"{% endif %}>Services</a>
     </div>
     <div class="tab-meta">
         {% if hostinfo is defined %}

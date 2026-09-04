@@ -65,9 +65,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.6.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.6.0"}
-    assert b"v0.6.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.7.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.7.0"}
+    assert b"v0.7.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -82,7 +82,7 @@ def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_
 
 
 def test_every_page_shares_the_rail_grid_and_marks_its_tab(client):
-    for path, endpoint_label in (("/", "Vacuum"), ("/history", "History"), ("/plasmaplots", "Plot")):
+    for path, endpoint_label in (("/", "Vacuum"), ("/history", "History"), ("/plasmaplots", "Plot"), ("/services", "Services")):
         response = client.get(path)
         assert response.status_code == 200
         assert response.headers["Cache-Control"] == "no-store"
@@ -119,7 +119,7 @@ def test_operator_roster_is_plain_names_without_passwords(client, app):
 
 
 def test_operator_is_chosen_in_the_top_bar_on_every_page(client):
-    for path in ("/", "/history", "/plasmaplots"):
+    for path in ("/", "/history", "/plasmaplots", "/services"):
         page = client.get(path).data.decode("utf-8")
         assert 'id="operator-select"' in page
         assert ">Read only<" in page
@@ -338,6 +338,51 @@ def test_plot_finds_recordings_by_calendar_day_not_by_one_long_list(client, tmp_
 
     groups = group_files_by_day(["cu_20260101_120000.csv"])
     assert groups[0]["label"].startswith("2026-01-01 · ") and groups[0]["files"][0]["time"] == "12:00:00"
+
+
+def test_health_endpoint_keeps_the_ensemble_contract(client):
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    body = response.json
+    assert set(body) == {"service", "version", "status", "detail"}
+    assert body["service"] == "pihti-diagram" and body["status"] == "ok"
+    assert body["version"] == __version__
+    assert body["detail"] == "no diagram changes recorded yet"
+    assert "/" not in body["detail"] and "\\" not in body["detail"]
+    identify(client)
+    client.post("/update", json={"id": "GVU", "status": "active"})
+    assert client.get("/api/health").json["detail"] == "diagram changed less than a minute ago"
+
+
+def test_services_board_names_five_states_and_never_guesses(tmp_path):
+    answers = {
+        "http://log.test:4310": ("ok", "0.20.1", "a session is open"),
+        "http://rig.test:4187": ("unreachable", "", "no answer within two seconds"),
+    }
+    app = make_app(
+        tmp_path,
+        NEIGHBOURS={"pihti-log": "http://log.test:4310/", "controlunit": "http://rig.test:4187"},
+        NEIGHBOUR_PROBE=lambda url: answers[url],
+    )
+    client = app.test_client()
+    rows = client.get("/api/neighbours").json["services"]
+    assert [row["alias"] for row in rows] == ["pihti-diagram", "pihti-log", "controlunit"]
+    assert rows[0]["state"] == "ok" and rows[0]["url"] == ""
+    assert rows[1] == {"alias": "pihti-log", "name": "PIHTI Log", "url": "http://log.test:4310",
+                       "state": "ok", "version": "0.20.1", "detail": "a session is open"}
+    assert rows[2]["state"] == "unreachable" and rows[2]["url"] == "http://rig.test:4187"
+    page = client.get("/services").data.decode("utf-8")
+    assert "has not been told" not in page and 'id="services-board"' in page
+
+    bare = make_app(tmp_path).test_client()
+    rows = bare.get("/api/neighbours").json["services"]
+    assert [row["state"] for row in rows[1:]] == ["not configured", "not configured"]
+    assert "has not been told where the other two services live" in bare.get("/services").data.decode("utf-8")
+
+    from pihti import neighbours
+
+    assert neighbours.read_addresses({"NEIGHBOURS": {"pihti-log": {"url": "http://a/"}, "x": 3}}) == {"pihti-log": "http://a"}
 
 
 def test_missing_plot_folder_has_friendly_notice(tmp_path):

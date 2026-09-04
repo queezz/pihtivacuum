@@ -29,6 +29,7 @@ from flask import (
 )
 from plotly.subplots import make_subplots
 from pihti import __version__
+from pihti import neighbours as ensemble
 from pihti.roster import default_private_dir as _default_private_dir
 from pihti.roster import env_path as _env_path
 from pihti.roster import resolve_operators, roster_path
@@ -587,6 +588,55 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.route("/version")
     def version():
         return jsonify({"name": "pihti", "version": __version__})
+
+    # -- the three-service ensemble -----------------------------------------
+    # Contract agreed with PIHTI Log and ControlUnit (2026-09-04): one
+    # unauthenticated GET /api/health per service, {service, version, status,
+    # detail}, status in ok/degraded/down, no path or secret in the body.
+
+    def neighbour_addresses() -> dict[str, str]:
+        if isinstance(app.config.get("NEIGHBOURS"), dict):
+            return ensemble.read_addresses({"NEIGHBOURS": app.config["NEIGHBOURS"]})
+        return ensemble.read_addresses(_load_json(Path(app.config["SETTINGS_FILE"]), {}))
+
+    board = ensemble.NeighbourBoard(neighbour_addresses, probe=app.config.get("NEIGHBOUR_PROBE") or ensemble.read_health)
+
+    def self_health() -> dict:
+        events = load_history_events(Path(app.config["LOG_FILE"]))
+        if events:
+            age = datetime.now() - events[-1]["ts"]
+            minutes = int(age.total_seconds() // 60)
+            if minutes < 1:
+                detail = "diagram changed less than a minute ago"
+            elif minutes < 120:
+                detail = f"diagram changed {minutes} min ago"
+            elif minutes < 48 * 60:
+                detail = f"diagram changed {minutes // 60} h ago"
+            else:
+                detail = f"diagram changed {minutes // (60 * 24)} days ago"
+        else:
+            detail = "no diagram changes recorded yet"
+        return {"service": ensemble.SELF_ALIAS, "version": __version__, "status": "ok", "detail": detail}
+
+    @app.route("/api/health")
+    def api_health():
+        return jsonify(self_health())
+
+    @app.route("/api/neighbours")
+    def api_neighbours():
+        if request.args.get("fresh"):
+            board.forget()
+        me = self_health()
+        rows = [
+            {"alias": ensemble.SELF_ALIAS, "name": ensemble.DISPLAY_NAMES[ensemble.SELF_ALIAS],
+             "url": "", "state": me["status"], "version": me["version"], "detail": me["detail"]},
+            *board.neighbours(),
+        ]
+        return jsonify({"services": rows, "checked_at": datetime.now().strftime(TIMESTAMP_FORMAT)})
+
+    @app.route("/services")
+    def services():
+        return render_template("services.html", configured=bool(neighbour_addresses()))
 
     @app.route("/plasmaplots")
     def plasmaplots():

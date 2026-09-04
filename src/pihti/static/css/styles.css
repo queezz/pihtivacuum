@@ -576,3 +576,38 @@ details.command pre {
   .container { padding: 0 10px; }
   #diagram-container { border-radius: 8px; }
 }
+
+/* -- services (the three-service ensemble) ---------------------------- */
+
+.services { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+
+.service-card {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.service-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.service-head h2 { margin: 0; font-size: 1.05rem; }
+
+/* One chip states the five states; the rail explains them once. */
+.state-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.state-ok .state-chip { color: var(--accent2); border-color: rgba(102, 194, 165, 0.45); background: var(--accent2-wash); }
+.state-degraded .state-chip { color: var(--amber-fg); border-color: var(--amber-border); background: var(--amber-bg); }
+.state-down .state-chip { color: var(--brick-fg); border-color: var(--brick-border); background: var(--brick-bg); }
+.state-unreachable .state-chip { color: var(--fg); border-style: dashed; }
+.state-not-configured .state-chip { color: var(--dim); }
+
+.service-actions { margin: 12px 0 0; }
+.service-actions a.button { width: 100%; }
