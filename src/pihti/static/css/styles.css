@@ -364,12 +364,29 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 
 .guide-alert { margin: 0 0 10px; }
 
-.operation-marker { pointer-events: none; }
-.operation-marker circle { fill: #f3e3bd; stroke: #2b211f; stroke-width: 3; }
-.operation-marker text { fill: #241b1b; font: bold 16px sans-serif; }
-.operation-marker.current circle { fill: #e0513e; stroke: white; stroke-width: 4; }
-.operation-marker.current text { fill: white; }
-.operation-marker.complete circle { fill: #7cab64; }
+/* Guide markers sit on the authored orange diagram, so they are the one
+   thing drawn in the page's own dark ink with a white rim: nothing on the
+   diagram itself looks like them. The current step's markers carry a
+   breathing halo; pointing at a step in the rail swells its markers. */
+.operation-marker { pointer-events: none; transition: transform 120ms ease-out; }
+.operation-marker circle { fill: #1c1f26; stroke: #ffffff; stroke-width: 3.5; }
+.operation-marker text { fill: #ffffff; font: bold 18px sans-serif; }
+.operation-marker .halo { display: none; fill: none; stroke: #ffffff; stroke-width: 3; opacity: 0.9; }
+.operation-marker.current circle { fill: #e0513e; }
+.operation-marker.current .halo { display: block; animation: marker-halo 1.6s ease-out infinite; }
+.operation-marker.complete circle { fill: #2f7d4f; }
+.operation-marker.spot circle:not(.halo) { stroke-width: 6; }
+.operation-marker.spot text { font-size: 22px; }
+@keyframes marker-halo {
+  from { r: 18; opacity: 0.9; }
+  to { r: 34; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .operation-marker.current .halo { animation: none; r: 26; opacity: 0.6; }
+}
+
+.guide-steps li { cursor: default; outline-offset: 2px; }
+.guide-steps li:hover, .guide-steps li:focus-visible { background: rgba(255, 255, 255, 0.05); }
 
 /* -- identity ---------------------------------------------------------- */
 
@@ -442,7 +459,24 @@ details.command pre {
 
 /* -- plot -------------------------------------------------------------- */
 
+.file-find { width: 100%; margin: 0 0 8px; background: var(--inset); font-family: var(--mono); font-size: 0.85rem; }
 .filelist { display: flex; flex-direction: column; gap: 2px; }
+.filelist details { border-top: 1px solid var(--line); }
+.filelist details:first-child { border-top: 0; }
+.filelist summary {
+  cursor: pointer;
+  padding: 7px 8px 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fg-muted, #9aa3ad);
+  list-style: none;
+}
+.filelist summary::-webkit-details-marker { display: none; }
+.filelist summary::before { content: "▸ "; }
+.filelist details[open] > summary::before { content: "▾ "; }
+.filelist summary .count { float: right; font-weight: 400; }
+.filelist button[hidden] { display: none; }
 .filelist button {
   width: 100%;
   padding: 5px 8px;

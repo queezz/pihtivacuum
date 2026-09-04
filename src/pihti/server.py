@@ -221,6 +221,32 @@ def parse_datetime_from_filename(file_name: str) -> datetime:
         return datetime.min
 
 
+def group_files_by_day(files: list[str]) -> list[dict]:
+    """Newest-first control-unit files folded into one group per recording day.
+
+    Each group is ``{"date": "2026-06-10", "label": "2026-06-10 · Wed",
+    "files": [{"name", "time"}]}``; a file whose name carries no timestamp
+    lands in a last group labelled "Undated" with its whole name as the time.
+    """
+    groups: list[dict] = []
+    by_date: dict[str, dict] = {}
+    for name in files:
+        recorded = parse_datetime_from_filename(name)
+        if recorded == datetime.min:
+            key, label, time = "undated", "Undated", name
+        else:
+            key = recorded.strftime("%Y-%m-%d")
+            label = f"{key} · {recorded.strftime('%a')}"
+            time = recorded.strftime("%H:%M:%S")
+        group = by_date.get(key)
+        if group is None:
+            group = by_date[key] = {"date": key, "label": label, "files": []}
+            groups.append(group)
+        group["files"].append({"name": name, "time": time})
+    groups.sort(key=lambda group: group["date"] != "undated", reverse=True)
+    return groups
+
+
 def get_cu_columns(file_path: Path) -> list[str]:
     with file_path.open("r", encoding="utf-8") as file:
         for line in file:
@@ -571,7 +597,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             files = []
             configured = False
         return render_template(
-            "plasmaplots.html", files=files, data_path_configured=configured
+            "plasmaplots.html",
+            files=files,
+            file_days=group_files_by_day(files),
+            data_path_configured=configured,
         )
 
     PLOT_LINEAR_CHANNELS = ["Ip_c"]

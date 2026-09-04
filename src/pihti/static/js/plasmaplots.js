@@ -54,6 +54,9 @@
     function markSelected(file) {
         selectedFile = fileButtons.some((button) => button.dataset.file === file) ? file : null;
         fileButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.file === selectedFile)));
+        const selectedButton = fileButtons.find((button) => button.dataset.file === selectedFile);
+        const group = selectedButton?.closest("details");
+        if (group) group.open = true;
         if (download) {
             download.setAttribute("aria-disabled", String(!selectedFile));
             download.href = selectedFile ? `/download_controlunit_csv?file=${encodeURIComponent(selectedFile)}` : "#";
@@ -102,6 +105,28 @@
             setLoading(false);
         }
     }
+
+    /* Find: type part of a day or a time; groups with no match fold away,
+     * groups with one open. Clearing the box restores the folded view with
+     * only the newest day open, or the selected file's day. */
+    const find = document.getElementById("file-find");
+    const dayGroups = Array.from(document.querySelectorAll("#file-list details[data-day]"));
+    function applyFind() {
+        const query = (find?.value || "").trim().toLowerCase();
+        dayGroups.forEach((group, groupIndex) => {
+            let shown = 0;
+            group.querySelectorAll("button[data-file]").forEach((button) => {
+                const hay = `${button.dataset.file} ${group.dataset.day} ${button.dataset.time}`.toLowerCase();
+                const hit = !query || hay.includes(query);
+                button.hidden = !hit;
+                if (hit) shown += 1;
+            });
+            group.hidden = shown === 0;
+            const holdsSelection = selectedFile && group.querySelector(`button[data-file="${CSS.escape(selectedFile)}"]`);
+            group.open = query ? shown > 0 : Boolean(holdsSelection) || (!selectedFile && groupIndex === 0);
+        });
+    }
+    find?.addEventListener("input", applyFind);
 
     fileButtons.forEach((button) => {
         button.addEventListener("click", () => {

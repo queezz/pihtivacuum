@@ -65,9 +65,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.4.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.4.1"}
-    assert b"v0.4.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.5.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.5.0"}
+    assert b"v0.5.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -298,7 +298,35 @@ def test_operation_guide_targets_exist_and_manual_boundary_is_explicit(client):
     svg_ids = {element.get("id") for element in svg_root.iter() if element.get("id")}
     for guide in guides["guides"]:
         assert guide["steps"][-1]["manual"] is True
-        assert all(step["targetId"] in svg_ids for step in guide["steps"])
+        for step in guide["steps"]:
+            targets = step.get("targets") or [{"id": step["targetId"]}]
+            assert targets, step
+            assert all(target["id"] in svg_ids for target in targets), step
+            if not step.get("manual"):
+                assert step["desiredStatus"] in {"active", "inactive"}
+    # Owner shape 2026-09-04: gauges together first, then gate valve with
+    # its turbo, then every route between the two vessels.
+    plasma = next(guide for guide in guides["guides"] if guide["id"] == "vent-plasma")
+    ids = [[target["id"] for target in step["targets"]] for step in plasma["steps"]]
+    assert ids[0] == ["upstream-single-gauge", "bypass-ionization-gauge"]
+    assert ids[1] == ["GVU", "TMPU"]
+    assert "valve_qms" in ids[2] and len(ids[2]) == 4
+
+
+def test_plot_file_list_is_grouped_by_day_with_a_find_box(client, tmp_path):
+    control_data = tmp_path / "control-data"
+    for name in ("cu_20260610_194248.csv", "cu_20260610_185959.csv", "cu_20260609_211051.csv", "cu_notes.csv"):
+        (control_data / name).write_text("t,Ip_c\n", encoding="utf-8")
+    page = client.get("/plasmaplots").data.decode("utf-8")
+    assert 'id="file-find"' in page
+    assert page.index('data-day="2026-06-10"') < page.index('data-day="2026-06-09"') < page.index('data-day="undated"')
+    assert '<details data-day="2026-06-10" open>' in page
+    assert 'data-file="cu_20260610_194248.csv" data-time="19:42:48"' in page
+    assert page.count("<details data-day=") == 4  # two June days, the fixture's January file, undated
+    from pihti.server import group_files_by_day
+
+    groups = group_files_by_day(["cu_20260101_120000.csv"])
+    assert groups[0]["label"].startswith("2026-01-01 · ") and groups[0]["files"][0]["time"] == "12:00:00"
 
 
 def test_missing_plot_folder_has_friendly_notice(tmp_path):

@@ -84,8 +84,22 @@
         });
     }
 
+    /* A step names one element (`targetId`) or several (`targets`), and is
+     * done in the diagram only when every one of them is in the wanted state. */
+    function stepTargets(step) {
+        if (Array.isArray(step.targets)) return step.targets;
+        return step.targetId ? [{id: step.targetId, markerOffset: step.markerOffset}] : [];
+    }
+
     function guideStepSatisfied(step) {
-        return !step.manual && normalizedStatus(vacuumState[step.targetId]) === step.desiredStatus;
+        const targets = stepTargets(step);
+        return !step.manual && targets.length > 0
+            && targets.every((target) => normalizedStatus(vacuumState[target.id]) === step.desiredStatus);
+    }
+
+    function spotlightStep(index, on) {
+        document.querySelectorAll(`#operation-guide-overlay .operation-marker[data-step="${index}"]`)
+            .forEach((marker) => marker.classList.toggle("spot", on));
     }
 
     function rootPointForElement(svg, element, offset) {
@@ -108,20 +122,28 @@
         overlay.id = "operation-guide-overlay";
         overlay.setAttribute("aria-hidden", "true");
         activeGuide.steps.forEach((step, index) => {
-            const target = svg.querySelector(`#${CSS.escape(step.targetId)}`);
-            if (!target) return;
-            const point = rootPointForElement(svg, target, step.markerOffset);
-            const marker = document.createElementNS(SVG_NS, "g");
-            marker.setAttribute("class", `operation-marker ${stepStates[index]}`);
-            marker.setAttribute("transform", `translate(${point.x} ${point.y})`);
-            const circle = document.createElementNS(SVG_NS, "circle");
-            circle.setAttribute("r", "15");
-            const text = document.createElementNS(SVG_NS, "text");
-            text.setAttribute("text-anchor", "middle");
-            text.setAttribute("dominant-baseline", "central");
-            text.textContent = String(index + 1);
-            marker.append(circle, text);
-            overlay.appendChild(marker);
+            stepTargets(step).forEach((stepTarget) => {
+                const target = svg.querySelector(`#${CSS.escape(stepTarget.id)}`);
+                if (!target) return;
+                const point = rootPointForElement(svg, target, stepTarget.markerOffset);
+                const marker = document.createElementNS(SVG_NS, "g");
+                marker.setAttribute("class", `operation-marker ${stepStates[index]}`);
+                marker.dataset.step = String(index);
+                marker.setAttribute("transform", `translate(${point.x} ${point.y})`);
+                // A halo ring behind the current step's markers, so the eye
+                // finds "next" without reading the rail.
+                const halo = document.createElementNS(SVG_NS, "circle");
+                halo.setAttribute("class", "halo");
+                halo.setAttribute("r", "18");
+                const circle = document.createElementNS(SVG_NS, "circle");
+                circle.setAttribute("r", "18");
+                const text = document.createElementNS(SVG_NS, "text");
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("dominant-baseline", "central");
+                text.textContent = String(index + 1);
+                marker.append(halo, circle, text);
+                overlay.appendChild(marker);
+            });
         });
         svg.appendChild(overlay);
     }
@@ -154,11 +176,19 @@
         list.replaceChildren(...activeGuide.steps.map((step, index) => {
             const item = document.createElement("li");
             item.className = stepStates[index];
+            item.tabIndex = 0;
             const label = document.createElement("span");
             label.textContent = step.action;
             const state = document.createElement("small");
-            state.textContent = stepStates[index] === "complete" ? "Done in diagram" : stepStates[index] === "current" ? "Next" : "Later";
+            const names = stepTargets(step).map((target) => target.id).join(", ");
+            const word = stepStates[index] === "complete" ? "Done in diagram" : stepStates[index] === "current" ? "Next" : "Later";
+            state.textContent = names ? `${word} · ${names}` : word;
             item.append(label, state);
+            // Pointing at a step swells its markers on the diagram.
+            item.addEventListener("mouseenter", () => spotlightStep(index, true));
+            item.addEventListener("mouseleave", () => spotlightStep(index, false));
+            item.addEventListener("focus", () => spotlightStep(index, true));
+            item.addEventListener("blur", () => spotlightStep(index, false));
             return item;
         }));
         const warning = (activeGuide.alerts || []).find((candidate) =>

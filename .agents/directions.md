@@ -2,8 +2,14 @@
 
 - Split `diagram.svg` at valve boundaries and wrap each continuously connected plumbing volume in a stable `zone-*` group without changing the existing valve, pump, or gauge IDs — owner work pending.
   Done when: every volume whose connectivity can change independently has one unambiguous group ID, so the application can derive connected components without guessing from path geometry.
-- Review and correct the prototype `Vent Plasma` and `Vent QMS` sequences in `static/operationGuides.json`, including exact valve names, ordering, and marker placement — owner guidance pending after hands-on use.
-  Done when: each step matches the physical operating procedure and the owner accepts the diagram markers and rail wording.
+- Confirm or correct the reshaped `Vent Plasma` and `Vent QMS` guides in `static/operationGuides.json` (0.5.0, shape from queezz 2026-09-04: gauges together, then gate valve with its turbo, then every route between the two vessels, then the gas line). The session guessed the four vessel-to-vessel routes as `valve_qms`, `GVBU`, `GVBD` and `Rough-Bypass`, and the plasma-side gauges as `upstream-single-gauge` plus `bypass-ionization-gauge` — owner guidance pending: which elements are really the four routes and which gauges belong to each vessel.
+  Done when: queezz names the routes and gauges, the JSON matches, and the guide loses its prototype flag.
+- Colour the diagram by predicted vacuum state (which volumes are connected to which pump or gauge) once the `zone-*` groups exist; the guides above are a first pass by design ("make a guide first, not a rule", queezz 2026-09-04), and the proper procedure comes after the colour build.
+  Done when: each zone renders a connectivity prediction labelled as such, and the vent guides read the prediction instead of a fixed element list.
+- Back up this diagram's runtime data (`logs.csv`, `elements_state.json`, `operators.json`, the operation-context files) from the Pi to the lab NAS. queezz's leaning on 2026-09-04: automatic, rather than a button on the web UI run from his PC; he copies by hand today. — owner decision pending: automatic on the Pi (a timer copying to the NAS share) or a button on the web UI, and where on the NAS.
+  Stakes: automatic needs the NAS share mounted on the Pi and runs unattended; a button needs nothing on the Pi but only works when someone presses it.
+  Recommendation: automatic, a daily copy from the Pi with the date in the folder name, because the data is tiny and the Pi is always on.
+  Safe default: none; hand copies continue.
 - Answer PIHTI Log's ensemble proposal (`.agents/ensemble-health.md`, letter `20260904-651a603e-d29c3c`): add `GET /api/health` returning `{service, version, status, detail}` with `status` one of `ok`, `degraded`, `down`, then reply to `code/pihti-log` with the shape and the port this project settles on.
   Done when: `/api/health` answers unauthenticated on the same origin with `Cache-Control: no-store` and no path, secret, or instrument address in its body; a test covers the contract; and the reply letter has been posted.
 - Grow the ensemble tab: one surface listing all three PIHTI services — ControlUnit, PIHTI Log, this diagram — each with its health, its link, and the `lab <alias>` that starts it, with neighbour addresses read from machine-local configuration rather than the repository.

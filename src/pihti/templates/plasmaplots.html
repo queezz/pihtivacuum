@@ -7,12 +7,18 @@
     <aside class="rail rail-left" id="plot-controls" aria-label="Plot controls">
         <button class="drawer-close" type="button">Close</button>
         <section class="rail-card rail-card--growing">
-            <h2 class="rail-label">Control-unit files</h2>
+            <h2 class="rail-label">Control-unit files <span class="count">{{ files|length }}</span></h2>
             {% if files %}
+            <input id="file-find" class="file-find" type="search" placeholder="Find a day or time, e.g. 0610 or 19:" aria-label="Find a control-unit file by date or time" autocomplete="off">
             <div class="scrolls">
-                <div id="file-list" class="filelist" role="group" aria-label="Control-unit CSV files, newest first">
-                    {% for file in files %}
-                    <button type="button" data-file="{{ file }}" aria-pressed="false" title="{{ file }}">{{ file }}</button>
+                <div id="file-list" class="filelist" role="group" aria-label="Control-unit CSV files by day, newest first">
+                    {% for day in file_days %}
+                    <details data-day="{{ day.date }}"{% if loop.first %} open{% endif %}>
+                        <summary>{{ day.label }} <span class="count">{{ day.files|length }}</span></summary>
+                        {% for file in day.files %}
+                        <button type="button" data-file="{{ file.name }}" data-time="{{ file.time }}" aria-pressed="false" title="{{ file.name }}">{{ file.time }}</button>
+                        {% endfor %}
+                    </details>
                     {% endfor %}
                 </div>
             </div>
