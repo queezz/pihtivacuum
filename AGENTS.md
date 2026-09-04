@@ -45,4 +45,8 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
 - The palette is Fleet's dark paperlib set; lecturedeck is never the model for this UI. The authored SVG keeps its own colours.
 - Any UI change runs Fleet's Perimeter Walk on a scratch `lab` service before it ships.
 
+## Deployment
+
+The lab Raspberry Pi (`pihti:5000`) serves this diagram from an editable install of `/home/pi/pihtivacuum` on Python 3.9, run by `deploy/pihti.service`; laptops and phones read it. It deploys by pulling `master` from GitHub, so a shipping session pushes after committing (owner decision 2026-09-04, see `.agents/README.md`) and then pulls and restarts on the Pi. Keep the package importable on Python 3.9.
+
 Read `.agents/README.md` for workflow, `.agents/directions.md` for open owner decisions, and `.agents/log/` for session evidence. Fleet-wide policy remains in Fleet's `RULES-BRIEF.md` and routed references.
