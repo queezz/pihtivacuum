@@ -65,9 +65,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.5.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.5.1"}
-    assert b"v0.5.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.6.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.6.0"}
+    assert b"v0.6.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -318,16 +318,22 @@ def test_operation_guide_targets_exist_and_manual_boundary_is_explicit(client):
     assert "upstream-baratron" not in sum(ids[:4], [])
 
 
-def test_plot_file_list_is_grouped_by_day_with_a_find_box(client, tmp_path):
+def test_plot_finds_recordings_by_calendar_day_not_by_one_long_list(client, tmp_path):
     control_data = tmp_path / "control-data"
     for name in ("cu_20260610_194248.csv", "cu_20260610_185959.csv", "cu_20260609_211051.csv", "cu_notes.csv"):
         (control_data / name).write_text("t,Ip_c\n", encoding="utf-8")
     page = client.get("/plasmaplots").data.decode("utf-8")
-    assert 'id="file-find"' in page
-    assert page.index('data-day="2026-06-10"') < page.index('data-day="2026-06-09"') < page.index('data-day="undated"')
-    assert '<details data-day="2026-06-10" open>' in page
-    assert 'data-file="cu_20260610_194248.csv" data-time="19:42:48"' in page
-    assert page.count("<details data-day=") == 4  # two June days, the fixture's January file, undated
+    assert 'id="plot-calendar"' in page and 'id="calendar-latest"' in page
+    assert 'id="file-list"' in page and "calendar.js" in page
+    # The archive reaches the browser as data, never as thirteen hundred buttons.
+    assert "<details" not in page and 'data-file="cu_' not in page
+    payload = json.loads(page.split('id="file-days-data">', 1)[1].split("</script>", 1)[0])
+    assert [group["date"] for group in payload] == ["2026-06-10", "2026-06-09", "2026-01-01", "undated"]
+    assert payload[0]["files"] == [
+        {"name": "cu_20260610_194248.csv", "time": "19:42:48"},
+        {"name": "cu_20260610_185959.csv", "time": "18:59:59"},
+    ]
+    assert client.get("/history").data.decode("utf-8").count("calendar.js") == 1
     from pihti.server import group_files_by_day
 
     groups = group_files_by_day(["cu_20260101_120000.csv"])

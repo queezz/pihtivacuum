@@ -459,24 +459,8 @@ details.command pre {
 
 /* -- plot -------------------------------------------------------------- */
 
-.file-find { width: 100%; margin: 0 0 8px; background: var(--inset); font-family: var(--mono); font-size: 0.85rem; }
 .filelist { display: flex; flex-direction: column; gap: 2px; }
-.filelist details { border-top: 1px solid var(--line); }
-.filelist details:first-child { border-top: 0; }
-.filelist summary {
-  cursor: pointer;
-  padding: 7px 8px 5px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--fg-muted, #9aa3ad);
-  list-style: none;
-}
-.filelist summary::-webkit-details-marker { display: none; }
-.filelist summary::before { content: "▸ "; }
-.filelist details[open] > summary::before { content: "▾ "; }
-.filelist summary .count { float: right; font-weight: 400; }
-.filelist button[hidden] { display: none; }
+.rail-label .count { float: right; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--dim); }
 .filelist button {
   width: 100%;
   padding: 5px 8px;

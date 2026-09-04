@@ -81,44 +81,15 @@
     }
 
     function renderCalendar() {
-        const grid = document.getElementById("calendar-grid");
-        const label = document.getElementById("calendar-month-label");
-        if (!grid || !label) return;
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        label.textContent = currentMonth.toLocaleDateString(undefined, {month: "long", year: "numeric"});
-        const maxCount = Math.max(1, ...Object.values(dailyCounts));
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const today = todayStr();
-        const cells = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((name) => {
-            const head = document.createElement("div");
-            head.className = "cal-head";
-            head.textContent = name;
-            return head;
+        window.pihtiCalendar?.render({
+            grid: document.getElementById("calendar-grid"),
+            label: document.getElementById("calendar-month-label"),
+            month: currentMonth,
+            counts: dailyCounts,
+            selected: selectedDate,
+            noun: "change",
+            onSelect: selectDate,
         });
-        for (let i = 0; i < new Date(year, month, 1).getDay(); i += 1) {
-            const empty = document.createElement("div");
-            empty.className = "cal-empty";
-            cells.push(empty);
-        }
-        for (let day = 1; day <= daysInMonth; day += 1) {
-            const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
-            const count = dailyCounts[dateStr] || 0;
-            const cell = document.createElement("button");
-            cell.type = "button";
-            cell.className = "cal-day" + (count ? " has-events" : "") + (dateStr === today ? " today" : "");
-            cell.dataset.date = dateStr;
-            cell.textContent = String(day);
-            cell.setAttribute("aria-pressed", String(dateStr === selectedDate));
-            cell.setAttribute("aria-label", `${dateStr}, ${count} change${count === 1 ? "" : "s"}`);
-            if (count) {
-                const intensity = 0.18 + 0.55 * Math.min(1, count / maxCount);
-                cell.style.backgroundColor = `rgba(126, 184, 247, ${intensity.toFixed(2)})`;
-            }
-            cell.addEventListener("click", () => selectDate(dateStr));
-            cells.push(cell);
-        }
-        grid.replaceChildren(...cells);
     }
 
     function renderTimeline() {

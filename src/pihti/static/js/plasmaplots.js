@@ -1,13 +1,41 @@
-/* Plot: the file list in the left rail is the control, the plot is the
- * content, the right rail states which file and channels the plot shows. */
+/* Plot: the left rail finds a recording by calendar day (a month grid, then
+ * the day's few files), the plot is the content, the right rail states which
+ * file and channels the plot shows. Thirteen hundred files never render as
+ * one list: a rail card shows a day, not the archive. */
 (function () {
     "use strict";
 
     const plotArea = document.getElementById("plotArea");
     const overlay = document.getElementById("loading-overlay");
     const download = document.getElementById("downloadBtn");
-    const fileButtons = Array.from(document.querySelectorAll("#file-list button[data-file]"));
+    const calendar = window.pihtiCalendar;
+
+    // {"YYYY-MM-DD": [{name, time}, ...]} newest day first, from the server.
+    const days = readDays();
+    const dayKeys = Object.keys(days);
+    const counts = Object.fromEntries(dayKeys.map((day) => [day, days[day].length]));
+    let selectedDate = null;
     let selectedFile = null;
+    let currentMonth = null;
+
+    function readDays() {
+        const raw = document.getElementById("file-days-data");
+        if (!raw) return {};
+        try {
+            const result = {};
+            for (const group of JSON.parse(raw.textContent)) {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(group.date)) result[group.date] = group.files;
+            }
+            return result;
+        } catch (error) {
+            console.error("The recording list could not be read", error);
+            return {};
+        }
+    }
+
+    function dayOfFile(file) {
+        return dayKeys.find((day) => days[day].some((entry) => entry.name === file)) || null;
+    }
 
     function setLoading(isLoading) {
         if (overlay) overlay.hidden = !isLoading;
@@ -41,7 +69,7 @@
         note.hidden = known;
         facts.hidden = !known;
         if (!known) {
-            note.textContent = meta ? "The last plot was made before its file was recorded." : "No plot yet. Choose a file on the left.";
+            note.textContent = meta ? "The last plot was made before its file was recorded." : "No plot yet. Choose a day and a recording on the left.";
             return;
         }
         document.getElementById("plot-file").textContent = meta.file;
@@ -51,20 +79,74 @@
         document.getElementById("plot-log").textContent = (meta.log || []).join(", ") || "—";
     }
 
-    function markSelected(file) {
-        selectedFile = fileButtons.some((button) => button.dataset.file === file) ? file : null;
-        fileButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.file === selectedFile)));
-        const selectedButton = fileButtons.find((button) => button.dataset.file === selectedFile);
-        const group = selectedButton?.closest("details");
-        if (group) group.open = true;
-        if (download) {
-            download.setAttribute("aria-disabled", String(!selectedFile));
-            download.href = selectedFile ? `/download_controlunit_csv?file=${encodeURIComponent(selectedFile)}` : "#";
-        }
+    function renderCalendar() {
+        if (!calendar || !currentMonth) return;
+        calendar.render({
+            grid: document.getElementById("plot-calendar"),
+            label: document.getElementById("calendar-month-label"),
+            month: currentMonth,
+            counts,
+            selected: selectedDate,
+            noun: "recording",
+            onSelect: selectDate,
+        });
+    }
+
+    function renderDayList() {
+        const list = document.getElementById("file-list");
+        const empty = document.getElementById("day-files-empty");
+        const label = document.getElementById("day-files-label");
+        if (!list || !empty) return;
+        const entries = selectedDate ? days[selectedDate] || [] : [];
+        if (label) label.textContent = selectedDate ? `Files · ${selectedDate}` : "Files";
+        empty.hidden = entries.length > 0;
+        list.replaceChildren(...entries.map((entry) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.dataset.file = entry.name;
+            button.title = entry.name;
+            button.textContent = entry.time;
+            button.setAttribute("aria-pressed", String(entry.name === selectedFile));
+            button.addEventListener("click", () => {
+                selectFile(entry.name);
+                fetchPlot(entry.name);
+                window.pihtiRails?.closeDrawers();
+            });
+            return button;
+        }));
+    }
+
+    function renderDownload() {
+        if (!download) return;
+        download.setAttribute("aria-disabled", String(!selectedFile));
+        download.href = selectedFile ? `/download_controlunit_csv?file=${encodeURIComponent(selectedFile)}` : "#";
     }
 
     function writeAddress() {
         window.history.replaceState(null, "", selectedFile ? `/plasmaplots?file=${encodeURIComponent(selectedFile)}` : "/plasmaplots");
+    }
+
+    function selectDate(dateStr) {
+        selectedDate = dateStr;
+        currentMonth = calendar.monthOf(dateStr);
+        if (selectedFile && dayOfFile(selectedFile) !== dateStr) selectedFile = null;
+        renderCalendar();
+        renderDayList();
+        renderDownload();
+        writeAddress();
+    }
+
+    function selectFile(file) {
+        const day = dayOfFile(file);
+        selectedFile = day ? file : null;
+        if (day) {
+            selectedDate = day;
+            currentMonth = calendar.monthOf(day);
+        }
+        renderCalendar();
+        renderDayList();
+        renderDownload();
+        writeAddress();
     }
 
     async function fetchPlot(file) {
@@ -75,7 +157,6 @@
             if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
             installPlotHtml(payload.plot);
             renderContext(payload);
-            try { localStorage.setItem("lastFile", file); } catch (error) { /* storage unavailable */ }
         } catch (error) {
             console.error("The plot could not be generated", error);
             showEmpty(`This file could not be plotted. ${error.message || ""}`.trim());
@@ -91,13 +172,13 @@
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
             if (!payload.plot) {
-                showEmpty(fileButtons.length ? "No plot yet. Choose a file on the left." : "No plot available.");
+                showEmpty(dayKeys.length ? "No plot yet. Choose a day and a recording on the left." : "No plot available.");
                 renderContext(null);
                 return;
             }
             installPlotHtml(payload.plot);
             renderContext(payload);
-            if (payload.file) markSelected(payload.file);
+            if (payload.file && dayOfFile(payload.file)) selectFile(payload.file);
         } catch (error) {
             console.error("The last plot could not be loaded", error);
             showEmpty("The last plot could not be loaded.");
@@ -106,44 +187,29 @@
         }
     }
 
-    /* Find: type part of a day or a time; groups with no match fold away,
-     * groups with one open. Clearing the box restores the folded view with
-     * only the newest day open, or the selected file's day. */
-    const find = document.getElementById("file-find");
-    const dayGroups = Array.from(document.querySelectorAll("#file-list details[data-day]"));
-    function applyFind() {
-        const query = (find?.value || "").trim().toLowerCase();
-        dayGroups.forEach((group, groupIndex) => {
-            let shown = 0;
-            group.querySelectorAll("button[data-file]").forEach((button) => {
-                const hay = `${button.dataset.file} ${group.dataset.day} ${button.dataset.time}`.toLowerCase();
-                const hit = !query || hay.includes(query);
-                button.hidden = !hit;
-                if (hit) shown += 1;
-            });
-            group.hidden = shown === 0;
-            const holdsSelection = selectedFile && group.querySelector(`button[data-file="${CSS.escape(selectedFile)}"]`);
-            group.open = query ? shown > 0 : Boolean(holdsSelection) || (!selectedFile && groupIndex === 0);
-        });
+    function shiftMonth(delta) {
+        if (!currentMonth) return;
+        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1);
+        renderCalendar();
     }
-    find?.addEventListener("input", applyFind);
 
-    fileButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-            markSelected(button.dataset.file);
-            writeAddress();
-            fetchPlot(button.dataset.file);
-            window.pihtiRails?.closeDrawers();
-        });
+    document.getElementById("calendar-prev")?.addEventListener("click", () => shiftMonth(-1));
+    document.getElementById("calendar-next")?.addEventListener("click", () => shiftMonth(1));
+    document.getElementById("calendar-latest")?.addEventListener("click", () => {
+        if (!dayKeys.length) return;
+        const latest = days[dayKeys[0]][0].name;
+        selectFile(latest);
+        fetchPlot(latest);
     });
-
     download?.addEventListener("click", (event) => {
         if (!selectedFile) event.preventDefault();
     });
 
+    // Read the address before the first render writes it back.
     const requested = new URLSearchParams(window.location.search).get("file");
-    if (requested && fileButtons.some((button) => button.dataset.file === requested)) {
-        markSelected(requested);
+    if (dayKeys.length) selectDate(dayKeys[0]);
+    if (requested && dayOfFile(requested)) {
+        selectFile(requested);
         fetchPlot(requested);
     } else {
         fetchLastPlot();
