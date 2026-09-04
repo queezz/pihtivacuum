@@ -65,9 +65,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.5.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.5.0"}
-    assert b"v0.5.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.5.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.5.1"}
+    assert b"v0.5.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -304,13 +304,18 @@ def test_operation_guide_targets_exist_and_manual_boundary_is_explicit(client):
             assert all(target["id"] in svg_ids for target in targets), step
             if not step.get("manual"):
                 assert step["desiredStatus"] in {"active", "inactive"}
-    # Owner shape 2026-09-04: gauges together first, then gate valve with
-    # its turbo, then every route between the two vessels.
+    # Owner shape 2026-09-04: ionization gauges off first (Baratron, Pirani and
+    # membrane gauges stay on at one atmosphere), then gate valve with its
+    # turbo, then every route between the two vessels, then nitrogen in
+    # through the gas line: venting means letting N2 in, not just opening up.
     plasma = next(guide for guide in guides["guides"] if guide["id"] == "vent-plasma")
     ids = [[target["id"] for target in step["targets"]] for step in plasma["steps"]]
-    assert ids[0] == ["upstream-single-gauge", "bypass-ionization-gauge"]
+    assert ids[0] == ["bypass-ionization-gauge"]
     assert ids[1] == ["GVU", "TMPU"]
     assert "valve_qms" in ids[2] and len(ids[2]) == 4
+    assert ids[3] == ["gaspanel-valve-n", "gasline-main"]
+    assert plasma["steps"][3]["desiredStatus"] == "active"
+    assert "upstream-baratron" not in sum(ids[:4], [])
 
 
 def test_plot_file_list_is_grouped_by_day_with_a_find_box(client, tmp_path):
