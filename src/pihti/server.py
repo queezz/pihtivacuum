@@ -103,7 +103,23 @@ def save_log_csv(log_entry: dict[str, str], file_path: Path) -> None:
         writer.writerow(log_entry)
 
 
+_EVENTS_CACHE: dict[Path, tuple[tuple[int, int], list[dict]]] = {}
+
+
 def load_history_events(file_path: Path) -> list[dict]:
+    """Parsed history, re-read only when the log file's size or mtime changes.
+
+    Every History request used to parse the whole CSV again; on the Raspberry
+    Pi that was most of the click-to-replay delay (0.4.1).
+    """
+    try:
+        stat = file_path.stat()
+        stamp = (stat.st_mtime_ns, stat.st_size)
+    except FileNotFoundError:
+        stamp = None
+    cached = _EVENTS_CACHE.get(file_path)
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
     events = []
     for row in load_logs_from_csv(file_path):
         try:
@@ -119,6 +135,7 @@ def load_history_events(file_path: Path) -> list[dict]:
                 "user": row.get("user", ""),
             }
         )
+    _EVENTS_CACHE[file_path] = (stamp, events)
     return events
 
 

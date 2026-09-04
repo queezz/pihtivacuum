@@ -6,6 +6,7 @@
     "use strict";
 
     let events = [];
+    let currentState = {};
     let dailyCounts = {};
     let selectedIdx = null;
     let selectedDate = null;
@@ -28,6 +29,26 @@
     function monthOf(dateStr) {
         const [year, month] = dateStr.split("-").map(Number);
         return new Date(year, month - 1, 1);
+    }
+
+    /* The log holds only changes, so a moment's state is the current state
+     * walked backwards: every change after the moment is undone to the value
+     * that element had before it. Same reconstruction as the server's
+     * /history/state-at, done here so a click costs no round trip. */
+    function stateAtIndex(idx) {
+        const state = {};
+        for (const [id, value] of Object.entries(currentState)) state[id] = value === "active";
+        const lastById = {};
+        const previous = events.map((event) => {
+            const before = lastById[event.id];
+            lastById[event.id] = event.state;
+            return before;
+        });
+        for (let eventIdx = events.length - 1; eventIdx > idx; eventIdx -= 1) {
+            const event = events[eventIdx];
+            state[event.id] = previous[eventIdx] === undefined ? false : previous[eventIdx];
+        }
+        return state;
     }
 
     function indexAtOrBefore(moment) {
@@ -172,14 +193,8 @@
         renderTimeline();
         renderMoment();
         writeAddress();
-        fetch(`/history/state/${idx}`)
-            .then((response) => response.json())
-            .then((data) => {
-                if (!data.state) return;
-                pendingState = data.state;
-                applyPendingState();
-            })
-            .catch((error) => console.error("History state could not be loaded", error));
+        pendingState = stateAtIndex(idx);
+        applyPendingState();
     }
 
     function shiftMonth(delta) {
@@ -203,10 +218,15 @@
     async function load() {
         attachListeners();
         try {
-            events = await (await fetch("/history/events")).json();
+            const [eventsResponse, stateResponse] = await Promise.all([
+                fetch("/history/events"), fetch("/elements-state"),
+            ]);
+            events = await eventsResponse.json();
+            currentState = await stateResponse.json();
         } catch (error) {
             console.error("History events could not be loaded", error);
             events = [];
+            currentState = {};
         }
         dailyCounts = {};
         events.forEach((event) => {

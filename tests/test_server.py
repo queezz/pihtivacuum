@@ -65,9 +65,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.4.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.4.0"}
-    assert b"v0.4.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.4.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.4.1"}
+    assert b"v0.4.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -162,6 +162,25 @@ def test_missing_roster_and_key_gives_an_honest_state_and_a_command(tmp_path):
     assert "-m pihti operators add" in page
     assert "<select" in page and "disabled" in page
     assert client.post("/api/identify", json={"username": "x"}).status_code == 503
+
+
+def test_history_is_parsed_once_until_the_log_changes(client, tmp_path):
+    from pihti.server import load_history_events
+
+    log_file = tmp_path / "logs.csv"
+    identify(client)
+    assert client.post("/update", json={"id": "GVU", "status": "active"}).status_code == 200
+    first = load_history_events(log_file)
+    assert load_history_events(log_file) is first
+    assert len(first) == 1
+    assert client.post("/update", json={"id": "GVU", "status": "inactive"}).status_code == 200
+    second = load_history_events(log_file)
+    assert second is not first and len(second) == 2
+    assert len(client.get("/history/events").json) == 2
+    # The browser rebuilds a moment from the events list and the current state,
+    # so the served events carry everything that reconstruction needs.
+    assert set(client.get("/history/events").json[0]) == {"ts", "id", "state", "user"}
+    assert client.get("/elements-state").json == {"GVU": "inactive"}
 
 
 def test_server_answers_on_the_lan_by_default_and_debug_stays_loopback(monkeypatch):
