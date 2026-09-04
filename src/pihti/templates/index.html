@@ -3,51 +3,49 @@
 {% block title %}PIHTI Vacuum{% endblock %}
 
 {% block content %}
-<div class="vacuum-shell">
-    <aside class="vacuum-rail vacuum-rail-left" id="guide-controls" aria-label="Diagram guide controls">
-        <button class="drawer-close" type="button" aria-label="Close context and guides">Close</button>
-        <div class="rail-section">
-            <p class="rail-eyebrow">DIAGRAM CONTEXT</p>
-            <h2>Line configuration</h2>
-            <p id="line-mode-status" class="line-mode-status" role="status">Unknown</p>
-            <div class="line-mode-options" role="group" aria-label="Line configuration annotation">
+<div class="page">
+    <aside class="rail rail-left" id="guide-controls" aria-label="Diagram controls">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card">
+            <h2 class="rail-label">Line configuration</h2>
+            <p id="line-mode-status" class="state-line" role="status">Unknown</p>
+            <div class="stack" role="group" aria-label="Line configuration annotation">
                 <button type="button" data-line-mode="membrane">Membrane installed</button>
                 <button type="button" data-line-mode="open">Pipe open</button>
                 <button type="button" data-line-mode="boron">Boron deposition</button>
             </div>
-            <p id="line-mode-note" class="rail-note"></p>
-        </div>
-        <div class="rail-section">
-            <p class="rail-eyebrow">OPERATOR GUIDE</p>
-            <h2>Choose an operation</h2>
-            <div id="operation-choices" class="operation-choices"></div>
-        </div>
+            <p id="line-mode-note" class="muted" style="margin-top: 10px;"></p>
+        </section>
+        <section class="rail-card">
+            <h2 class="rail-label">Operations</h2>
+            <div id="operation-choices" class="stack"></div>
+            <button id="clear-guide" type="button" style="margin-top: 8px; width: 100%;" hidden>Clear guide</button>
+        </section>
     </aside>
 
-    <main class="vacuum-main">
-        <div class="drawer-tabs" aria-label="Diagram side panels">
-            <button type="button" data-drawer="guide-controls" aria-controls="guide-controls" aria-expanded="false">Context &amp; guides</button>
-            <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">Current steps</button>
+    <main class="page-main">
+        <div class="rail-toggles" aria-label="Side panels">
+            <button type="button" data-drawer="guide-controls" aria-controls="guide-controls" aria-expanded="false">Controls</button>
+            <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">Current guide</button>
         </div>
-        <h1>Vacuum</h1>
         <div id="diagram-container" aria-label="PIHTI vacuum system diagram"></div>
         <div id="tooltip"></div>
     </main>
 
-    <aside class="vacuum-rail vacuum-rail-right" id="guide-steps" aria-label="Current operation guide">
-        <button class="drawer-close" type="button" aria-label="Close current steps">Close</button>
-        <div class="rail-section guide-heading">
-            <p class="rail-eyebrow">CURRENT GUIDE</p>
-            <h2 id="guide-title">No guide selected</h2>
-            <p id="guide-summary" class="guide-summary">Choose an operation on the left to place numbered steps on the diagram.</p>
-            <button id="clear-guide" class="quiet-button" type="button" hidden>Clear guide</button>
-        </div>
-        <div id="guide-alert" class="guide-alert" role="alert" hidden></div>
-        <ol id="guide-step-list" class="guide-step-list"></ol>
-        <p class="guide-boundary">Prototype diagram guidance only. It does not operate hardware, measure pressure, or replace an interlock.</p>
+    <aside class="rail rail-right" id="guide-steps" aria-label="Current operation guide">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card rail-card--growing rail-card--fit">
+            <h2 class="rail-label">Current guide</h2>
+            <h3 id="guide-title">No guide selected</h3>
+            <p id="guide-summary" class="muted">Choose an operation on the left to place numbered steps on the diagram.</p>
+            <div id="guide-alert" class="notice brick guide-alert" role="alert" hidden></div>
+            <div class="scrolls">
+                <ol id="guide-step-list" class="guide-steps"></ol>
+            </div>
+            <p class="muted" style="margin-top: 12px;">Prototype diagram guidance only. It does not operate hardware, measure pressure, or replace an interlock.</p>
+        </section>
     </aside>
 </div>
-<button class="drawer-backdrop" type="button" aria-label="Close side panel" hidden></button>
 {% endblock %}
 
 {% block extra_js %}

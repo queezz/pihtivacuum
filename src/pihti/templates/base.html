@@ -5,23 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PIHTI{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <script defer src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/rails.js') }}"></script>
 </head>
 
 <body>
-    <div id="navbar">
-        {% include 'navbar.html' %}
-    </div>
-    <div class="content">
+    {% include 'navbar.html' %}
+    <div class="container">
         {% block content %}{% endblock %}
     </div>
-    <!-- <script src="{{ url_for('static', filename='js/diagram.js') }}"></script> -->
-
-    <!-- Additional scripts can be injected into this block -->
-    {% block extra_js %}
-    <!-- Default script block, can be overridden in child templates -->
-    {% endblock %}
+    <button class="drawer-backdrop" type="button" aria-label="Close side panel" hidden></button>
+    {% block extra_js %}{% endblock %}
 </body>
 
 </html>

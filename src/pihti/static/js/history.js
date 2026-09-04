@@ -1,190 +1,232 @@
-/**
- * History timeline — load events, render list, apply state on click.
- * Calendar activity panel: jump to day, month navigation.
- */
+/* History: the calendar picks a day, the timeline picks a moment, the diagram
+ * in the main column replays the operator-entered state at that moment.
+ * The address bar carries the selection (?day=… or ?at=…) so a moment can be
+ * linked to and survives reload. */
 (function () {
+    "use strict";
+
     let events = [];
+    let dailyCounts = {};
     let selectedIdx = null;
     let selectedDate = null;
     let currentMonth = null;
-    let dailyActivity = {};
+    let pendingState = null;
+    let diagramReady = false;
 
-    function todayStr() {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const pad = (value) => String(value).padStart(2, "0");
+    const dateOf = (ts) => (ts || "").split(" ")[0];
+    const timeOf = (ts) => (ts || "").split(" ")[1] || "";
+    const isoDate = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    const todayStr = () => isoDate(new Date());
+
+    function escapeHtml(value) {
+        const div = document.createElement("div");
+        div.textContent = value ?? "";
+        return div.innerHTML;
     }
 
-    function loadEvents() {
-        return fetch('/history/events')
-            .then(r => r.json())
-            .then(data => {
-                events = data;
-                dailyActivity = computeDailyActivity(events);
-                setDefaultMonthAndDate();
-                renderCalendar();
-                renderList();
-                attachCalendarListeners();
-            })
-            .catch(err => console.error('Error loading history events:', err));
+    function monthOf(dateStr) {
+        const [year, month] = dateStr.split("-").map(Number);
+        return new Date(year, month - 1, 1);
     }
 
-    function computeDailyActivity(evts) {
-        const byDate = {};
-        evts.forEach(e => {
-            const date = (e.ts || '').split(' ')[0];
-            if (date) byDate[date] = (byDate[date] || 0) + 1;
+    function indexAtOrBefore(moment) {
+        let idx = null;
+        events.forEach((event, eventIdx) => {
+            if (event.ts <= moment) idx = eventIdx;
         });
-        return byDate;
+        return idx;
     }
 
-    function setDefaultMonthAndDate() {
-        if (events.length === 0) {
-            currentMonth = new Date();
-            selectedDate = todayStr();
-            return;
+    function readAddress() {
+        const params = new URLSearchParams(window.location.search);
+        const at = (params.get("at") || "").replace("T", " ").trim();
+        const day = (params.get("day") || "").trim();
+        if (at) {
+            const idx = indexAtOrBefore(at);
+            if (idx !== null) return {idx, date: dateOf(events[idx].ts)};
+            if (/^\d{4}-\d{2}-\d{2}/.test(at)) return {idx: null, date: at.slice(0, 10)};
         }
-        const lastTs = events[events.length - 1].ts;
-        const d = new Date(lastTs);
-        currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-        selectedDate = (lastTs || '').split(' ')[0] || todayStr();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return {idx: null, date: day};
+        return null;
+    }
+
+    function writeAddress() {
+        const params = new URLSearchParams();
+        if (selectedIdx !== null) params.set("at", events[selectedIdx].ts);
+        else if (selectedDate) params.set("day", selectedDate);
+        const query = params.toString();
+        window.history.replaceState(null, "", query ? `/history?${query}` : "/history");
     }
 
     function renderCalendar() {
-        const grid = document.getElementById('calendar-grid');
-        const label = document.getElementById('calendar-month-label');
+        const grid = document.getElementById("calendar-grid");
+        const label = document.getElementById("calendar-month-label");
         if (!grid || !label) return;
-
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
-        label.textContent = currentMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-
-        const firstDay = new Date(year, month, 1);
-        const startPad = firstDay.getDay();
+        label.textContent = currentMonth.toLocaleDateString(undefined, {month: "long", year: "numeric"});
+        const maxCount = Math.max(1, ...Object.values(dailyCounts));
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const maxCount = Math.max(1, ...Object.values(dailyActivity));
-
-        const cells = [];
-        ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => cells.push({ type: 'header', text: d }));
-        for (let i = 0; i < startPad; i++) cells.push({ type: 'outside' });
-        for (let d = 1; d <= daysInMonth; d++) {
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            cells.push({ type: 'day', date: dateStr, day: d, count: dailyActivity[dateStr] || 0 });
-        }
-        const padEnd = Math.max(0, 42 - (cells.length - 7));
-        for (let i = 0; i < padEnd; i++) cells.push({ type: 'outside' });
-
-        grid.innerHTML = '';
-        cells.forEach(c => {
-            const cell = document.createElement('div');
-            if (c.type === 'header') {
-                cell.className = 'calendar-cell calendar-header';
-                cell.textContent = c.text;
-            } else if (c.type === 'outside') {
-                cell.className = 'calendar-cell calendar-outside';
-            } else {
-                cell.className = 'calendar-cell calendar-day' + (selectedDate === c.date ? ' calendar-selected' : '');
-                cell.dataset.date = c.date;
-                cell.textContent = c.day;
-                if (c.count > 0) {
-                    const intensity = Math.min(1, c.count / maxCount);
-                    cell.style.backgroundColor = `rgba(0, 123, 255, ${0.15 + 0.6 * intensity})`;
-                    cell.title = `${c.date}: ${c.count} event(s)`;
-                }
-                cell.addEventListener('click', () => selectDate(c.date));
-            }
-            grid.appendChild(cell);
+        const today = todayStr();
+        const cells = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((name) => {
+            const head = document.createElement("div");
+            head.className = "cal-head";
+            head.textContent = name;
+            return head;
         });
+        for (let i = 0; i < new Date(year, month, 1).getDay(); i += 1) {
+            const empty = document.createElement("div");
+            empty.className = "cal-empty";
+            cells.push(empty);
+        }
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+            const count = dailyCounts[dateStr] || 0;
+            const cell = document.createElement("button");
+            cell.type = "button";
+            cell.className = "cal-day" + (count ? " has-events" : "") + (dateStr === today ? " today" : "");
+            cell.dataset.date = dateStr;
+            cell.textContent = String(day);
+            cell.setAttribute("aria-pressed", String(dateStr === selectedDate));
+            cell.setAttribute("aria-label", `${dateStr}, ${count} change${count === 1 ? "" : "s"}`);
+            if (count) {
+                const intensity = 0.18 + 0.55 * Math.min(1, count / maxCount);
+                cell.style.backgroundColor = `rgba(126, 184, 247, ${intensity.toFixed(2)})`;
+            }
+            cell.addEventListener("click", () => selectDate(dateStr));
+            cells.push(cell);
+        }
+        grid.replaceChildren(...cells);
+    }
+
+    function renderTimeline() {
+        const list = document.getElementById("history-events");
+        const empty = document.getElementById("history-no-events");
+        const label = document.getElementById("timeline-label");
+        if (!list || !empty) return;
+        const rows = events
+            .map((event, idx) => ({event, idx}))
+            .filter(({event}) => dateOf(event.ts) === selectedDate)
+            .reverse();
+        if (label) label.textContent = selectedDate ? `Timeline · ${selectedDate}` : "Timeline";
+        empty.hidden = rows.length > 0;
+        list.replaceChildren(...rows.map(({event, idx}) => {
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "tl-row";
+            row.dataset.idx = String(idx);
+            row.setAttribute("aria-pressed", String(idx === selectedIdx));
+            row.title = `${event.ts} · ${event.id} · ${event.state ? "active" : "inactive"} · ${event.user || "unknown operator"}`;
+            row.innerHTML = `
+                <span class="tl-time">${escapeHtml(timeOf(event.ts))}</span>
+                <span class="tl-id">${escapeHtml(event.id)}</span>
+                <span class="pill tl-pill ${event.state ? "active" : ""}">${event.state ? "on" : "off"}</span>`;
+            row.addEventListener("click", () => selectEvent(idx));
+            return row;
+        }));
+    }
+
+    function renderMoment() {
+        const emptyNote = document.getElementById("moment-empty");
+        const facts = document.getElementById("moment-facts");
+        const image = document.getElementById("moment-image");
+        if (!emptyNote || !facts || !image) return;
+        const event = selectedIdx === null ? null : events[selectedIdx];
+        emptyNote.hidden = Boolean(event);
+        facts.hidden = !event;
+        image.hidden = !event;
+        if (!event) return;
+        const link = document.getElementById("moment-link");
+        link.textContent = event.ts;
+        link.href = `/history?at=${encodeURIComponent(event.ts)}`;
+        document.getElementById("moment-element").textContent = event.id;
+        document.getElementById("moment-state").textContent = event.state ? "active" : "inactive";
+        document.getElementById("moment-user").textContent = event.user || "—";
+        document.getElementById("moment-image-link").href = `/state.svg?at=${encodeURIComponent(event.ts)}`;
+    }
+
+    function applyPendingState() {
+        if (!diagramReady || !pendingState || typeof window.applyState !== "function") return;
+        const stateForApply = {};
+        for (const [id, value] of Object.entries(pendingState)) stateForApply[id] = value ? "active" : "inactive";
+        window.applyState(stateForApply);
     }
 
     function selectDate(dateStr) {
         selectedDate = dateStr;
+        currentMonth = monthOf(dateStr);
+        if (selectedIdx !== null && dateOf(events[selectedIdx].ts) !== dateStr) selectedIdx = null;
         renderCalendar();
-        renderList();
-    }
-
-    function goToToday() {
-        selectedDate = todayStr();
-        const now = new Date();
-        currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        renderCalendar();
-        renderList();
-    }
-
-    function attachCalendarListeners() {
-        document.getElementById('calendar-prev')?.addEventListener('click', () => {
-            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-            renderCalendar();
-        });
-        document.getElementById('calendar-next')?.addEventListener('click', () => {
-            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-            renderCalendar();
-        });
-        document.getElementById('calendar-today')?.addEventListener('click', goToToday);
-        document.getElementById('calendar-toggle')?.addEventListener('click', () => {
-            const wrapper = document.getElementById('calendar-wrapper');
-            const btn = document.getElementById('calendar-toggle');
-            if (wrapper && btn) {
-                wrapper.classList.toggle('collapsed');
-                btn.textContent = wrapper.classList.contains('collapsed') ? '\u25B6' : '\u25BC';
-                btn.setAttribute('aria-label', wrapper.classList.contains('collapsed') ? 'Expand calendar' : 'Collapse calendar');
-            }
-        });
-    }
-
-    function renderList() {
-        const ul = document.getElementById('history-events');
-        const noEvents = document.getElementById('history-no-events');
-        if (!ul || !noEvents) return;
-
-        const filtered = events.filter(e => ((e.ts || '').split(' ')[0]) === selectedDate);
-        ul.innerHTML = '';
-        noEvents.style.display = 'none';
-
-        if (filtered.length === 0) {
-            noEvents.style.display = 'block';
-            return;
-        }
-        [...filtered].reverse().forEach((e, displayIdx) => {
-            const idx = events.indexOf(e);
-            const li = document.createElement('li');
-            li.className = 'history-event' + (selectedIdx === idx ? ' selected' : '');
-            li.dataset.idx = idx;
-            li.dataset.date = selectedDate;
-            li.innerHTML = `
-                <span class="history-ts">${escapeHtml(e.ts)}</span>
-                <span class="history-id">${escapeHtml(e.id)}</span>
-                <span class="history-status ${e.state ? 'active' : 'inactive'}">${e.state ? 'active' : 'inactive'}</span>
-                <span class="history-user">${escapeHtml(e.user)}</span>
-            `;
-            li.addEventListener('click', () => selectEvent(idx));
-            ul.appendChild(li);
-        });
-    }
-
-    function escapeHtml(s) {
-        const div = document.createElement('div');
-        div.textContent = s;
-        return div.innerHTML;
+        renderTimeline();
+        renderMoment();
+        writeAddress();
     }
 
     function selectEvent(idx) {
         if (idx < 0 || idx >= events.length) return;
         selectedIdx = idx;
-        renderList();
-
+        selectedDate = dateOf(events[idx].ts);
+        currentMonth = monthOf(selectedDate);
+        renderCalendar();
+        renderTimeline();
+        renderMoment();
+        writeAddress();
         fetch(`/history/state/${idx}`)
-            .then(r => r.json())
-            .then(data => {
-                const state = data.state;
-                if (!state || typeof window.applyState !== 'function') return;
-                const stateForApply = {};
-                for (const [id, val] of Object.entries(state)) {
-                    stateForApply[id] = val ? 'active' : 'inactive';
-                }
-                window.applyState(stateForApply);
+            .then((response) => response.json())
+            .then((data) => {
+                if (!data.state) return;
+                pendingState = data.state;
+                applyPendingState();
             })
-            .catch(err => console.error('Error fetching history state:', err));
+            .catch((error) => console.error("History state could not be loaded", error));
     }
 
-    document.addEventListener('DOMContentLoaded', loadEvents);
-})();
+    function shiftMonth(delta) {
+        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1);
+        renderCalendar();
+    }
+
+    function attachListeners() {
+        document.getElementById("calendar-prev")?.addEventListener("click", () => shiftMonth(-1));
+        document.getElementById("calendar-next")?.addEventListener("click", () => shiftMonth(1));
+        document.getElementById("calendar-latest")?.addEventListener("click", () => {
+            if (events.length) selectEvent(events.length - 1);
+            else selectDate(todayStr());
+        });
+        document.addEventListener("pihti:diagram-ready", () => {
+            diagramReady = true;
+            applyPendingState();
+        });
+    }
+
+    async function load() {
+        attachListeners();
+        try {
+            events = await (await fetch("/history/events")).json();
+        } catch (error) {
+            console.error("History events could not be loaded", error);
+            events = [];
+        }
+        dailyCounts = {};
+        events.forEach((event) => {
+            const date = dateOf(event.ts);
+            if (date) dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+        });
+        const requested = readAddress();
+        if (requested?.idx !== null && requested?.idx !== undefined) {
+            selectEvent(requested.idx);
+        } else if (requested?.date) {
+            selectDate(requested.date);
+        } else {
+            selectedDate = events.length ? dateOf(events[events.length - 1].ts) : todayStr();
+            currentMonth = monthOf(selectedDate);
+            renderCalendar();
+            renderTimeline();
+            renderMoment();
+        }
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", load);
+    else load();
+}());

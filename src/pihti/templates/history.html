@@ -1,47 +1,58 @@
 {% extends 'base.html' %}
 
-{% block title %}History — PIHTI Vacuum{% endblock %}
+{% block title %}History · PIHTI{% endblock %}
 
 {% block content %}
 <script>window.historyMode = true;</script>
-<div class="history-page">
-<div class="history-scroll-area">
-    <div class="history-header-sticky">
-        <h1 class="history-title" style="text-align: center;">History
-            <a href="{{ url_for('download_logs') }}" class="btn-download">Download Logs (CSV)</a>
-        </h1>
-    </div>
-<div class="history-layout">
-    <div class="history-left">
-        <div class="history-diagram">
-            <div id="diagram-container"></div>
-            <div id="tooltip"></div>
-        </div>
-        <div class="history-calendar-wrapper" id="calendar-wrapper">
-            <div class="history-calendar-nav">
-                <button type="button" id="calendar-toggle" class="calendar-toggle" aria-label="Toggle calendar">&#9660;</button>
+<div class="page">
+    <aside class="rail rail-left" id="history-controls" aria-label="History controls">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card">
+            <h2 class="rail-label">Calendar</h2>
+            <div class="cal-nav">
                 <button type="button" id="calendar-prev" aria-label="Previous month">&larr;</button>
-                <span id="calendar-month-label"></span>
-                <div class="calendar-nav-right">
-                    <button type="button" id="calendar-today">Today</button>
-                    <button type="button" id="calendar-next" aria-label="Next month">&rarr;</button>
-                </div>
+                <span id="calendar-month-label" class="cal-month"></span>
+                <button type="button" id="calendar-next" aria-label="Next month">&rarr;</button>
             </div>
-            <div class="history-calendar-body" id="calendar-body">
-                <div id="calendar-grid" class="history-calendar-grid"></div>
+            <div id="calendar-grid" class="cal-grid" role="group" aria-label="Days with diagram changes"></div>
+            <button type="button" id="calendar-latest" style="margin-top: 8px; width: 100%;">Latest change</button>
+        </section>
+        <section class="rail-card rail-card--growing">
+            <h2 class="rail-label" id="timeline-label">Timeline</h2>
+            <div class="scrolls">
+                <div id="history-events" class="timeline" role="group" aria-label="Diagram changes on the selected day"></div>
+                <p id="history-no-events" class="muted" hidden>No diagram changes on this day.</p>
             </div>
+        </section>
+    </aside>
+
+    <main class="page-main">
+        <div class="rail-toggles" aria-label="Side panels">
+            <button type="button" data-drawer="history-controls" aria-controls="history-controls" aria-expanded="false">Calendar &amp; timeline</button>
+            <button type="button" data-drawer="history-context" aria-controls="history-context" aria-expanded="false">Selected moment</button>
         </div>
-    </div>
-    <div class="history-timeline-panel">
-        <h2>Timeline</h2>
-        <p class="history-hint">Click an event to see the diagram state at that moment.</p>
-        <div id="history-timeline-content">
-            <ul id="history-events" class="history-events"></ul>
-            <p id="history-no-events" class="history-no-events" style="display:none;">No events on this day</p>
-        </div>
-    </div>
-</div>
-</div>
+        <div id="diagram-container" aria-label="Diagram state at the selected moment"></div>
+        <div id="tooltip"></div>
+    </main>
+
+    <aside class="rail rail-right" id="history-context" aria-label="Selected moment">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card">
+            <h2 class="rail-label">Selected moment</h2>
+            <p id="moment-empty" class="muted">The diagram shows its current state. Choose a moment in the timeline to replay it.</p>
+            <dl id="moment-facts" class="facts" hidden>
+                <dt>Time</dt><dd><a id="moment-link" href="#"></a></dd>
+                <dt>Element</dt><dd id="moment-element"></dd>
+                <dt>Marked</dt><dd id="moment-state"></dd>
+                <dt>Operator</dt><dd id="moment-user"></dd>
+            </dl>
+            <p id="moment-image" class="muted" style="margin-top: 10px;" hidden><a id="moment-image-link" href="#">Diagram image at this moment</a></p>
+        </section>
+        <section class="rail-card">
+            <h2 class="rail-label">Export</h2>
+            <a class="button" style="width: 100%;" href="{{ url_for('download_logs') }}">Download history (CSV)</a>
+        </section>
+    </aside>
 </div>
 {% endblock %}
 

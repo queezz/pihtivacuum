@@ -1,31 +1,26 @@
-<!-- templates/navbar.html -->
-<div class="navbar">
-    <div class="navbar-container">
-        <div class="navbar-logo">
-            <a href="{{ url_for('home') }}">PIHTI</a>
-            <span class="navbar-version" title="PIHTI release">v{{ app_version }}</span>
-        </div>
-        <button class="navbar-toggle" type="button" aria-label="Open navigation"
-                aria-controls="navbarItems" aria-expanded="false">
-            <span id="toggleIcon" aria-hidden="true">&#9776;</span>
-        </button>
-        <ul class="navbar-items" id="navbarItems">
-            <li><a href="{{ url_for('home') }}">Vacuum</a></li>
-            <li><a href="{{ url_for('serve_history_view') }}">History</a></li>
-            <li><a href="{{ url_for('plasmaplots') }}">Plot</a></li>
-        </ul>
-        {% if hostinfo is defined %}
-        <div class="navbar-hostinfo">
-            {{ hostinfo.hostname_local }} · {{ hostinfo.ip }}
-        </div>
-        {% endif %}
-        <div class="navbar-user">
-            {% if session.get('username') %}
-            <span>{{ session['username'] }}</span>
-            <a href="{{ url_for('identity_page') }}" class="navbar-link">Switch operator</a>
-            {% else %}
-            <a href="{{ url_for('identity_page') }}" class="navbar-link">Choose operator</a>
-            {% endif %}
-        </div>
+<nav class="tabbar" aria-label="Main">
+    <div class="tab-group">
+        <a class="tab brand-tab" href="{{ url_for('home') }}">PIHTI <span class="tab-version" title="PIHTI release">v{{ app_version }}</span></a>
+        <a class="tab" href="{{ url_for('home') }}" {% if active_nav == 'home' %}aria-current="page"{% endif %}>Vacuum</a>
+        <a class="tab" href="{{ url_for('serve_history_view') }}" {% if active_nav == 'serve_history_view' %}aria-current="page"{% endif %}>History</a>
+        <a class="tab" href="{{ url_for('plasmaplots') }}" {% if active_nav == 'plasmaplots' %}aria-current="page"{% endif %}>Plot</a>
     </div>
-</div>
+    <div class="tab-meta">
+        {% if hostinfo is defined %}
+        <span class="tab-host">{{ hostinfo.hostname_local }} · {{ hostinfo.ip }}</span>
+        {% endif %}
+        {% if operators %}
+        <label class="operator-control">
+            <span>Operator</span>
+            <select id="operator-select" data-current="{{ session.get('username', '') }}" aria-label="Current operator">
+                <option value="">Read only</option>
+                {% for operator in operators %}
+                <option value="{{ operator }}" {% if session.get('username') == operator %}selected{% endif %}>{{ operator }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        {% else %}
+        <a class="operator-missing" href="{{ url_for('identity_page') }}">No operators on this machine</a>
+        {% endif %}
+    </div>
+</nav>

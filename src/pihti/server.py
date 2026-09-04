@@ -13,9 +13,9 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
-from cryptography.fernet import Fernet, InvalidToken
 from flask import (
     Flask,
+    Response,
     abort,
     current_app,
     jsonify,
@@ -29,22 +29,23 @@ from flask import (
 )
 from plotly.subplots import make_subplots
 from pihti import __version__
+from pihti.roster import default_private_dir as _default_private_dir
+from pihti.roster import env_path as _env_path
+from pihti.roster import resolve_operators, roster_path
 from pihti.utils.hostinfo import get_hostinfo
 
 
 PKG_DIR = Path(__file__).resolve().parent
 MAX_LOGS = 1000
+TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-
-def _default_private_dir() -> Path:
-    if local_app_data := os.environ.get("LOCALAPPDATA"):
-        return Path(local_app_data) / "pihti-diagram"
-    return Path.home() / ".config" / "pihti-diagram"
-
-
-def _env_path(name: str, default: Path) -> Path:
-    value = os.environ.get(name)
-    return Path(value).expanduser() if value else default
+# Plot series colours: the dataviz reference palette's dark categorical slots
+# 1-4 in fixed order, validated against the page's panel surface (#161b22).
+PLOT_SERIES_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500"]
+PLOT_SURFACE = "#161b22"
+PLOT_INK = "rgba(228, 234, 242, 0.92)"
+PLOT_MUTED = "rgba(228, 234, 242, 0.55)"
+PLOT_GRID = "rgba(255, 255, 255, 0.08)"
 
 
 def _boolean_env(name: str, default: bool = False) -> bool:
@@ -138,24 +139,44 @@ def state_at_index(events: list[dict], state_now: dict[str, bool], idx: int) -> 
     return state
 
 
-def _load_operator_names(app: Flask) -> list[str]:
-    inline_key = os.environ.get("PIHTI_USERS_KEY")
-    key = (
-        inline_key.encode("ascii")
-        if inline_key
-        else Path(app.config["USERS_KEY_FILE"]).read_bytes().strip()
-    )
-    encrypted_data = Path(app.config["USERS_FILE_ENCRYPTED"]).read_bytes()
+def parse_timestamp(value: str | None) -> datetime | None:
+    """Parse ``YYYY-MM-DD HH:MM:SS`` (a ``T`` separator is accepted too)."""
+    if not value:
+        return None
     try:
-        users = json.loads(Fernet(key).decrypt(encrypted_data).decode("utf-8"))
-    except (InvalidToken, ValueError, json.JSONDecodeError) as exc:
-        raise RuntimeError("The encrypted users file or its key is invalid.") from exc
-    if not isinstance(users, dict) or not all(
-        isinstance(name, str) and isinstance(password_hash, str)
-        for name, password_hash in users.items()
-    ):
-        raise RuntimeError("The encrypted users file has an invalid structure.")
-    return sorted(users, key=str.casefold)
+        return datetime.strptime(value.strip().replace("T", " "), TIMESTAMP_FORMAT)
+    except ValueError:
+        return None
+
+
+def index_at_timestamp(events: list[dict], moment: datetime) -> int | None:
+    """Index of the last event at or before ``moment``; ``None`` when none is."""
+    idx = None
+    for event_idx, event in enumerate(events):
+        if event["ts"] <= moment:
+            idx = event_idx
+    return idx
+
+
+def render_state_svg(svg_text: str, element_config: list[dict], state: dict) -> str:
+    """Return the authored SVG with operator-entered fills applied as a style block."""
+    rules = []
+    for item in element_config:
+        element_id = item.get("id")
+        colors = item.get("colors") or {}
+        if not element_id or not isinstance(colors, dict):
+            continue
+        active = state.get(element_id) in ("active", True)
+        fill = colors.get("active" if active else "inactive")
+        if fill and all(ch.isalnum() or ch in "#-_" for ch in element_id) and all(
+            ch.isalnum() or ch in "#(),. " for ch in fill
+        ):
+            rules.append(f"#{element_id}{{fill:{fill} !important}}")
+    style = "<style>" + "".join(rules) + "</style>"
+    closing = svg_text.rfind("</svg>")
+    if closing < 0:
+        return svg_text
+    return svg_text[:closing] + style + svg_text[closing:]
 
 
 def operator_required(view):
@@ -192,26 +213,53 @@ def get_cu_columns(file_path: Path) -> list[str]:
 
 
 def generate_plot_html(dataframe, columns_linear, columns_log):
-    figure = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
-    for column in columns_linear:
-        figure.add_trace(
-            go.Scatter(x=dataframe["date"], y=dataframe[column], mode="lines", name=column),
-            row=1,
-            col=1,
-        )
-    for column in columns_log:
-        figure.add_trace(
-            go.Scatter(x=dataframe["date"], y=dataframe[column], mode="lines", name=column),
-            row=2,
-            col=1,
-        )
-    figure.update_layout(
-        height=800,
-        yaxis={"title": "Signals (Linear)", "type": "linear"},
-        yaxis2={"title": "Signals (Log)", "type": "log", "tickformat": ".1e"},
-        legend={"title": "Signals"},
+    figure = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.08,
+        subplot_titles=("Linear channels", "Log channels"),
     )
-    return pio.to_html(figure, full_html=False)
+    colors = iter(PLOT_SERIES_COLORS)
+    for row, columns in ((1, columns_linear), (2, columns_log)):
+        for column in columns:
+            figure.add_trace(
+                go.Scatter(
+                    x=dataframe["date"],
+                    y=dataframe[column],
+                    mode="lines",
+                    name=column,
+                    line={"width": 2, "color": next(colors, None)},
+                    hovertemplate="%{y:.3g}<extra>" + column + "</extra>",
+                ),
+                row=row,
+                col=1,
+            )
+    axis = {
+        "gridcolor": PLOT_GRID,
+        "zerolinecolor": PLOT_GRID,
+        "linecolor": PLOT_GRID,
+        "tickfont": {"color": PLOT_MUTED},
+        "title_font": {"color": PLOT_MUTED},
+    }
+    figure.update_layout(
+        height=760,
+        margin={"l": 60, "r": 20, "t": 40, "b": 40},
+        paper_bgcolor=PLOT_SURFACE,
+        plot_bgcolor=PLOT_SURFACE,
+        font={"color": PLOT_INK, "family": "Aptos, Calibri, system-ui, sans-serif"},
+        hovermode="x unified",
+        hoverlabel={"bgcolor": "#1b222c", "font": {"color": PLOT_INK}},
+        legend={"orientation": "h", "y": -0.06, "font": {"color": PLOT_INK}},
+        xaxis={**axis},
+        xaxis2={**axis, "title": "Time"},
+        yaxis={**axis, "title": "Value (linear)", "type": "linear"},
+        yaxis2={**axis, "title": "Value (log)", "type": "log", "tickformat": ".1e"},
+    )
+    for annotation in figure.layout.annotations:
+        annotation.font.color = PLOT_MUTED
+        annotation.font.size = 12
+    return pio.to_html(figure, full_html=False, config={"displaylogo": False})
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -237,6 +285,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         OPERATION_CONTEXT_FILE=runtime_root / "operation_context.json",
         OPERATION_CONTEXT_LOG_FILE=runtime_root / "operation_context_log.csv",
         LAST_PLOT_FILE=runtime_root / "last_plot.html",
+        LAST_PLOT_META_FILE=runtime_root / "last_plot.json",
+        OPERATORS_FILE=roster_path(runtime_root),
         ELEMENTS_CONFIG_FILE=PKG_DIR / "static" / "elementsConfig.json",
         USERS_FILE_ENCRYPTED=_env_path(
             "PIHTI_USERS_FILE", runtime_root / "users.json.enc"
@@ -256,8 +306,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     valid_elements = {
         item["id"] for item in element_config if isinstance(item, dict) and "id" in item
     }
-    operators_cache: list[str] | None = None
     last_plot_html: str | None = None
+    last_plot_meta: dict | None = None
 
     def touch_operator() -> None:
         session["last_activity"] = datetime.now().isoformat(timespec="seconds")
@@ -301,7 +351,14 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.context_processor
     def inject_page_context():
-        return {"hostinfo": get_hostinfo(), "app_version": __version__}
+        operators, roster_source = available_operators()
+        return {
+            "hostinfo": get_hostinfo(),
+            "app_version": __version__,
+            "active_nav": request.endpoint,
+            "operators": operators,
+            "roster_source": roster_source,
+        }
 
     @app.before_request
     def reject_cross_origin_writes():
@@ -341,13 +398,56 @@ def create_app(test_config: dict | None = None) -> Flask:
             ]
         )
 
+    def current_state_flags() -> dict[str, bool]:
+        return {key: value == "active" for key, value in elements_state.items()}
+
     @app.route("/history/state/<int:idx>")
     def get_history_state(idx):
         events = load_history_events(Path(app.config["LOG_FILE"]))
         if idx < 0 or idx >= len(events):
             return jsonify({"error": "Invalid index"}), 400
-        state_now = {key: value == "active" for key, value in elements_state.items()}
-        return jsonify({"index": idx, "state": state_at_index(events, state_now, idx)})
+        return jsonify({"index": idx, "state": state_at_index(events, current_state_flags(), idx)})
+
+    @app.route("/history/state-at")
+    def get_history_state_at():
+        """Absolute diagram state at a timestamp: the last change at or before it."""
+        moment = parse_timestamp(request.args.get("ts"))
+        if moment is None:
+            return jsonify({"error": "ts must be YYYY-MM-DD HH:MM:SS"}), 400
+        events = load_history_events(Path(app.config["LOG_FILE"]))
+        idx = index_at_timestamp(events, moment)
+        if idx is None:
+            return jsonify({"error": "No diagram change at or before that moment"}), 404
+        return jsonify(
+            {
+                "index": idx,
+                "ts": events[idx]["ts"].strftime(TIMESTAMP_FORMAT),
+                "state": state_at_index(events, current_state_flags(), idx),
+            }
+        )
+
+    @app.route("/state.svg")
+    def state_svg():
+        """The authored diagram with operator-entered fills applied server-side.
+
+        ``?at=YYYY-MM-DD HH:MM:SS`` renders the state at that moment instead.
+        This is the same operator-entered annotation the page shows, not a
+        pressure measurement.
+        """
+        state: dict = elements_state
+        if raw_moment := request.args.get("at"):
+            moment = parse_timestamp(raw_moment)
+            if moment is None:
+                return jsonify({"error": "at must be YYYY-MM-DD HH:MM:SS"}), 400
+            events = load_history_events(Path(app.config["LOG_FILE"]))
+            idx = index_at_timestamp(events, moment)
+            if idx is None:
+                return jsonify({"error": "No diagram change at or before that moment"}), 404
+            state = state_at_index(events, current_state_flags(), idx)
+        svg_text = (Path(app.static_folder) / "diagram.svg").read_text(encoding="utf-8")
+        return Response(
+            render_state_svg(svg_text, element_config, state), mimetype="image/svg+xml"
+        )
 
     @app.route("/update", methods=["POST"])
     @operator_required
@@ -441,10 +541,6 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
         return jsonify(context)
 
-    @app.route("/navbar")
-    def navbar():
-        return render_template("navbar.html")
-
     @app.route("/version")
     def version():
         return jsonify({"name": "pihti", "version": __version__})
@@ -461,49 +557,76 @@ def create_app(test_config: dict | None = None) -> Flask:
             "plasmaplots.html", files=files, data_path_configured=configured
         )
 
+    PLOT_LINEAR_CHANNELS = ["Ip_c"]
+    PLOT_LOG_CHANNELS = ["Pu_c", "Pd_c", "Bu_c"]
+
     @app.route("/plot", methods=["POST"])
     def plot_file():
-        nonlocal last_plot_html
-        file_path = resolve_cu_file(request.form.get("file"))
-        columns = get_cu_columns(file_path)
-        dataframe = pd.read_csv(file_path, skiprows=10, names=columns)
-        last_plot_html = generate_plot_html(
-            dataframe, ["Ip_c"], ["Pu_c", "Pd_c", "Bu_c"]
-        )
+        nonlocal last_plot_html, last_plot_meta
+        file_name = request.form.get("file")
+        file_path = resolve_cu_file(file_name)
+        try:
+            columns = get_cu_columns(file_path)
+            dataframe = pd.read_csv(file_path, skiprows=10, names=columns)
+        except (ValueError, UnicodeDecodeError, pd.errors.ParserError) as exc:
+            return jsonify({"error": f"This file is not a readable control-unit log: {exc}"}), 422
+        missing = [
+            column
+            for column in PLOT_LINEAR_CHANNELS + PLOT_LOG_CHANNELS
+            if column not in dataframe.columns
+        ]
+        if missing:
+            return jsonify({"error": f"Missing channels in this file: {', '.join(missing)}"}), 422
+        last_plot_html = generate_plot_html(dataframe, PLOT_LINEAR_CHANNELS, PLOT_LOG_CHANNELS)
+        last_plot_meta = {
+            "file": file_name,
+            "generated_at": datetime.now().strftime(TIMESTAMP_FORMAT),
+            "linear": PLOT_LINEAR_CHANNELS,
+            "log": PLOT_LOG_CHANNELS,
+        }
         plot_path = Path(app.config["LAST_PLOT_FILE"])
         plot_path.parent.mkdir(parents=True, exist_ok=True)
         plot_path.write_text(last_plot_html, encoding="utf-8")
-        return jsonify(plot=last_plot_html)
+        Path(app.config["LAST_PLOT_META_FILE"]).write_text(
+            json.dumps(last_plot_meta, indent=4) + "\n", encoding="utf-8"
+        )
+        return jsonify(plot=last_plot_html, **last_plot_meta)
 
     @app.route("/get_last_plot")
     def get_last_plot():
+        """The last generated plot, with the file it was generated from when known."""
         if last_plot_html:
-            return jsonify({"plot": last_plot_html})
+            return jsonify({"plot": last_plot_html, **(last_plot_meta or {})})
         try:
             plot = Path(app.config["LAST_PLOT_FILE"]).read_text(encoding="utf-8")
-            return jsonify({"plot": plot})
         except FileNotFoundError:
-            return jsonify({"plot": "<p>No plot available. Please generate one.</p>"})
+            return jsonify({"plot": None})
+        meta = _load_json(Path(app.config["LAST_PLOT_META_FILE"]), {})
+        return jsonify({"plot": plot, **(meta if isinstance(meta, dict) else {})})
 
     @app.route("/download_controlunit_csv")
     def download_controlunit_csv():
         file_path = resolve_cu_file(request.args.get("file"))
         return send_file(file_path, as_attachment=True, download_name=file_path.name)
 
-    def available_operators() -> list[str]:
-        nonlocal operators_cache
-        if operators_cache is None:
-            operators_cache = _load_operator_names(app)
-        return operators_cache
+    def available_operators() -> tuple[list[str], str]:
+        """Names and their source: ``roster``, ``legacy`` registry, or ``missing``."""
+        try:
+            return resolve_operators(
+                Path(app.config["OPERATORS_FILE"]),
+                Path(app.config["USERS_FILE_ENCRYPTED"]),
+                Path(app.config["USERS_KEY_FILE"]),
+            )
+        except RuntimeError:
+            current_app.logger.exception("The operator roster could not be read")
+            return [], "missing"
 
     @app.route("/api/identify", methods=["POST"])
     @app.route("/login", methods=["POST"])
     def choose_operator():
-        try:
-            operators = available_operators()
-        except (FileNotFoundError, RuntimeError):
-            current_app.logger.exception("Operator identities are unavailable")
-            return jsonify({"message": "Operator identities are not configured on this machine."}), 503
+        operators, source = available_operators()
+        if source == "missing":
+            return jsonify({"message": "No operator roster exists on this machine."}), 503
         data = request.get_json(silent=True) or request.form
         username = str(data.get("username", ""))
         if username in operators:
@@ -516,22 +639,28 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
         return jsonify({"message": "Operator identity not found"}), 404
 
+    @app.route("/api/identity/clear", methods=["POST"])
+    def clear_operator():
+        """Return to read-only. Reading was never gated; this drops the label."""
+        session.clear()
+        return jsonify({"status": "cleared"})
+
     @app.route("/logout")
     def logout():
         session.clear()
-        return redirect(url_for("identity_page"))
+        return redirect(url_for("home"))
 
     @app.route("/identify")
     def identity_page():
-        try:
-            operators = available_operators()
-            unavailable = False
-        except (FileNotFoundError, RuntimeError):
-            current_app.logger.exception("Operator identities are unavailable")
-            operators = []
-            unavailable = True
+        operators, source = available_operators()
         return render_template(
-            "identify.html", operators=operators, identities_unavailable=unavailable
+            "identify.html",
+            operators=operators,
+            roster_source=source,
+            roster_command=(
+                '& "$env:USERPROFILE\\.venvs\\pihti-diagram\\Scripts\\python.exe" '
+                '-m pihti operators add "Name"'
+            ),
         )
 
     @app.route("/login", methods=["GET"])
@@ -560,7 +689,9 @@ app = create_app()
 
 
 def main():
-    host = os.environ.get("PIHTI_HOST", "127.0.0.1")
+    # LAN by default: served from one machine, read on a laptop or a phone
+    # (owner decision 2026-09-04). Debug stays loopback-only below.
+    host = os.environ.get("PIHTI_HOST", "0.0.0.0")
     port = int(os.environ.get("PIHTI_PORT", "5000"))
     debug = _boolean_env("PIHTI_DEBUG")
     if debug and host not in {"127.0.0.1", "localhost", "::1"}:

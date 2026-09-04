@@ -191,41 +191,6 @@
         }
     }
 
-    function closeDrawers() {
-        document.querySelectorAll(".vacuum-rail.drawer-open").forEach((rail) => rail.classList.remove("drawer-open"));
-        document.querySelectorAll("[data-drawer]").forEach((button) => button.setAttribute("aria-expanded", "false"));
-        const backdrop = document.querySelector(".drawer-backdrop");
-        if (backdrop) backdrop.hidden = true;
-    }
-
-    function openDrawer(id) {
-        if (!window.matchMedia("(max-width: 1179px)").matches) return;
-        closeDrawers();
-        const rail = document.getElementById(id);
-        const button = document.querySelector(`[data-drawer="${id}"]`);
-        const backdrop = document.querySelector(".drawer-backdrop");
-        if (!rail || !button || !backdrop) return;
-        rail.classList.add("drawer-open");
-        button.setAttribute("aria-expanded", "true");
-        backdrop.hidden = false;
-        rail.setAttribute("tabindex", "-1");
-        rail.focus();
-    }
-
-    function setupDrawers() {
-        document.querySelectorAll("[data-drawer]").forEach((button) => {
-            button.addEventListener("click", () => {
-                const rail = document.getElementById(button.dataset.drawer);
-                if (rail?.classList.contains("drawer-open")) closeDrawers();
-                else openDrawer(button.dataset.drawer);
-            });
-        });
-        document.querySelector(".drawer-backdrop")?.addEventListener("click", closeDrawers);
-        document.querySelectorAll(".drawer-close").forEach((button) => button.addEventListener("click", closeDrawers));
-        document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeDrawers(); });
-        window.matchMedia("(min-width: 1180px)").addEventListener("change", (event) => { if (event.matches) closeDrawers(); });
-    }
-
     function setupGuideControls() {
         const choices = document.getElementById("operation-choices");
         if (!choices) return;
@@ -239,7 +204,7 @@
             button.addEventListener("click", () => {
                 activeGuide = guide;
                 renderGuide();
-                openDrawer("guide-steps");
+                window.pihtiRails?.openDrawer("guide-steps");
             });
             return button;
         }));
@@ -304,6 +269,7 @@
             container.style.pointerEvents = "none";
             await fetchAndUpdateStates();
             attachElementListeners();
+            document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));
             return;
         }
         const [guidesResponse, userResponse, contextResponse] = await Promise.all([
@@ -313,11 +279,11 @@
         const user = await userResponse.json();
         operatorIdentified = user.is_identified;
         const context = await contextResponse.json();
-        setupDrawers();
         setupGuideControls();
         setupLineModes(context);
         await fetchAndUpdateStates();
         attachElementListeners();
+        document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));
         window.setInterval(fetchAndUpdateStates, 5000);
     }
 

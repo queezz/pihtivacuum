@@ -4,23 +4,34 @@
 
 {% block content %}
 <main class="identity-shell">
-    <p class="eyebrow">PIHTI DIAGRAM</p>
     <h1>Who is operating?</h1>
-    <form id="identity-form" class="identity-card">
+    <form id="identity-form" class="rail-card identity-card">
         <label for="operator-name">Operator</label>
         <select id="operator-name" name="username" required {% if not operators %}disabled{% endif %}>
             {% for operator in operators %}
             <option value="{{ operator }}">{{ operator }}</option>
             {% else %}
-            <option>No operator identities configured</option>
+            <option>No operators on this machine</option>
             {% endfor %}
         </select>
-        <p class="identity-note">This choice labels diagram changes. It does not control access. It expires after 12 hours without a diagram change.</p>
+        <p class="muted">This choice labels diagram changes. It does not control access. It expires after 12 hours without a diagram change.</p>
         <button type="submit" {% if not operators %}disabled{% endif %}>Continue</button>
-        <p id="identity-status" class="form-status" role="status">
-            {% if identities_unavailable %}Operator identities are unavailable on this machine.{% endif %}
-        </p>
-        <a class="read-link" href="{{ url_for('home') }}">View the diagram without choosing an operator</a>
+        <p id="identity-status" class="muted" role="status"></p>
+        {% if roster_source == 'missing' %}
+        <p class="notice">No operator roster exists on this machine, and the legacy encrypted registry cannot be opened here.</p>
+        <details class="command">
+            <summary>Add an operator name from a PowerShell prompt</summary>
+            <pre>{{ roster_command }}</pre>
+            <p class="muted" style="margin-top: 8px;">Repeat per name. Names already present in the history log can be added at once with <code>operators import-history</code>.</p>
+        </details>
+        {% elif not operators %}
+        <p class="notice">The operator roster is empty.</p>
+        <details class="command">
+            <summary>Add an operator name from a PowerShell prompt</summary>
+            <pre>{{ roster_command }}</pre>
+        </details>
+        {% endif %}
+        <a href="{{ url_for('home') }}" style="text-align: center;">View the diagram without choosing an operator</a>
     </form>
 </main>
 {% endblock %}

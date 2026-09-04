@@ -1,52 +1,63 @@
 {% extends 'base.html' %}
 
-{% block title %}Plasma Plots{% endblock %}
+{% block title %}Plot · PIHTI{% endblock %}
 
 {% block content %}
-{% if not data_path_configured %}
-<div class="ui-notice">
-  <span class="ui-notice-icon">ℹ️</span>
-  <div class="ui-notice-text">
-    <strong>No data directory configured</strong><br>
-    To view plots or download data, specify the logger data path
-    on the Control Unit Raspberry Pi.
-  </div>
-</div>
-{% elif not files %}
-<div class="ui-notice">
-  <span class="ui-notice-icon">ℹ️</span>
-  <div class="ui-notice-text">
-    <strong>No control-unit CSV files found</strong><br>
-    The configured directory contains no files beginning with <code>cu_</code>.
-  </div>
-</div>
-{% endif %}
-{% if files %}
-<h1>Select a CSV File to Plot</h1>
-<form id="fileForm" style="display: flex; justify-content: space-between; align-items: center;">
-    <div>
-        <select name="file" id="fileDropdown">
-            {% for file in files %}
-            <option value="{{ file }}">{{ file }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit" class="btn-plot">Plot</button>
-    </div>
-    <button type="button" id="downloadBtn" class="btn-download">Download CSV</button>
-</form>
-{% endif %}
-<div id="plotArea">
+<div class="page">
+    <aside class="rail rail-left" id="plot-controls" aria-label="Plot controls">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card rail-card--growing">
+            <h2 class="rail-label">Control-unit files</h2>
+            {% if files %}
+            <div class="scrolls">
+                <div id="file-list" class="filelist" role="group" aria-label="Control-unit CSV files, newest first">
+                    {% for file in files %}
+                    <button type="button" data-file="{{ file }}" aria-pressed="false" title="{{ file }}">{{ file }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p class="muted">No files.</p>
+            {% endif %}
+        </section>
+        <section class="rail-card">
+            <h2 class="rail-label">Export</h2>
+            <a id="downloadBtn" class="button" style="width: 100%;" href="#" aria-disabled="true">Download selected CSV</a>
+        </section>
+    </aside>
 
-    <div id="plotPlaceholder" style="text-align: center; padding: 50px; font-size: 1.2em;">
-        Fetching last plot...
-    </div>
+    <main class="page-main">
+        <div class="rail-toggles" aria-label="Side panels">
+            <button type="button" data-drawer="plot-controls" aria-controls="plot-controls" aria-expanded="false">Files</button>
+            <button type="button" data-drawer="plot-context" aria-controls="plot-context" aria-expanded="false">This plot</button>
+        </div>
+        {% if not data_path_configured %}
+        <p class="notice" style="margin-bottom: 16px;"><strong>No control-unit data directory is configured on this machine.</strong> Set <code>PIHTI_CUDATA_DIRECTORY</code>, or <code>CUDATA_DIRECTORY</code> in the local settings file, to the logger folder on the control-unit Raspberry Pi.</p>
+        {% elif not files %}
+        <p class="notice" style="margin-bottom: 16px;"><strong>No control-unit CSV files found.</strong> The configured directory holds no files beginning with <code>cu_</code>.</p>
+        {% endif %}
+        <div id="plotArea">
+            <p id="plotPlaceholder" class="plot-empty">Loading the last plot…</p>
+        </div>
+    </main>
 
+    <aside class="rail rail-right" id="plot-context" aria-label="This plot">
+        <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card">
+            <h2 class="rail-label">This plot</h2>
+            <p id="plot-empty-note" class="muted">No plot yet. Choose a file on the left.</p>
+            <dl id="plot-facts" class="facts" hidden>
+                <dt>File</dt><dd id="plot-file" class="mono"></dd>
+                <dt>Recorded</dt><dd id="plot-recorded"></dd>
+                <dt>Plotted</dt><dd id="plot-generated"></dd>
+                <dt>Linear</dt><dd id="plot-linear" class="mono"></dd>
+                <dt>Log</dt><dd id="plot-log" class="mono"></dd>
+            </dl>
+            <p class="muted" style="margin-top: 12px;">Channel codes are the control unit's own. Units, instrument identity, and background subtraction are not recorded yet.</p>
+        </section>
+    </aside>
 </div>
-<div id="loading-overlay" style="display: none;">
-    <div class="spinner"></div>
-</div>
-
-
+<div id="loading-overlay" hidden><div class="spinner" role="status" aria-label="Loading"></div></div>
 {% endblock %}
 
 {% block extra_js %}

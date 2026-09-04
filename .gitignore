@@ -8,6 +8,10 @@ settings.json
 nohup.out
 pihti.log
 last_plot.html
+last_plot.json
+operators.json
+operation_context.json
+operation_context_log.csv
 secret.key
 users.json
 
