@@ -53,32 +53,32 @@
     <path
      style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
      d="m 488.45101,188.70585 75.69701,0.0886"
-     id="bypas-manifold-downstream-line"
+     id="bypass-manifold-downstream-line"
      sodipodi:nodetypes="cc" />
     <path
      style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
      d="m 346.13776,121.94012 h 180 v 63"
-     id="bypas-manifold-main"
+     id="bypass-manifold-main"
      sodipodi:nodetypes="ccc" />
     <path
      style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
      d="m 499.4451,200.62628 h 53.12366 v -20 h -17.9776 v -20 h -17.04479 v 20 H 499.4451 Z"
-     id="bypas-manifold-t-downstream-t"
+     id="bypass-manifold-t-downstream-t"
      sodipodi:nodetypes="ccccccccc" />
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
      d="m 315.13776,147.94486 v 31.99526"
-     id="bypas-manifold-upstream-gv"
+     id="bypass-manifold-upstream-gv"
      sodipodi:nodetypes="cc" />
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
      d="m 314.88977,80 v 31.99526"
-     id="bypas-manifold-upstream-t-to-pipe"
+     id="bypass-manifold-upstream-t-to-pipe"
      sodipodi:nodetypes="cc" />
     <path
      style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
      d="m 305.22734,93.85249 v 55.37097 h 20 v -18.61829 h 20 v -19.19085 h -20 V 93.85249 Z"
-     id="bypas-manifold-t-upsteram"
+     id="bypass-manifold-t-upstream"
      sodipodi:nodetypes="ccccccccc" />
   </g>
   <g
@@ -87,12 +87,12 @@
     <path
      style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
      d="m 452.13776,482.94012 v -294 h 23"
-     id="bypas-pumpline"
+     id="bypass-pumpline"
      sodipodi:nodetypes="ccc" />
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
      d="M 473.32388,444.6928 H 452.57187"
-     id="bypas-pumpline-vent"
+     id="bypass-pumpline-vent"
      sodipodi:nodetypes="cc" />
   </g>
   <g
@@ -120,6 +120,11 @@
      style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
      d="M 96.765962,335.29788 C 96.853901,286.23207 96.33909,186.0869 96.00793,142.42234"
      id="gasline-argon"
+     sodipodi:nodetypes="cc" />
+    <path
+     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+     d="m 96.758135,335.14903 v 71.28544"
+     id="gasline-argon-1"
      sodipodi:nodetypes="cc" />
     <path
      style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none"
@@ -195,7 +200,7 @@
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
      d="m 96.645278,413 v 27.28544"
-     id="gasapanel-manifold-argon"
+     id="gaspanel-manifold-argon"
      sodipodi:nodetypes="cc" />
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
@@ -267,7 +272,7 @@
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
      d="m 316.13776,387.94012 v 30"
-     id="plasma-vacuum-pump-portt" />
+     id="plasma-vacuum-pump-port" />
   </g>
   <g
      id="pipes-probe"
@@ -352,7 +357,7 @@
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
      d="M 498.75201,443.88977 H 478"
-     id="bypas-pumpline-vent-air-side"
+     id="bypass-pumpline-vent-air-side"
      sodipodi:nodetypes="cc" />
     <path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
@@ -435,11 +440,11 @@
        class="non-clickable" /></g><path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:1.88977;stroke-linejoin:round;stroke-opacity:1"
      d="m 223.63776,520.94012 h 25 l -25,25 h 25 z"
-     id="GVU-6"
+     id="upstream-pumpline-vent-valve"
      sodipodi:nodetypes="ccccc" /><path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:1.88977;stroke-linejoin:round;stroke-opacity:1"
      d="m 488.60711,432.1928 v 25 l -25,-25 v 25 z"
-     id="Rough-bypass-vent"
+     id="bypass-pumpline-vent-valve"
      sodipodi:nodetypes="ccccc" /><path
      style="fill:#6ec900;fill-opacity:1;stroke:#000000;stroke-width:1.88977;stroke-linejoin:round;stroke-opacity:1"
      d="m 380.32228,389.23173 v 25 l -25,-25 v 25 z"
@@ -491,7 +496,7 @@
        sodipodi:nodetypes="cc" /><path
        style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:1.88977;stroke-linejoin:round;stroke-opacity:1"
        d="m 488.03311,422.68481 h 25 l -25,25 h 25 z"
-       id="GVU-6-9"
+       id="downstream-pumpline-vent-valve"
        sodipodi:nodetypes="ccccc" /></g><image
      width="92.984146"
      height="72.245033"
@@ -596,10 +601,6 @@
      height="92.891937"
      x="595.948"
      y="292.58563" /><path
-     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
-     d="m 96.758135,335.14903 v 71.28544"
-     id="path1464-3-2-6"
-     sodipodi:nodetypes="cc" /><path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:1.88977;stroke-linejoin:round;stroke-opacity:1"
      d="m 84.231218,394.22334 24.999682,0.1257 -25.125382,24.87398 24.999682,0.1257 z"
      id="gaspanel-valve-ar"
@@ -660,7 +661,7 @@
      id="path1464-1-3-1-5-7-4"
      sodipodi:nodetypes="cc" /><circle
      style="fill:#d4cece;fill-opacity:1;stroke:#b5b5b5;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
-     id="nitrogen-line"
+     id="nitrogen-bottle"
      cx="-36.671482"
      cy="439.76102"
      transform="scale(-1,1)"

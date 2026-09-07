@@ -43,7 +43,7 @@
                 "plasma-vacuum-gate-port",
                 "plasma-vacuum-gauge-manifold",
                 "plasma-vacuum-pump-manifold",
-                "plasma-vacuum-pump-portt"
+                "plasma-vacuum-pump-port"
             ]
         },
         "plasma-turbo-line": {
@@ -99,20 +99,20 @@
             "label": "Bypass manifold",
             "group": "pipes-bypass-manifold",
             "elements": [
-                "bypas-manifold-downstream-line",
-                "bypas-manifold-main",
-                "bypas-manifold-t-downstream-t",
-                "bypas-manifold-t-upsteram",
-                "bypas-manifold-upstream-gv",
-                "bypas-manifold-upstream-t-to-pipe"
+                "bypass-manifold-downstream-line",
+                "bypass-manifold-main",
+                "bypass-manifold-t-downstream-t",
+                "bypass-manifold-t-upstream",
+                "bypass-manifold-upstream-gv",
+                "bypass-manifold-upstream-t-to-pipe"
             ]
         },
         "bypass-pumpline": {
             "label": "Bypass pumping line",
             "group": "pipes-bypass-pumpline",
             "elements": [
-                "bypas-pumpline",
-                "bypas-pumpline-vent"
+                "bypass-pumpline",
+                "bypass-pumpline-vent"
             ]
         },
         "probe-line": {
@@ -146,6 +146,7 @@
             "group": "pipes-gasline-argon",
             "elements": [
                 "gasline-argon",
+                "gasline-argon-1",
                 "gasline-argon-to-downstream"
             ]
         },
@@ -171,7 +172,7 @@
             "label": "Gas panel manifold",
             "group": "pipes-gaspanel-manifold",
             "elements": [
-                "gasapanel-manifold-argon",
+                "gaspanel-manifold-argon",
                 "gaspanel-manifold",
                 "gaspanel-manifold-hydrogen",
                 "gaspanel-manifold-oxygen",
@@ -191,7 +192,7 @@
             "group": "pipes-vent-air",
             "always": "air",
             "elements": [
-                "bypas-pumpline-vent-air-side",
+                "bypass-pumpline-vent-air-side",
                 "downstream-tmp-to-scroll-pipe-vent-air-side",
                 "gaspanel-air-vent",
                 "gasline-pumping-air-vent",
@@ -221,9 +222,9 @@
         {"id": "gaspanel-valve-pump", "joins": ["gas-panel-manifold", "gas-panel-pumpline"]},
         {"id": "gaspanel-valve-vent", "joins": ["gas-panel-manifold", "atmosphere"], "vent": true},
         {"id": "gaspanel-pump-vent", "joins": ["gas-panel-pumpline", "atmosphere"], "vent": true},
-        {"id": "GVU-6", "joins": ["plasma-foreline", "atmosphere"], "vent": true},
-        {"id": "GVU-6-9", "joins": ["qms-foreline", "atmosphere"], "vent": true},
-        {"id": "Rough-bypass-vent", "joins": ["bypass-pumpline", "atmosphere"], "vent": true}
+        {"id": "upstream-pumpline-vent-valve", "joins": ["plasma-foreline", "atmosphere"], "vent": true},
+        {"id": "downstream-pumpline-vent-valve", "joins": ["qms-foreline", "atmosphere"], "vent": true},
+        {"id": "bypass-pumpline-vent-valve", "joins": ["bypass-pumpline", "atmosphere"], "vent": true}
     ],
     "pumps": [
         {"id": "TMPU", "kind": "turbo", "volume": "plasma-turbo-line", "backed_by": "plasma-foreline"},

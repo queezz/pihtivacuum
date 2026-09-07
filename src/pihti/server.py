@@ -42,6 +42,41 @@ PKG_DIR = Path(__file__).resolve().parent
 MAX_LOGS = 1000
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# Old id -> current id, from the 2026-09-08 spelling-and-oddity correction of
+# diagram.svg (owner decision 2026-09-08, letter 20260907-b9fddf7b-4768ce).
+# History (logs.csv) and the state file (elements_state.json) carry real ids
+# from real days; this is applied only when reading them back, so a stored
+# event or permalink from before the rename still finds the current element.
+# Stored history is never rewritten.
+ID_ALIASES: dict[str, str] = {
+    "bypas-manifold-downstream-line": "bypass-manifold-downstream-line",
+    "bypas-manifold-main": "bypass-manifold-main",
+    "bypas-manifold-t-downstream-t": "bypass-manifold-t-downstream-t",
+    "bypas-manifold-t-upsteram": "bypass-manifold-t-upstream",
+    "bypas-manifold-upstream-gv": "bypass-manifold-upstream-gv",
+    "bypas-manifold-upstream-t-to-pipe": "bypass-manifold-upstream-t-to-pipe",
+    "bypas-pumpline": "bypass-pumpline",
+    "bypas-pumpline-vent": "bypass-pumpline-vent",
+    "bypas-pumpline-vent-air-side": "bypass-pumpline-vent-air-side",
+    "plasma-vacuum-pump-portt": "plasma-vacuum-pump-port",
+    "gasapanel-manifold-argon": "gaspanel-manifold-argon",
+    "GVU-6": "upstream-pumpline-vent-valve",
+    "GVU-6-9": "downstream-pumpline-vent-valve",
+    "Rough-bypass-vent": "bypass-pumpline-vent-valve",
+    "nitrogen-line": "nitrogen-bottle",
+    "path1464-3-2-6": "gasline-argon-1",
+}
+
+
+def apply_id_alias(element_id: str) -> str:
+    """The current id for a possibly-retired one; unrecognised ids pass through."""
+    return ID_ALIASES.get(element_id, element_id)
+
+
+def apply_id_aliases_to_state(state: dict[str, str]) -> dict[str, str]:
+    """A state mapping with every old id rewritten to its current id, read-only."""
+    return {apply_id_alias(key): value for key, value in state.items()}
+
 # Plot series colours: the dataviz reference palette's dark categorical slots
 # 1-4 in fixed order, validated against the page's panel surface (#161b22).
 PLOT_SERIES_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500"]
@@ -132,7 +167,7 @@ def load_history_events(file_path: Path) -> list[dict]:
         events.append(
             {
                 "ts": timestamp,
-                "id": row.get("id", ""),
+                "id": apply_id_alias(row.get("id", "")),
                 "state": (row.get("status", "inactive") or "inactive").strip().lower()
                 == "active",
                 "user": row.get("user", ""),
@@ -365,7 +400,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         app.config.update(test_config)
 
     state_file = Path(app.config["STATE_FILE"])
-    elements_state: dict[str, str] = _load_json(state_file, {})
+    elements_state: dict[str, str] = apply_id_aliases_to_state(
+        _load_json(state_file, {})
+    )
     logs = load_logs_from_csv(Path(app.config["LOG_FILE"]))[-MAX_LOGS:]
     element_config = _load_json(Path(app.config["ELEMENTS_CONFIG_FILE"]), [])
     plumbing = plumbing_map.load_plumbing(app.static_folder)

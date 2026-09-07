@@ -342,7 +342,7 @@
         "confirmToggle": false
     },
     {
-        "id": "GVU-6",
+        "id": "upstream-pumpline-vent-valve",
         "label": "Plasma backing line vent valve",
         "colors": {
             "active": "#9bf08d",
@@ -351,7 +351,7 @@
         "confirmToggle": true
     },
     {
-        "id": "GVU-6-9",
+        "id": "downstream-pumpline-vent-valve",
         "label": "QMS backing line vent valve",
         "colors": {
             "active": "#9bf08d",
@@ -360,7 +360,7 @@
         "confirmToggle": true
     },
     {
-        "id": "Rough-bypass-vent",
+        "id": "bypass-pumpline-vent-valve",
         "label": "Bypass pumping line vent valve",
         "colors": {
             "active": "#9bf08d",

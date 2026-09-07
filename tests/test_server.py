@@ -71,9 +71,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.11.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.11.0"}
-    assert b"v0.11.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.11.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.11.1"}
+    assert b"v0.11.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -689,7 +689,12 @@ def test_pipe_colour_is_predicted_from_the_valves_and_says_air_first(client):
 
     vented = plumbing_map.predict(
         plumbing,
-        {"TMPU": "active", "GVU": "active", "RoughU": "active", "GVU-6": "active"},
+        {
+            "TMPU": "active",
+            "GVU": "active",
+            "RoughU": "active",
+            "upstream-pumpline-vent-valve": "active",
+        },
     )
     assert vented["volumes"]["plasma-foreline"] == "air"
     assert vented["volumes"]["plasma-vessel"] == "high-vacuum"
@@ -709,7 +714,7 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     assert set(live.json) == {"volumes", "elements", "air"}
     assert client.get("/predicted-vacuum", query_string={"at": "bad"}).status_code == 400
     identify(client)
-    client.post("/update", json={"id": "GVU-6", "status": "active"})
+    client.post("/update", json={"id": "upstream-pumpline-vent-valve", "status": "active"})
     stamp = client.get("/history/events").json[-1]["ts"]
     replayed = client.get("/predicted-vacuum", query_string={"at": stamp})
     assert replayed.json["volumes"]["plasma-foreline"] == "air"
@@ -721,3 +726,33 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
         assert 'id="vacuum-legend"' in page, path
         assert 'class="diagram-legend"' in page, path
         assert "measure pressure" not in page, path
+
+
+def test_an_old_permalink_still_selects_the_renamed_element(tmp_path):
+    """logs.csv and elements_state.json carry real ids from real days; the
+    2026-09-08 spelling/oddity correction renamed GVU-6 in diagram.svg and
+    plumbing.json to upstream-pumpline-vent-valve, but a stored event or a
+    permalink pointing at the old id must still find the current element.
+    The alias is applied only on read — the files on disk stay untouched."""
+    old_ts = "2026-09-01 12:00:00"
+    (tmp_path / "elements_state.json").write_text(
+        json.dumps({"GVU-6": "active"}), encoding="utf-8"
+    )
+    (tmp_path / "logs.csv").write_text(
+        "timestamp,id,status,user\n" f"{old_ts},GVU-6,active,operator\n",
+        encoding="utf-8",
+    )
+    client = make_app(tmp_path).test_client()
+
+    assert client.get("/elements-state").json == {"upstream-pumpline-vent-valve": "active"}
+
+    events = client.get("/history/events").json
+    assert events[-1]["id"] == "upstream-pumpline-vent-valve"
+
+    replayed = client.get("/predicted-vacuum", query_string={"at": old_ts})
+    assert replayed.json["volumes"]["plasma-foreline"] == "air"
+
+    assert json.loads((tmp_path / "elements_state.json").read_text(encoding="utf-8")) == {
+        "GVU-6": "active"
+    }
+    assert "GVU-6" in (tmp_path / "logs.csv").read_text(encoding="utf-8")
