@@ -122,6 +122,16 @@ that month, pressed the day and the recording, and plotted it.
 Refusals are now read defensively and that case says "That recording is not on
 this machine."
 
+**Confirmed in use the same evening.** queezz, on the deployed Pi: "I still see
+the scroll bar in the viewplot. Why?", then, a minute later, "It was stale
+plot. Needed to refetch." The stored `last_plot.html` was the one 0.9.0 drew at
+18:04, carrying `height:760px`; the reset had already removed its white page
+and margins, and plotting a recording replaced it with a responsive one and the
+scrollbar with it. The same shape as 0.6.0's cached pre-0.4.0 plot: a stored
+plot belongs to the release that drew it, and the next plot heals it. Nothing
+to fix — forcing an old plot's height is what clipped a legend earlier in this
+same walk.
+
 **A hazard worth knowing:** editing a static file without bumping the version
 serves the old copy to any browser that saw the previous release — the walk hit
 exactly this and needed a forced refresh of one asset. `AGENTS.md` now says so
