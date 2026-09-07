@@ -711,6 +711,33 @@ def create_app(test_config: dict | None = None) -> Flask:
             mode = line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment)
         return jsonify(plumbing_map.predict(plumbing, state, mode))
 
+    @app.route("/press-warnings")
+    def press_warnings():
+        """What one press would newly join to gas or vent air, before it is made.
+
+        Asked by the page just before its confirm box appears, so the box can
+        carry the sentence. It answers about a *copy* of the entered state with
+        the press applied and changes nothing: this route reads, and the press
+        itself still goes to ``/update``.
+
+        The two things it answers about are a switched-on ionization gauge and
+        a spinning turbo pump. It is a prediction from the valve positions an
+        operator entered — the same walk that colours the pipes — and never an
+        interlock: it reads no pressure, refuses no press, and protects no
+        hardware.
+        """
+        element_id = apply_id_alias(request.args.get("id") or "")
+        status = request.args.get("status")
+        if element_id not in valid_elements or status not in {"active", "inactive"}:
+            return jsonify({"error": "Invalid element or status"}), 400
+        return jsonify(
+            {
+                "warnings": plumbing_map.press_warnings(
+                    plumbing, elements_state, element_id, status, current_line_mode()
+                )
+            }
+        )
+
     @app.route("/operation-guides")
     def serve_operation_guides():
         return send_from_directory(directory=app.static_folder, path="operationGuides.json")

@@ -313,6 +313,103 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     }
 
 
+AIR = "air"
+GAS = "gas"
+IONIZATION = "ionization"
+TURBO = "turbo"
+
+
+def _exposure(verdict: str) -> int:
+    """How bad the predicted content of a volume is for something delicate in it.
+
+    Nothing worth saying is ``0``, gas is ``1``, vent air is ``2``. Ranking
+    them rather than merely listing them is what lets a press be judged against
+    the state *before* it: a warning is owed when a press makes a volume worse
+    for what is standing in it, never merely because it was already bad. It is
+    also what keeps closing a vent quiet — air falling back to gas is an
+    improvement, and an improvement is not a warning.
+    """
+    return {GAS: 1, AIR: 2}.get(verdict, 0)
+
+
+def exposures(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
+    """What each switched-on ion gauge and running turbo is predicted to stand in.
+
+    Two things on this rig mind gas and air: an ionization gauge that is
+    switched on, which minds both, and a turbo pump that is spinning, which
+    minds vent air. Everything else on the drawing is happy at one atmosphere
+    (queezz, 2026-09-04: the Baratrons, the Pirani, the Pfeiffer single gauge
+    and the Ulvac membrane gauge all work there), so only the gauges the map
+    marks ``kind: "ionization"`` are counted.
+
+    A running turbo is a *boundary* in the prediction, so the volume that
+    matters for it is its own — the one the vent would actually join — never
+    everything behind it.
+
+    Keyed by kind and id, so two readings of the same rig can be compared.
+    """
+    verdicts = predict(plumbing, state, line_mode)["volumes"]
+    state = apply_line_mode_to_state(plumbing, state, line_mode)
+    found: dict[tuple[str, str], dict] = {}
+    for gauge in plumbing.get("gauges") or []:
+        if gauge.get("kind") != IONIZATION or not _is(state, gauge["id"], "active"):
+            continue
+        verdict = verdicts.get(gauge.get("volume"), ISOLATED)
+        found[("gauge", gauge["id"])] = {
+            "kind": "gauge",
+            "id": gauge["id"],
+            "volume": gauge.get("volume"),
+            "state": verdict,
+            "level": _exposure(verdict),
+        }
+    for pump in plumbing.get("pumps") or []:
+        if pump.get("kind") != TURBO or not _is(state, pump["id"], "active"):
+            continue
+        verdict = verdicts.get(pump.get("volume"), ISOLATED)
+        found[("turbo", pump["id"])] = {
+            "kind": "turbo",
+            "id": pump["id"],
+            "volume": pump.get("volume"),
+            "state": verdict,
+            # Gas through a spinning turbo is ordinary running; air is not.
+            "level": 2 if verdict == AIR else 0,
+        }
+    return found
+
+
+def press_warnings(
+    plumbing: dict,
+    state: dict,
+    element_id: str,
+    status: str,
+    line_mode: str | None = None,
+) -> list[dict]:
+    """What one press would newly expose, judged against the state without it.
+
+    queezz asked for two warnings on 2026-09-08 (letter
+    ``20260907-d5386824-f57dfd``): "create warning when putting gas/air on to
+    IG", "and when vent goes on to TMP". Both are answered here the same way —
+    by predicting from a *copy* of the entered state with the press applied and
+    comparing it against the prediction for the state as it stands. Only what
+    the press makes worse is returned, so a valve that changes nothing
+    dangerous is quiet and one that changes something already bad does not cry
+    twice.
+
+    **This is a prediction from the valve positions an operator entered, and
+    never an interlock.** Nothing here reads a pressure, refuses a press, or
+    protects any hardware; it only says, in words, what the same walk that
+    colours the pipes thinks the press would join.
+    """
+    before = exposures(plumbing, state, line_mode)
+    after_state = dict(state)
+    after_state[element_id] = status
+    return [
+        item
+        for key, item in exposures(plumbing, after_state, line_mode).items()
+        if item["level"] > before.get(key, {}).get("level", 0)
+    ]
+
+
 def _line(volume: str, verdict: str, colour: str, band: float) -> dict:
     """A drawn line in its volume's colour, and how much wider to draw it.
 

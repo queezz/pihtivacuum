@@ -71,9 +71,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.12.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.12.1"}
-    assert b"v0.12.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.13.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.13.0"}
+    assert b"v0.13.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -868,6 +868,167 @@ def test_membrane_cannot_be_set_directly(client):
     response = client.post("/update", json={"id": "Membrane", "status": "active"})
     assert response.status_code == 400
     assert "Line configuration" in response.json["error"]
+
+
+def test_a_press_that_would_reach_a_live_ion_gauge_warns(client):
+    """queezz, 2026-09-08: "create warning when putting gas/air on to IG".
+
+    The same valve press either warns or does not, and the only difference
+    between the two runs is whether the ionization gauge is switched on. Both
+    halves of the warning are checked: vent air arriving at the QMS vessel's
+    own ionization gauge, and gas arriving at the bypass one.
+    """
+    plumbing = client.get("/plumbing").json
+
+    # Vent air, one gate valve away from a switched-on QMS ionization gauge:
+    # the gas panel is vented, its argon valve and the flow-calibration valve
+    # are open, so only GVBD stands between that air and the QMS vessel.
+    route = {
+        "gaspanel-valve-vent": "active",
+        "gaspanel-valve-ar": "active",
+        "flow-calibration-valve": "active",
+    }
+    live = {**route, "downstream-ionization-gauge": "active"}
+    warned = plumbing_map.press_warnings(plumbing, live, "GVBD", "active", "unknown")
+    assert warned == [
+        {
+            "kind": "gauge",
+            "id": "downstream-ionization-gauge",
+            "volume": "qms-vessel",
+            "state": "air",
+            "level": 2,
+        }
+    ]
+    # The identical press with the gauge switched off is an ordinary press.
+    assert plumbing_map.press_warnings(plumbing, route, "GVBD", "active", "unknown") == []
+
+    # Gas, and the bypass ionization gauge. `membrane` keeps the linked
+    # `Membrane` valve shut, so bypass-l1 really is the route being opened.
+    gas = {"argon-bottle": "active", "flow-calibration-valve": "active"}
+    on_gas = plumbing_map.press_warnings(
+        plumbing, {**gas, "bypass-ionization-gauge": "active"}, "bypass-l1", "active", "membrane"
+    )
+    assert [(item["id"], item["state"]) for item in on_gas] == [
+        ("bypass-ionization-gauge", "gas")
+    ]
+    assert plumbing_map.press_warnings(plumbing, gas, "bypass-l1", "active", "membrane") == []
+
+    # Switching the gauge on into a volume that already holds air is the same
+    # mistake from the other side, and warns too.
+    into_air = plumbing_map.press_warnings(
+        plumbing, {**route, "GVBD": "active"}, "downstream-ionization-gauge", "active", "unknown"
+    )
+    assert [item["id"] for item in into_air] == ["downstream-ionization-gauge"]
+
+
+def test_a_press_that_would_vent_a_running_turbo_warns(client):
+    """queezz, 2026-09-08: "and when vent goes on to TMP".
+
+    A running turbo is a boundary in the prediction, so the volume that matters
+    is the pump's own — the one the vent would actually join — never everything
+    behind it. Venting the backing line under a spinning turbo therefore does
+    not warn: nothing in this map joins a foreline to the vessel above its
+    pump.
+    """
+    plumbing = client.get("/plumbing").json
+    vented_gas_line = {
+        "gaspanel-valve-vent": "active",
+        "gaspanel-valve-ar": "active",
+        "gasline-ar": "active",
+        "gasline-main": "active",
+    }
+    warned = plumbing_map.press_warnings(
+        plumbing, {**vented_gas_line, "TMPU": "active"}, "GVU", "active", "unknown"
+    )
+    assert warned == [
+        {
+            "kind": "turbo",
+            "id": "TMPU",
+            "volume": "plasma-turbo-line",
+            "state": "air",
+            "level": 2,
+        }
+    ]
+    # The same press with the turbo stopped is an ordinary press.
+    assert plumbing_map.press_warnings(
+        plumbing, vented_gas_line, "GVU", "active", "unknown"
+    ) == []
+    # The backing line is on the far side of the pump, so its vent is quiet.
+    assert plumbing_map.press_warnings(
+        plumbing, {"TMPU": "active"}, "upstream-pumpline-vent-valve", "active", "unknown"
+    ) == []
+
+
+def test_a_press_that_changes_nothing_dangerous_is_quiet(client):
+    """Only what a press makes worse is worth a sentence.
+
+    A gauge that works at one atmosphere is never warned about, a press that
+    joins nothing has nothing to say, closing a vent is an improvement rather
+    than a warning, and a hazard that is already standing does not cry twice.
+    """
+    plumbing = client.get("/plumbing").json
+    vented = {
+        "gaspanel-valve-vent": "active",
+        "gaspanel-valve-ar": "active",
+        "flow-calibration-valve": "active",
+        "GVBD": "active",
+    }
+    # Only the two gauges the map marks `ionization` are counted; queezz named
+    # the rest as working at one atmosphere (2026-09-04).
+    ionization = {gauge["id"] for gauge in plumbing["gauges"] if gauge.get("kind") == "ionization"}
+    assert ionization == {"bypass-ionization-gauge", "downstream-ionization-gauge"}
+    for gauge in plumbing["gauges"]:
+        expected = [gauge["id"]] if gauge["id"] in ionization else []
+        warned = plumbing_map.press_warnings(
+            plumbing, vented, gauge["id"], "active", "unknown"
+        )
+        assert [item["id"] for item in warned] == expected, gauge["id"]
+
+    # A press that joins nothing dangerous, on a rig with everything shut.
+    assert plumbing_map.press_warnings(plumbing, {}, "bypass-l2", "active", "unknown") == []
+    # Closing the vent that caused the exposure is not a new exposure.
+    live = {**vented, "downstream-ionization-gauge": "active"}
+    assert plumbing_map.press_warnings(
+        plumbing, live, "gaspanel-valve-vent", "inactive", "unknown"
+    ) == []
+    # Nor is an unrelated press while the gauge already stands in that air.
+    assert plumbing_map.press_warnings(plumbing, live, "bypass-l2", "active", "unknown") == []
+
+
+def test_the_press_warning_route_answers_before_the_press_and_writes_nothing(tmp_path):
+    """The page asks this before its confirm box; it is a read, never a press."""
+    state_file = tmp_path / "elements_state.json"
+    before = {
+        "gaspanel-valve-vent": "active",
+        "gaspanel-valve-ar": "active",
+        "flow-calibration-valve": "active",
+        "downstream-ionization-gauge": "active",
+    }
+    state_file.write_text(json.dumps(before), encoding="utf-8")
+    client = make_app(tmp_path).test_client()
+
+    answer = client.get("/press-warnings", query_string={"id": "GVBD", "status": "active"})
+    assert answer.status_code == 200
+    assert [item["id"] for item in answer.json["warnings"]] == ["downstream-ionization-gauge"]
+    assert answer.json["warnings"][0]["state"] == "air"
+
+    quiet = client.get("/press-warnings", query_string={"id": "bypass-l2", "status": "active"})
+    assert quiet.json == {"warnings": []}
+
+    # An old id from a real history still resolves, and junk is refused.
+    assert client.get(
+        "/press-warnings", query_string={"id": "GVU-6", "status": "active"}
+    ).status_code == 200
+    for query in (
+        {"id": "not-an-element", "status": "active"},
+        {"id": "GVBD", "status": "maybe"},
+        {},
+    ):
+        assert client.get("/press-warnings", query_string=query).status_code == 400
+
+    # Asking about a press does not make it: the stored state is untouched.
+    assert json.loads(state_file.read_text(encoding="utf-8")) == before
+    assert client.get("/elements-state").json == before
 
 
 def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):

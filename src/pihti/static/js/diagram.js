@@ -50,14 +50,70 @@
         tooltip.textContent = text;
     }
 
+    /* What a press would newly join to gas or vent air, asked of the server
+     * just before the box appears. The walk lives in one place — the volume map
+     * and the server's own reading of it — so a warning can never drift from
+     * the colours beside it. `null` means the question could not be asked at
+     * all, which the box then says: an unchecked press is not a safe one. */
+    async function pressWarnings(id, status) {
+        try {
+            const response = await fetch(
+                `/press-warnings?id=${encodeURIComponent(id)}&status=${encodeURIComponent(status)}`
+            );
+            if (!response.ok) return null;
+            const result = await response.json();
+            return Array.isArray(result.warnings) ? result.warnings : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /* The warning, in the words a person uses at the rig. queezz asked for both
+     * on 2026-09-08: "create warning when putting gas/air on to IG" and "and
+     * when vent goes on to TMP". One sentence per kind of thing the press would
+     * newly expose, and the sentence says up front that it is read from the
+     * valve positions — the confirm box is a modal of its own, and a reader
+     * about to press something must know whether this is a measurement. It is
+     * not, and it stops nothing: a warning here is still only a confirm box. */
+    function warningText(warnings) {
+        const sentences = [];
+        const gauges = warnings.filter((item) => item.kind === "gauge");
+        const turbos = warnings.filter((item) => item.kind === "turbo");
+        if (gauges.length) {
+            const states = new Set(gauges.map((item) => item.state));
+            const what = states.has("air") && states.has("gas")
+                ? "gas and vent air"
+                : states.has("air") ? "vent air" : "gas";
+            sentences.push(`Warning, predicted from the valve positions: this would let ${what} reach the ${joinWords(
+                gauges.map((item) => inSentence(displayName(item.id)))
+            )}, ${gauges.length > 1 ? "which are" : "which is"} switched on.`);
+        }
+        if (turbos.length) {
+            sentences.push(`Warning, predicted from the valve positions: this would let vent air reach the ${joinWords(
+                turbos.map((item) => inSentence(displayName(item.id)))
+            )}, ${turbos.length > 1 ? "which are" : "which is"} marked running.`);
+        }
+        return sentences.join("\n\n");
+    }
+
     async function toggleElementStatus(element, config) {
         if (isInteracting) return;
         const currentFill = rgbToHex(element.style.fill || window.getComputedStyle(element).fill);
         const newStatus = currentFill === config.colors.active ? "inactive" : "active";
-        if (config.confirmToggle && !window.confirm(`Mark ${displayName(element.id)} ${newStatus}?`)) return;
+        // Held from here rather than from after the box, so the five-second
+        // refresh cannot repaint the drawing out from under an open question.
         isInteracting = true;
-        element.style.fill = newStatus === "active" ? config.colors.active : config.colors.inactive;
         try {
+            const warnings = await pressWarnings(element.id, newStatus);
+            const notice = warnings === null
+                ? "This press could not be checked against the diagram just now."
+                : warningText(warnings);
+            const question = `Mark ${displayName(element.id)} ${newStatus}?`;
+            // A warning is a confirm: an element with no confirm box of its own
+            // still asks when there is something to say.
+            if ((notice || config.confirmToggle)
+                && !window.confirm(notice ? `${notice}\n\n${question}` : question)) return;
+            element.style.fill = newStatus === "active" ? config.colors.active : config.colors.inactive;
             const response = await fetch("/update", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},

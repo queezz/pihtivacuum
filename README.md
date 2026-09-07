@@ -2,7 +2,7 @@
 
 PIHTI is a LAN-native, operator-annotated vacuum-system diagram with state history and control-unit plots. The diagram is an operating aid, not a control panel, pressure measurement, safety interlock, or source of hardware truth.
 
-Current release: **0.12.1**. The same version appears in the navigation bar and at `/version`.
+Current release: **0.13.0**. The same version appears in the navigation bar and at `/version`.
 
 ## What the landing page does
 
@@ -19,6 +19,8 @@ The vent sequences live in `src/pihti/static/operationGuides.json` and are inten
 Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. The field and the five state colours are one palette, chosen by measured contrast: the field is a quiet warm stone so the colours are the loudest thing on the page, and every colour clears 3:1 against it while differing in lightness as well as hue. A coloured line is drawn wider than authored — a plain multiple of queezz's own stroke, with a switch in the key under the drawing — and an isolated line is not widened at all. The two vessels, the two bypass tees and the cross take the full state colour as their fill and keep the outline he drew. Each gauge's stem takes the colour of the volume it reads.
 
 Under the drawing, one line per vessel says in words what the prediction finds it joined to: the other vessel, a gas, vent air through a named valve, a pump, or nothing. All of it is a prediction from the entered valve positions, never a measurement.
+
+The same prediction also warns before a press. When a press would newly let gas or vent air reach an ionization gauge that is switched on, or vent air reach a turbo pump that is marked running, the confirm box carries a sentence saying so above the question — and an element with no confirm box of its own still asks when there is something to say. The answer is read from a copy of the entered state with the press applied, so only what the press makes *worse* is mentioned. **It is a prediction from the valve positions, never an interlock:** it reads no pressure, refuses no press, and protects no hardware.
 
 ## Run and test
 
