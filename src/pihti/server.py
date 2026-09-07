@@ -6,6 +6,7 @@ import csv
 import json
 import os
 import secrets
+from hashlib import sha256
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -287,7 +288,9 @@ def generate_plot_html(dataframe, columns_linear, columns_log):
         "title_font": {"color": PLOT_MUTED},
     }
     figure.update_layout(
-        height=760,
+        # No fixed height: the plot is framed, and the frame decides how tall
+        # it is. A fixed height gave the frame its own scrollbars.
+        autosize=True,
         margin={"l": 60, "r": 20, "t": 40, "b": 40},
         paper_bgcolor=PLOT_SURFACE,
         plot_bgcolor=PLOT_SURFACE,
@@ -303,7 +306,12 @@ def generate_plot_html(dataframe, columns_linear, columns_log):
     for annotation in figure.layout.annotations:
         annotation.font.color = PLOT_MUTED
         annotation.font.size = 12
-    return pio.to_html(figure, full_html=False, config={"displaylogo": False})
+    return pio.to_html(
+        figure,
+        full_html=False,
+        default_height="100%",
+        config={"displaylogo": False, "responsive": True},
+    )
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -425,9 +433,15 @@ def create_app(test_config: dict | None = None) -> Flask:
         # can never outlive the release it belongs to. Pages, data and the plot
         # are never stored.
         versioned = request.endpoint == "static" and request.args.get("v") == __version__
-        response.headers["Cache-Control"] = (
-            "public, max-age=31536000, immutable" if versioned else "no-store"
-        )
+        if versioned:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif request.endpoint == "plot_recordings":
+            # A past month never changes, so this may be kept — but it is
+            # always revalidated against its ETag, so a month that does gain a
+            # recording is never served stale.
+            response.headers["Cache-Control"] = "no-cache"
+        else:
+            response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         # The last plot is a document of its own, framed by the Plot tab from
         # this same origin so Plotly's megabytes parse outside the page's
@@ -672,10 +686,18 @@ def create_app(test_config: dict | None = None) -> Flask:
         except RuntimeError:
             files = []
             configured = False
+        months = months_with_recordings(files)
+        newest = months[0] if months else ""
+        opening = files_in_month(newest) if newest else []
         return render_template(
             "plasmaplots.html",
             files=files,
-            file_days=group_files_by_day(files),
+            # Only the newest month travels in the page; the rest is fetched a
+            # month at a time and revalidated (see `/plot/recordings`).
+            months=months,
+            opening_month=newest,
+            opening_days=group_files_by_day(opening),
+            latest_file=files[0] if files else "",
             data_path_configured=configured,
         )
 
@@ -737,6 +759,47 @@ def create_app(test_config: dict | None = None) -> Flask:
         except FileNotFoundError:
             return ""
 
+    def month_of_file(name: str) -> str:
+        recorded = parse_datetime_from_filename(name)
+        return "undated" if recorded == datetime.min else recorded.strftime("%Y-%m")
+
+    def files_in_month(month: str) -> list[str]:
+        return [name for name in available_cu_files() if month_of_file(name) == month]
+
+    def months_with_recordings(files: list[str]) -> list[str]:
+        """Newest first, the months that hold at least one recording."""
+        seen = []
+        for name in files:
+            month = month_of_file(name)
+            if month not in seen:
+                seen.append(month)
+        return seen
+
+    @app.route("/plot/recordings")
+    def plot_recordings():
+        """One month of the archive.
+
+        The page used to carry every recording — thirteen hundred of them, a
+        hundred kilobytes of JSON on every visit, and it could not be cached
+        because the newest day changes. A month is a few dozen entries, and a
+        month that has passed never changes again, so this answer carries an
+        ETag: going back a year costs one round trip the first time and a
+        304 afterwards (queezz, 2026-09-07: "going back is fine to be slower.
+        However we know our history, so that should not be slower").
+        """
+        month = request.args.get("month", "")
+        dated = len(month) == 7 and month[4] == "-" and month[:4].isdigit() and month[5:].isdigit()
+        if not dated and month != "undated":
+            return jsonify({"error": "A month reads YYYY-MM, or `undated`."}), 400
+        try:
+            names = files_in_month(month)
+        except RuntimeError:
+            return jsonify({"error": "No control-unit directory is configured."}), 404
+        payload = {"month": month, "days": group_files_by_day(names)}
+        response = jsonify(payload)
+        response.set_etag(sha256(chr(10).join(names).encode("utf-8")).hexdigest()[:32])
+        return response.make_conditional(request)
+
     @app.route("/plot/meta")
     def plot_meta():
         """What the last plot is, without the plot: a few hundred bytes."""
@@ -745,6 +808,19 @@ def create_app(test_config: dict | None = None) -> Flask:
             stored = _load_json(Path(app.config["LAST_PLOT_META_FILE"]), {})
             meta = stored if isinstance(stored, dict) else {}
         return jsonify({"has_plot": bool(stored_plot_html()), **meta})
+
+    # A framed document brings its own margins, its own white page and its own
+    # scrollbars unless it is told otherwise, and a plot saved by an older
+    # release carries a fixed height that does not fit the frame. This is
+    # prepended when the document is served, so plots made before 0.9.1 lose
+    # the white border and the inner scrollbars too.
+    PLOT_FRAME_STYLE = (
+        "<style>html,body{margin:0;padding:0;height:100%;"
+        f"background:{PLOT_SURFACE};}}"
+        # Plotly's off-screen measuring SVG is a body child and would otherwise
+        # give the document a scrollbar of its own.
+        "body>svg{position:absolute;top:0;left:0;visibility:hidden;}</style>"
+    )
 
     @app.route("/plot/last.html")
     def plot_last_html():
@@ -757,7 +833,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         html = stored_plot_html()
         if not html:
             abort(404)
-        return Response(html, mimetype="text/html")
+        return Response(PLOT_FRAME_STYLE + html, mimetype="text/html")
 
     @app.route("/download_controlunit_csv")
     def download_controlunit_csv():

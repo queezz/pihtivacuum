@@ -15,7 +15,9 @@
                 <button type="button" id="calendar-next" aria-label="Next month">&rarr;</button>
             </div>
             <div id="plot-calendar" class="cal-grid" role="group" aria-label="Days with control-unit recordings"></div>
+            <p id="calendar-loading" class="muted" style="margin: 8px 0 0;" hidden>Reading that month…</p>
             <button type="button" id="calendar-latest" style="margin-top: 8px; width: 100%;">Latest recording</button>
+            <button type="button" id="calendar-undated" style="margin-top: 8px; width: 100%;" hidden>Undated recordings</button>
             {% else %}
             <p class="muted">No files.</p>
             {% endif %}
@@ -28,7 +30,7 @@
                 <p id="day-files-empty" class="muted" hidden>No recordings on this day.</p>
             </div>
         </section>
-        <script type="application/json" id="file-days-data">{{ file_days|tojson }}</script>
+        <script type="application/json" id="archive-data">{{ {"months": months, "month": opening_month, "days": opening_days, "latest": latest_file}|tojson }}</script>
         {% endif %}
         <section class="rail-card">
             <h2 class="rail-label">Export</h2>

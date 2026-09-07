@@ -70,9 +70,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.9.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.9.0"}
-    assert b"v0.9.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.9.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.9.1"}
+    assert b"v0.9.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -91,7 +91,7 @@ def test_every_page_shares_the_rail_grid_and_marks_its_tab(client):
         response = client.get(path)
         assert response.status_code == 200
         assert response.headers["Cache-Control"] == "no-store"
-        # SAMEORIGIN, not DENY, since 0.9.0: the Plot tab frames its own plot
+        # SAMEORIGIN, not DENY, since 0.9.1: the Plot tab frames its own plot
         # document so Plotly parses outside this page. Other origins still may
         # not frame us.
         assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
@@ -335,12 +335,21 @@ def test_plot_finds_recordings_by_calendar_day_not_by_one_long_list(client, tmp_
     assert 'id="file-list"' in page and "calendar.js" in page
     # The archive reaches the browser as data, never as thirteen hundred buttons.
     assert "<details" not in page and 'data-file="cu_' not in page
-    payload = json.loads(page.split('id="file-days-data">', 1)[1].split("</script>", 1)[0])
-    assert [group["date"] for group in payload] == ["2026-06-10", "2026-06-09", "2026-01-01", "undated"]
-    assert payload[0]["files"] == [
+    payload = json.loads(page.split('id="archive-data">', 1)[1].split("</script>", 1)[0])
+    # Since 0.9.1 the page carries the newest month and the index of months,
+    # not the whole archive; the rest is fetched a month at a time.
+    assert payload["months"] == ["2026-06", "2026-01", "undated"]
+    assert payload["month"] == "2026-06"
+    assert [group["date"] for group in payload["days"]] == ["2026-06-10", "2026-06-09"]
+    assert payload["latest"] == "cu_20260610_194248.csv"
+    assert payload["days"][0]["files"] == [
         {"name": "cu_20260610_194248.csv", "time": "19:42:48"},
         {"name": "cu_20260610_185959.csv", "time": "18:59:59"},
     ]
+    assert "cu_20260101_120000.csv" not in page
+    older = client.get("/plot/recordings?month=2026-01").json
+    assert [group["date"] for group in older["days"]] == ["2026-01-01"]
+    assert client.get("/plot/recordings?month=undated").json["days"][0]["date"] == "undated"
     assert client.get("/history").data.decode("utf-8").count("calendar.js") == 1
     from pihti.server import group_files_by_day
 
@@ -359,7 +368,7 @@ def test_pages_carry_this_project_s_own_icon(client):
 
 
 def test_static_assets_are_cacheable_only_when_they_carry_the_release(client):
-    # Before 0.9.0 every response was `no-store`, so each tab switch re-fetched
+    # Before 0.9.1 every response was `no-store`, so each tab switch re-fetched
     # the 185 kB drawing, the stylesheet and every script. Now a static URL
     # stamped with the running release may be kept, and one without it may not,
     # so a stale asset can never outlive its release.
@@ -373,6 +382,40 @@ def test_static_assets_are_cacheable_only_when_they_carry_the_release(client):
     assert 'href="/static/css/styles.css"' not in page
     # Pages and data stay uncacheable whatever else changes.
     assert client.get("/elements-state").headers["Cache-Control"] == "no-store"
+
+
+def test_the_archive_travels_one_month_at_a_time(app, client, tmp_path):
+    # Thirteen hundred recordings used to ride in the page. Now the page
+    # carries the newest month and going back asks for one month, which a
+    # passed month answers with a 304 (queezz, 2026-09-07: "we know our
+    # history, so that should not be slower").
+    folder = Path(app.config["CUDATA_DIRECTORY"])
+    for name in ("cu_20260905_101500.csv", "cu_20260905_120000.csv", "cu_20260712_090000.csv", "notes.txt"):
+        (folder / name).write_text("sample", encoding="utf-8")
+    page = client.get("/plasmaplots").data.decode("utf-8")
+    assert "cu_20260905_101500.csv" in page          # the newest month is in the page
+    assert "cu_20260712_090000.csv" not in page      # an older one is not
+    assert 'id="archive-data"' in page
+
+    older = client.get("/plot/recordings?month=2026-07")
+    assert older.status_code == 200
+    assert older.headers["Cache-Control"] == "no-cache"
+    assert [day["date"] for day in older.json["days"]] == ["2026-07-12"]
+    assert older.json["days"][0]["files"] == [{"name": "cu_20260712_090000.csv", "time": "09:00:00"}]
+
+    # History does not change, so asking again costs a 304 and no body.
+    again = client.get("/plot/recordings?month=2026-07", headers={"If-None-Match": older.headers["ETag"]})
+    assert again.status_code == 304
+    assert not again.data
+
+    # A month that gains a recording stops matching, so nothing is served stale.
+    (folder / "cu_20260713_090000.csv").write_text("sample", encoding="utf-8")
+    fresh = client.get("/plot/recordings?month=2026-07", headers={"If-None-Match": older.headers["ETag"]})
+    assert fresh.status_code == 200
+    assert len(fresh.json["days"]) == 2
+
+    assert client.get("/plot/recordings?month=nonsense").status_code == 400
+    assert client.get("/plot/recordings?month=undated").json["days"] == []
 
 
 def test_health_endpoint_keeps_the_ensemble_contract(client):
@@ -463,7 +506,7 @@ def test_plot_records_which_file_it_shows(client, app, tmp_path):
     assert response.json["linear"] == ["Ip_c"]
     assert response.json["log"] == ["Pu_c", "Pd_c", "Bu_c"]
     # The megabytes of Plotly never ride in this answer: the page frames the
-    # plot's own document instead (0.9.0).
+    # plot's own document instead (0.9.1).
     assert "plot" not in response.json
     document = client.get("/plot/last.html")
     assert document.status_code == 200 and document.mimetype == "text/html"

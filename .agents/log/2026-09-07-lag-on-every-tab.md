@@ -77,3 +77,58 @@ not touched.
 `diagram.js`, `git diff --check` clean. A new test pins the cache rule from
 both sides — stamped is cacheable, unstamped and stale-stamped are not — and
 the plot tests moved to the new routes.
+
+
+## 0.9.1: the frame's own chrome, and an archive read a month at a time
+
+queezz on the 0.9.0 screenshot: "You've introduced white border and scrolls
+inside the plot area, though. But nice otherwise." And: "Calendar archive for
+1318 is... wrong. Very wrong. Usually we need a few recent days and a way to go
+back. And going back is fine to be slower. However we know our history, so that
+should not be slower, cause history doesn't change normally."
+
+**The frame's chrome.** A framed document brings its own white page, its own
+8 px body margin and its own scrollbars, and the figure carried a fixed
+`height=760` that did not match the frame. `/plot/last.html` now prefixes the
+stored document with a reset — no margin, the panel colour, Plotly's off-screen
+measuring SVG taken out of the flow — and new figures are generated with
+`autosize` and `default_height="100%"`, `responsive: true`. Measured on a
+freshly drawn plot in a 720 px frame: document scroll height 718 against a
+718 px viewport, no scrollbar either way, body background `#161b22`, margin 0,
+the legend inside the frame. A first attempt forced `height:100vh !important`
+and clipped the legend off a plot saved by the previous release; that was
+caught in the walk and replaced with the reset above, which leaves an old
+plot's own height alone until the next plot replaces it.
+
+**The archive.** The page carried every recording: 100 kB of JSON, uncacheable
+because the newest day changes. Now `/plasmaplots` ships only the newest month,
+the index of months that hold recordings, and the newest file. `GET
+/plot/recordings?month=YYYY-MM` (or `month=undated`) answers one month with an
+ETag and `Cache-Control: no-cache`, so a month that has passed is revalidated
+rather than re-sent. Prev and next step to the next month that actually holds
+recordings, so going back a year is a few presses through months with data
+instead of twelve through empty grids, and they disable at the ends. A
+recording's day is read from its own name, so a deep link needs no index.
+
+Measured on scratch with recordings spread over twelve months: the Plot page
+fell from 100 kB to 5.9 kB; stepping back four months cost four fetches of
+677 bytes; stepping forward again over months already held cost none; after a
+reload the same four months cost 300 bytes each, the bodies coming from cache
+(304). A deep link to `?file=cu_20260408_090000.csv`, eight months back, loaded
+that month, pressed the day and the recording, and plotted it.
+
+**Also found in the walk:** a missing recording answers with Flask's own HTML
+404, and the page read it as JSON, so the reader saw "Unexpected token '<'".
+Refusals are now read defensively and that case says "That recording is not on
+this machine."
+
+**A hazard worth knowing:** editing a static file without bumping the version
+serves the old copy to any browser that saw the previous release — the walk hit
+exactly this and needed a forced refresh of one asset. `AGENTS.md` now says so
+in as many words.
+
+Gates: `pytest` 27 passed (exit 0), `node --check`, `git diff --check` clean.
+The archive contract is pinned by a test that asserts the page carries the
+newest month and not an older one, that a month answers with an ETag, that
+asking again with that ETag is a 304 with no body, and that a month which gains
+a recording stops matching.

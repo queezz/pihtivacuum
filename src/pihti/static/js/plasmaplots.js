@@ -10,31 +10,83 @@
     const download = document.getElementById("downloadBtn");
     const calendar = window.pihtiCalendar;
 
-    // {"YYYY-MM-DD": [{name, time}, ...]} newest day first, from the server.
-    const days = readDays();
-    const dayKeys = Object.keys(days);
-    const counts = Object.fromEntries(dayKeys.map((day) => [day, days[day].length]));
+    /* The archive is read one month at a time. Thirteen hundred recordings
+     * used to travel in the page — a hundred kilobytes on every visit, and
+     * uncacheable, because the newest day changes. The page now carries only
+     * the newest month; going back asks the server, and a month that has
+     * passed answers 304 from then on, because history does not change
+     * (queezz, 2026-09-07). */
+    const archive = readArchive();
+    const months = archive.months || [];          // newest first, may end in "undated"
+    const loaded = new Map();                     // month -> {"YYYY-MM-DD": [{name, time}]}
+    const latestFile = archive.latest || "";
+    let monthKey = archive.month || "";
     let selectedDate = null;
     let selectedFile = null;
-    let currentMonth = null;
+    let currentMonth = null;                      // Date, first of the drawn month
 
-    function readDays() {
-        const raw = document.getElementById("file-days-data");
+    function readArchive() {
+        const raw = document.getElementById("archive-data");
         if (!raw) return {};
         try {
-            const result = {};
-            for (const group of JSON.parse(raw.textContent)) {
-                if (/^\d{4}-\d{2}-\d{2}$/.test(group.date)) result[group.date] = group.files;
-            }
-            return result;
+            return JSON.parse(raw.textContent);
         } catch (error) {
-            console.error("The recording list could not be read", error);
+            console.error("The recording index could not be read", error);
             return {};
         }
     }
 
+    function storeMonth(key, groups) {
+        const byDate = {};
+        for (const group of groups || []) byDate[group.date] = group.files;
+        loaded.set(key, byDate);
+        return byDate;
+    }
+
+    function daysOf(key) {
+        return loaded.get(key) || {};
+    }
+
+    /* A refusal is not always JSON: a missing recording answers with Flask's
+     * own 404 page, and reading that as JSON used to put a parser error in
+     * front of the reader instead of a sentence. */
+    async function readAnswer(response) {
+        try {
+            return await response.json();
+        } catch (error) {
+            return {error: response.status === 404
+                ? "That recording is not on this machine."
+                : `The server answered ${response.status}.`};
+        }
+    }
+
+    async function loadMonth(key) {
+        if (!key || loaded.has(key)) return daysOf(key);
+        const note = document.getElementById("calendar-loading");
+        if (note) note.hidden = false;
+        try {
+            const response = await fetch(`/plot/recordings?month=${encodeURIComponent(key)}`);
+            const payload = await readAnswer(response);
+            if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+            return storeMonth(key, payload.days);
+        } catch (error) {
+            console.error("That month could not be read", error);
+            return storeMonth(key, []);
+        } finally {
+            if (note) note.hidden = true;
+        }
+    }
+
+    /* A recording says its own day in its name, so nothing has to be looked up
+     * in an index the page no longer holds. */
     function dayOfFile(file) {
-        return dayKeys.find((day) => days[day].some((entry) => entry.name === file)) || null;
+        const match = /^cu_(\d{4})(\d{2})(\d{2})_/.exec(file || "");
+        return match ? `${match[1]}-${match[2]}-${match[3]}` : "undated";
+    }
+
+    function monthOfFile(file) {
+        const day = dayOfFile(file);
+        return day === "undated" ? "undated" : day.slice(0, 7);
     }
 
     /* Status is a line above the plot, never a veil over the page. A modal
@@ -86,9 +138,16 @@
     }
 
     function renderCalendar() {
-        if (!calendar || !currentMonth) return;
+        const grid = document.getElementById("plot-calendar");
+        if (!calendar || !currentMonth || !grid) return;
+        // Only the month on screen is counted, because only it is loaded.
+        const byDate = daysOf(monthKey);
+        const counts = Object.fromEntries(
+            Object.keys(byDate).filter((date) => date !== "undated").map((date) => [date, byDate[date].length])
+        );
+        grid.hidden = monthKey === "undated";
         calendar.render({
-            grid: document.getElementById("plot-calendar"),
+            grid,
             label: document.getElementById("calendar-month-label"),
             month: currentMonth,
             counts,
@@ -103,7 +162,7 @@
         const empty = document.getElementById("day-files-empty");
         const label = document.getElementById("day-files-label");
         if (!list || !empty) return;
-        const entries = selectedDate ? days[selectedDate] || [] : [];
+        const entries = selectedDate ? daysOf(monthKey)[selectedDate] || [] : [];
         if (label) label.textContent = selectedDate ? `Files · ${selectedDate}` : "Files";
         empty.hidden = entries.length > 0;
         list.replaceChildren(...entries.map((entry) => {
@@ -132,27 +191,34 @@
         window.history.replaceState(null, "", selectedFile ? `/plasmaplots?file=${encodeURIComponent(selectedFile)}` : "/plasmaplots");
     }
 
-    function selectDate(dateStr) {
-        selectedDate = dateStr;
-        currentMonth = calendar.monthOf(dateStr);
-        if (selectedFile && dayOfFile(selectedFile) !== dateStr) selectedFile = null;
+    function redraw() {
         renderCalendar();
         renderDayList();
         renderDownload();
         writeAddress();
     }
 
-    function selectFile(file) {
+    function selectDate(dateStr) {
+        selectedDate = dateStr;
+        if (dateStr !== "undated") currentMonth = calendar.monthOf(dateStr);
+        if (selectedFile && dayOfFile(selectedFile) !== dateStr) selectedFile = null;
+        redraw();
+    }
+
+    /* Selecting a file may be the first sight of a month the page never
+     * carried — a deep link into last winter, say — so the month is fetched
+     * before the day is shown. */
+    async function selectFile(file) {
         const day = dayOfFile(file);
-        selectedFile = day ? file : null;
-        if (day) {
-            selectedDate = day;
-            currentMonth = calendar.monthOf(day);
+        const month = monthOfFile(file);
+        if (month !== monthKey) {
+            await loadMonth(month);
+            monthKey = month;
         }
-        renderCalendar();
-        renderDayList();
-        renderDownload();
-        writeAddress();
+        selectedFile = file;
+        selectedDate = day;
+        if (day !== "undated") currentMonth = calendar.monthOf(day);
+        redraw();
     }
 
     async function fetchPlot(file) {
@@ -161,14 +227,14 @@
         showStatus(`Plotting ${file}…`);
         try {
             const response = await fetch("/plot", {method: "POST", body: new URLSearchParams({file})});
-            const payload = await response.json();
+            const payload = await readAnswer(response);
             if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
             showPlot(payload.generated);
             showStatus("");
             renderContext(payload);
         } catch (error) {
             console.error("The plot could not be generated", error);
-            showEmpty(`This file could not be plotted. ${error.message || ""}`.trim());
+            showEmpty(error.message || "This recording could not be plotted.");
         }
     }
 
@@ -178,10 +244,10 @@
     async function fetchLastPlot() {
         try {
             const response = await fetch("/plot/meta");
-            const payload = await response.json();
+            const payload = await readAnswer(response);
             if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
             if (!payload.has_plot) {
-                showEmpty(dayKeys.length ? "No plot yet. Choose a day and a recording on the left." : "No plot available.");
+                showEmpty(latestFile ? "No plot yet. Choose a day and a recording on the left." : "No plot available.");
                 renderContext(null);
                 return;
             }
@@ -195,19 +261,49 @@
         }
     }
 
-    function shiftMonth(delta) {
-        if (!currentMonth) return;
-        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1);
+    /* Prev and next step to the next month that actually holds recordings, so
+     * going back a year is a few presses rather than twelve through empty
+     * grids. Months with nothing in them are not stops on the way. */
+    const datedMonths = months.filter((month) => month !== "undated");
+
+    async function stepMonth(delta) {
+        const here = datedMonths.indexOf(monthKey);
+        // `months` is newest first, so a step back in time is a step forward
+        // through the list.
+        const next = datedMonths[here === -1 ? 0 : here - delta];
+        if (!next) return;
+        await loadMonth(next);
+        monthKey = next;
+        currentMonth = calendar.monthOf(`${next}-01`);
+        selectedDate = null;
         renderCalendar();
+        renderDayList();
+        updateMonthSteps();
     }
 
-    document.getElementById("calendar-prev")?.addEventListener("click", () => shiftMonth(-1));
-    document.getElementById("calendar-next")?.addEventListener("click", () => shiftMonth(1));
+    function updateMonthSteps() {
+        const here = datedMonths.indexOf(monthKey);
+        const prev = document.getElementById("calendar-prev");
+        const next = document.getElementById("calendar-next");
+        if (prev) prev.disabled = here === -1 || here >= datedMonths.length - 1;
+        if (next) next.disabled = here <= 0;
+    }
+
+    document.getElementById("calendar-prev")?.addEventListener("click", () => stepMonth(-1));
+    document.getElementById("calendar-next")?.addEventListener("click", () => stepMonth(1));
+    const undatedButton = document.getElementById("calendar-undated");
+    if (undatedButton && months.includes("undated")) {
+        undatedButton.hidden = false;
+        undatedButton.addEventListener("click", async () => {
+            await loadMonth("undated");
+            monthKey = "undated";
+            selectDate("undated");
+        });
+    }
     document.getElementById("calendar-latest")?.addEventListener("click", () => {
-        if (!dayKeys.length) return;
-        const latest = days[dayKeys[0]][0].name;
-        selectFile(latest);
-        fetchPlot(latest);
+        if (!latestFile) return;
+        selectFile(latestFile);
+        fetchPlot(latestFile);
     });
     download?.addEventListener("click", (event) => {
         if (!selectedFile) event.preventDefault();
@@ -215,11 +311,19 @@
 
     // Read the address before the first render writes it back.
     const requested = new URLSearchParams(window.location.search).get("file");
-    if (dayKeys.length) selectDate(dayKeys[0]);
-    if (requested && dayOfFile(requested)) {
-        selectFile(requested);
-        fetchPlot(requested);
-    } else {
-        fetchLastPlot();
-    }
+    (async function start() {
+        if (monthKey) {
+            storeMonth(monthKey, archive.days);
+            currentMonth = calendar.monthOf(`${monthKey}-01`);
+            const newest = Object.keys(daysOf(monthKey)).sort().reverse()[0];
+            if (newest) selectDate(newest);
+        }
+        updateMonthSteps();
+        if (requested) {
+            await selectFile(requested);
+            fetchPlot(requested);
+        } else {
+            fetchLastPlot();
+        }
+    }());
 }());
