@@ -76,6 +76,39 @@ release settles for all three:
   survives the board's thirty-second refresh, so a disclosure never closes
   under the reader.
 
+## Two owner decisions about what a status means (2026-09-07)
+
+Both arrived from `code/pihti-log` and both land on the *producers*. This
+project is a consumer here: its board renders whatever a neighbour's
+`/api/health` reports, and `src/pihti/neighbours.py` never re-reads a
+neighbour's own `status`. Nothing changed in this repository; it was checked,
+and it is written down so nobody "helpfully" adds a rule later.
+
+- **An idle ControlUnit is `ok`, not `degraded`** (letter
+  `20260907-086b78af-5a8d73`). queezz: *"Also degraded for a Controlunit up,
+  but not logging. Wrong. It's up and not doing a thing, not degraded."*
+  Online without acquisition is healthy, with an idle detail beside it;
+  `degraded` is reserved for an actual malfunction. ControlUnit fixes this at
+  the source (its `controlunit/web/status.py` derived health from
+  `acquiring`). Our card will simply say `ok` with its idle sentence.
+- **A pending journal draft does not degrade the shared board** (letter
+  `20260907-817e5f67-f68a07`, superseding the wording-only suggestion in
+  `20260907-ba2d4f0a-afb66f`). queezz: *"That's stupid on the Lab link page.
+  That should be a service tab on that server's page."* The trio board reports
+  reachability and operational availability; recovery work that needs a person
+  belongs on PIHTI Log's own service page with a way to resolve it. PIHTI Log
+  separates its exported status from its local recovery attention.
+
+The consumer contract that follows, and the reason no code moved: `read_health`
+passes a reported `ok`/`degraded`/`down` straight through with the producer's
+own detail. It decides only the facts that are *ours* to decide — a refusal, an
+HTTP error, silence, a malformed body, a missing address — and it never
+promotes or demotes a status a neighbour reported about itself. A consumer that
+second-guessed a producer would make the six states mean six different things
+on three boards, which is exactly what the trio work is undoing.
+`tests/test_server.py::test_a_neighbour_s_own_status_is_taken_at_its_word`
+holds it.
+
 ## Invariants this project keeps
 
 - **No service depends on another to run.** A neighbour that is down is shown
@@ -103,6 +136,33 @@ release settles for all three:
   card, because that is the thing a person at the rig actually presses.
 - The PIHTI Log adapter that reads this project stays read-only and never
   calls a device mutation route.
+- **A producer's own status is taken at its word.** See the two owner
+  decisions above. We classify what only this machine can see; the neighbour
+  classifies itself.
+
+## This board is the trio's reference (owner direction 2026-09-07)
+
+queezz, from three side-by-side Mac screenshots (letter
+`20260907-09cac2c8-d703f1`): *"Three link tabs, and all different. They should
+wear different colors so we know which one is which, but they should be
+identical. The diagram is doing the best job here on mac."* So PIHTI Log and
+ControlUnit copy this board's desktop geometry, wording, card order and legend,
+and this project holds it still while they do. ControlUnit reports its 4.2.1
+already carries the 0.8.0 shape (letter `20260907-badc369e-291e47`); PIHTI Log
+reports the same at its 0.37.1 (note `20260907-78f344ce-e15344`).
+
+What each host keeps for itself: its own accent palette, its own chrome, its
+own version and observed reachability, and its own "this is the service you are
+reading" card. What is shared: card order, the geometry, and one meaning per
+state everywhere.
+
+**They carry the fix, not the defect.** The narrow-screen clipping the Mac
+audit found here (letter `20260907-8cbfd520-ca289d`) was fixed in 0.10.0 by
+letting the top bar wrap rather than overflow — measured at 390 px, document
+width 454 px before and 390 px after, on all five pages, with the operator
+selector fully on screen and every tab still visible. The desktop board did not
+move: rails at y 76, 256 px wide, cards in the same order at the same x
+positions.
 
 ## What is asked of this project
 

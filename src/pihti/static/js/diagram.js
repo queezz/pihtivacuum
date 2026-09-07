@@ -8,9 +8,24 @@
     let activeGuide = null;
     let isInteracting = false;
     let operatorIdentified = false;
+    /* id -> the name a person uses at the rig, from elementsConfig. A page
+     * shows the name; the key stays in the file and the log. */
+    let nameById = {};
 
     function normalizedStatus(value) {
         return value === "active" || value === true ? "active" : "inactive";
+    }
+
+    /* The readable name for a component, or "" when this release's diagram
+     * does not carry it — a history entry can name a component that has since
+     * been removed, and inventing a name for it would be worse than saying so.
+     * History reads this through `window.pihtiElementName`. */
+    function elementName(id) {
+        return nameById[id] || "";
+    }
+
+    function displayName(id) {
+        return elementName(id) || id;
     }
 
     function rgbToHex(rgb) {
@@ -30,7 +45,7 @@
         if (isInteracting) return;
         const currentFill = rgbToHex(element.style.fill || window.getComputedStyle(element).fill);
         const newStatus = currentFill === config.colors.active ? "inactive" : "active";
-        if (config.confirmToggle && !window.confirm(`Mark ${element.id} ${newStatus}?`)) return;
+        if (config.confirmToggle && !window.confirm(`Mark ${displayName(element.id)} ${newStatus}?`)) return;
         isInteracting = true;
         element.style.fill = newStatus === "active" ? config.colors.active : config.colors.inactive;
         try {
@@ -69,7 +84,7 @@
             const element = document.getElementById(id);
             if (!element) return;
             element.style.cursor = operatorIdentified ? "pointer" : "not-allowed";
-            element.addEventListener("mouseenter", (event) => showTooltip(tooltip, event, id));
+            element.addEventListener("mouseenter", (event) => showTooltip(tooltip, event, displayName(id)));
             element.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
         });
         container.addEventListener("click", (event) => {
@@ -180,7 +195,7 @@
             const label = document.createElement("span");
             label.textContent = step.action;
             const state = document.createElement("small");
-            const names = stepTargets(step).map((target) => target.id).join(", ");
+            const names = stepTargets(step).map((target) => displayName(target.id)).join(", ");
             const word = stepStates[index] === "complete" ? "Done in diagram" : stepStates[index] === "current" ? "Next" : "Later";
             state.textContent = names ? `${word} · ${names}` : word;
             item.append(label, state);
@@ -298,6 +313,9 @@
         document.querySelectorAll(".non-clickable").forEach((element) => { element.style.pointerEvents = "none"; });
         const configResponse = await fetch("/elements-config");
         elementsConfig = await configResponse.json();
+        nameById = Object.fromEntries(
+            elementsConfig.filter((item) => item.label).map((item) => [item.id, item.label])
+        );
         if (window.historyMode) {
             container.style.pointerEvents = "none";
             await fetchAndUpdateStates();
@@ -321,5 +339,6 @@
     }
 
     window.applyState = applyState;
+    window.pihtiElementName = elementName;
     loadDiagram().catch((error) => console.error("Diagram could not be loaded", error));
 }());

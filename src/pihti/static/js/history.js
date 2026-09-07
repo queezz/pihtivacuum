@@ -13,6 +13,13 @@
     let currentMonth = null;
     let pendingState = null;
     let diagramReady = false;
+    /* Component names arrive with the diagram's own element configuration,
+     * which diagram.js fetches. Until it reports ready, nothing here can tell
+     * a named component from one the diagram no longer carries, so the rows
+     * print the recorded name plainly and are drawn again when it does. */
+    let namesReady = false;
+
+    const RETIRED_NOTE = "This component is not on the current diagram; its recorded name is shown.";
 
     const pad = (value) => String(value).padStart(2, "0");
     const dateOf = (ts) => (ts || "").split(" ")[0];
@@ -24,6 +31,14 @@
         const div = document.createElement("div");
         div.textContent = value ?? "";
         return div.innerHTML;
+    }
+
+    /* What a reader is shown for one recorded component: its readable name
+     * where the diagram has one, otherwise the recorded name, marked as
+     * retired rather than quietly passed off as the equipment's own word. */
+    function componentLabel(id) {
+        const name = window.pihtiElementName?.(id) || "";
+        return {text: name || id, retired: namesReady && !name};
     }
 
     function monthOf(dateStr) {
@@ -109,10 +124,11 @@
             row.className = "tl-row";
             row.dataset.idx = String(idx);
             row.setAttribute("aria-pressed", String(idx === selectedIdx));
-            row.title = `${event.ts} · ${event.id} · ${event.state ? "active" : "inactive"} · ${event.user || "unknown operator"}`;
+            const component = componentLabel(event.id);
+            row.title = `${event.ts} · ${component.text}${component.retired ? ` (${RETIRED_NOTE})` : ""} · ${event.state ? "active" : "inactive"} · ${event.user || "unknown operator"}`;
             row.innerHTML = `
                 <span class="tl-time">${escapeHtml(timeOf(event.ts))}</span>
-                <span class="tl-id">${escapeHtml(event.id)}</span>
+                <span class="tl-id${component.retired ? " tl-id--retired" : ""}">${escapeHtml(component.text)}</span>
                 <span class="pill tl-pill ${event.state ? "active" : ""}">${event.state ? "on" : "off"}</span>`;
             row.addEventListener("click", () => selectEvent(idx));
             return row;
@@ -132,7 +148,12 @@
         const link = document.getElementById("moment-link");
         link.textContent = event.ts;
         link.href = `/history?at=${encodeURIComponent(event.ts)}`;
-        document.getElementById("moment-element").textContent = event.id;
+        const component = componentLabel(event.id);
+        const element = document.getElementById("moment-element");
+        element.textContent = component.text;
+        element.classList.toggle("tl-id--retired", component.retired);
+        if (component.retired) element.title = RETIRED_NOTE;
+        else element.removeAttribute("title");
         document.getElementById("moment-state").textContent = event.state ? "active" : "inactive";
         document.getElementById("moment-user").textContent = event.user || "—";
         document.getElementById("moment-image-link").href = `/state.svg?at=${encodeURIComponent(event.ts)}`;
@@ -182,7 +203,11 @@
         });
         document.addEventListener("pihti:diagram-ready", () => {
             diagramReady = true;
+            namesReady = true;
             applyPendingState();
+            // The rows were drawn before the names existed; draw them again.
+            renderTimeline();
+            renderMoment();
         });
     }
 

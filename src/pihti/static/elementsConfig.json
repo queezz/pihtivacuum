@@ -1,6 +1,7 @@
 [
     {
         "id": "GVU",
+        "label": "Plasma gate valve (GVU)",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -9,6 +10,7 @@
     },
     {
         "id": "GVD",
+        "label": "QMS gate valve (GVD)",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -17,6 +19,7 @@
     },
     {
         "id": "GVBD",
+        "label": "Bypass gate valve, downstream (GVBD)",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -25,6 +28,7 @@
     },
     {
         "id": "GVBU",
+        "label": "Bypass gate valve, upstream (GVBU)",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -33,6 +37,7 @@
     },
     {
         "id": "TMPU",
+        "label": "Plasma turbo pump (TMPU)",
         "colors": {
             "active": "yellow",
             "inactive": "gray"
@@ -41,6 +46,7 @@
     },
     {
         "id": "TMPD",
+        "label": "QMS turbo pump (TMPD)",
         "colors": {
             "active": "yellow",
             "inactive": "gray"
@@ -49,6 +55,7 @@
     },
     {
         "id": "RoughD",
+        "label": "Roughing line, downstream (RoughD)",
         "colors": {
             "active": "yellow",
             "inactive": "gray"
@@ -57,6 +64,7 @@
     },
     {
         "id": "RoughU",
+        "label": "Roughing line, upstream (RoughU)",
         "colors": {
             "active": "yellow",
             "inactive": "gray"
@@ -65,6 +73,7 @@
     },
     {
         "id": "Rough-Bypass",
+        "label": "Roughing bypass",
         "colors": {
             "active": "yellow",
             "inactive": "gray"
@@ -73,6 +82,7 @@
     },
     {
         "id": "valve_qms",
+        "label": "QMS valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -81,6 +91,7 @@
     },
     {
         "id": "Membrane",
+        "label": "Membrane",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -89,6 +100,7 @@
     },
     {
         "id": "bypass-l1",
+        "label": "Bypass line valve 1",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -97,6 +109,7 @@
     },
     {
         "id": "bypass-l2",
+        "label": "Bypass line valve 2",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -105,6 +118,7 @@
     },
     {
         "id": "bypass-vcr-u",
+        "label": "Bypass VCR valve, upstream",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -113,6 +127,7 @@
     },
     {
         "id": "bypass-vcr-d",
+        "label": "Bypass VCR valve, downstream",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -121,6 +136,7 @@
     },
     {
         "id": "gasline-main",
+        "label": "Main gas line",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -129,6 +145,7 @@
     },
     {
         "id": "gasline-h",
+        "label": "Hydrogen gas line",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -137,6 +154,7 @@
     },
     {
         "id": "gasline-o",
+        "label": "Oxygen gas line",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -145,6 +163,7 @@
     },
     {
         "id": "gasline-ar",
+        "label": "Argon gas line",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -153,6 +172,7 @@
     },
     {
         "id": "flow-calibration-valve",
+        "label": "Flow calibration valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -161,6 +181,7 @@
     },
     {
         "id": "gaspanel-valve-h",
+        "label": "Gas panel hydrogen valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -169,6 +190,7 @@
     },
     {
         "id": "gaspanel-valve-o",
+        "label": "Gas panel oxygen valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -177,6 +199,7 @@
     },
     {
         "id": "gaspanel-valve-ar",
+        "label": "Gas panel argon valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -185,6 +208,7 @@
     },
     {
         "id": "gaspanel-valve-n",
+        "label": "Gas panel nitrogen valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -193,6 +217,7 @@
     },
     {
         "id": "gaspanel-valve-vent",
+        "label": "Gas panel vent valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -201,6 +226,7 @@
     },
     {
         "id": "gaspanel-valve-pump",
+        "label": "Gas panel pump valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -209,6 +235,7 @@
     },
     {
         "id": "gaspanel-pump-vent",
+        "label": "Gas panel pump vent valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -217,6 +244,7 @@
     },
     {
         "id": "gaspanel-pump",
+        "label": "Gas panel pump",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -225,6 +253,7 @@
     },
     {
         "id": "bypass-absolute-gauge",
+        "label": "Bypass absolute gauge",
         "colors": {
             "active": "#6bfaff",
             "inactive": "gray"
@@ -233,6 +262,7 @@
     },
     {
         "id": "bypass-ionization-gauge",
+        "label": "Bypass ionization gauge",
         "colors": {
             "active": "#ffc75e",
             "inactive": "gray"
@@ -241,6 +271,7 @@
     },
     {
         "id": "upstream-single-gauge",
+        "label": "Upstream single gauge",
         "colors": {
             "active": "#ffc75e",
             "inactive": "gray"
@@ -249,6 +280,7 @@
     },
     {
         "id": "upstream-baratron",
+        "label": "Upstream Baratron",
         "colors": {
             "active": "#6bfaff",
             "inactive": "gray"
@@ -257,6 +289,7 @@
     },
     {
         "id": "downstream-ionization-gauge",
+        "label": "QMS ionization gauge (downstream)",
         "colors": {
             "active": "#ffc75e",
             "inactive": "gray"
@@ -265,6 +298,7 @@
     },
     {
         "id": "downstream-baratron",
+        "label": "QMS Baratron (downstream)",
         "colors": {
             "active": "#6bfaff",
             "inactive": "gray"
@@ -273,6 +307,7 @@
     },
     {
         "id": "hydrogen-bottle",
+        "label": "Hydrogen bottle",
         "colors": {
             "active": "red",
             "inactive": "white"
@@ -281,6 +316,7 @@
     },
     {
         "id": "oxygen-bottle",
+        "label": "Oxygen bottle",
         "colors": {
             "active": "#323f40",
             "inactive": "white"
@@ -289,6 +325,7 @@
     },
     {
         "id": "argon-bottle",
+        "label": "Argon bottle",
         "colors": {
             "active": "#cfd4d3",
             "inactive": "white"
@@ -297,6 +334,7 @@
     },
     {
         "id": "helium-bottle",
+        "label": "Helium bottle",
         "colors": {
             "active": "#cfd4d3",
             "inactive": "white"

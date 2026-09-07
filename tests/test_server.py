@@ -70,9 +70,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.9.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.9.1"}
-    assert b"v0.9.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.10.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.10.0"}
+    assert b"v0.10.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -537,3 +537,93 @@ def test_control_data_download_rejects_path_traversal(client):
     response = client.get("/download_controlunit_csv?file=cu_20260101_120000.csv")
     assert response.status_code == 200
     assert response.data == b"sample"
+
+
+def test_every_component_has_a_readable_name_and_no_page_prints_a_raw_key(client):
+    """A person reads equipment names; the keys stay in the files and the log.
+
+    Mac audit 2026-09-07 (letter ``20260907-8cbfd520-ca289d``): the guide said
+    "Next · bypass-ionization-gauge" and History's Element field printed
+    ``event.id``. Fleet ``WEBUI.md``: no surface renders a string meant for the
+    machine.
+    """
+    config = client.get("/elements-config").json
+    labels = {item["id"]: item.get("label", "") for item in config}
+    assert all(labels.values()), [key for key, value in labels.items() if not value]
+    assert len(set(labels.values())) == len(labels), "two components would read alike"
+    # The three the audit named, and the designation kept beside the words.
+    assert labels["bypass-ionization-gauge"] == "Bypass ionization gauge"
+    assert labels["gaspanel-valve-n"] == "Gas panel nitrogen valve"
+    assert labels["gasline-main"] == "Main gas line"
+    assert labels["GVU"].endswith("(GVU)") and labels["TMPD"].endswith("(TMPD)")
+
+    guides = client.get("/operation-guides").json
+    for guide in guides["guides"]:
+        for step in guide["steps"]:
+            for target in step.get("targets") or [{"id": step["targetId"]}]:
+                assert labels.get(target["id"]), target
+
+    scripts = Path(PROJECT_ROOT / "src" / "pihti" / "static" / "js")
+    diagram_js = (scripts / "diagram.js").read_text(encoding="utf-8")
+    history_js = (scripts / "history.js").read_text(encoding="utf-8")
+    assert "window.pihtiElementName = elementName;" in diagram_js
+    assert "displayName(target.id)" in diagram_js
+    assert "displayName(element.id)" in diagram_js
+    assert ".map((target) => target.id).join" not in diagram_js
+    # History reads the same names, and says so when the diagram no longer
+    # carries a component rather than passing its key off as a name.
+    assert "window.pihtiElementName?.(id)" in history_js
+    assert "escapeHtml(event.id)" not in history_js
+    assert 'getElementById("moment-element").textContent = event.id' not in history_js
+    assert "not on the current diagram" in history_js
+
+
+def test_the_top_bar_wraps_instead_of_pushing_the_operator_off_the_screen():
+    """At 390px the five tabs and the selector wanted 454px of a 390px screen.
+
+    The bar wraps: one DOM in a different placement, no phone-only control.
+    """
+    css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(encoding="utf-8")
+    tabbar = css.split(".tabbar {", 1)[1].split("}", 1)[0]
+    assert "flex-wrap: wrap;" in tabbar
+    meta = css.split(".tab-meta {", 1)[1].split("}", 1)[0]
+    assert "margin-left: auto;" in meta
+    assert "flex-wrap: wrap" in css.split(".tab-group {", 1)[1].split("}", 1)[0]
+
+
+def test_a_neighbour_s_own_status_is_taken_at_its_word(tmp_path):
+    """Two owner decisions of 2026-09-07 land on the producers, not here.
+
+    An idle ControlUnit reports ``ok`` with an idle detail; PIHTI Log stops
+    reporting ``degraded`` for a pending draft. This board renders what
+    ``/api/health`` says and never re-reads a producer's own status.
+    """
+    reports = {
+        "http://log.test:4310": ("ok", "0.37.1", "no session open"),
+        "http://rig.test:4187": ("ok", "4.2.1", "idle, not recording"),
+    }
+    app = make_app(
+        tmp_path,
+        NEIGHBOURS={"pihti-log": "http://log.test:4310", "controlunit": "http://rig.test:4187"},
+        NEIGHBOUR_PROBE=lambda url: reports[url],
+    )
+    rows = app.test_client().get("/api/neighbours").json["services"]
+    assert [(row["state"], row["detail"]) for row in rows[1:]] == [
+        ("ok", "no session open"),
+        ("ok", "idle, not recording"),
+    ]
+
+
+def test_two_spellings_of_one_operator_never_become_two_identical_options(tmp_path):
+    """The roster is this machine's own flat list of account names.
+
+    There is no shared trio roster file and no display-name/username pair here,
+    so the trio's "Display Name (username)" rule has nothing to disambiguate;
+    what this roster must never do is offer the reader two options that read
+    exactly alike.
+    """
+    roster_file = tmp_path / "operators.json"
+    roster_file.write_text(json.dumps(["Kaoru Hayashi", "kaoru hayashi", " Kaoru  Hayashi "]), encoding="utf-8")
+    assert roster.read_roster(roster_file) == ["Kaoru Hayashi"]
+    page = make_app(tmp_path, OPERATORS_FILE=roster_file).test_client().get("/").data.decode("utf-8")
+    assert page.count('<option value="Kaoru Hayashi"') == 1

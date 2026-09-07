@@ -119,22 +119,31 @@ a.button[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 
 /* -- tab bar ----------------------------------------------------------- */
 
+/* The bar wraps rather than overflows. On a phone the five tabs and the
+   operator selector cannot share one row — at 390px they wanted 454px and the
+   selector fell off the right edge entirely (Mac audit 2026-09-07, letter
+   `20260907-8cbfd520-ca289d`) — so the selector drops to its own row beneath
+   the tabs, and the tabs themselves wrap before they can be pushed off. It is
+   the same DOM in a different placement, never a second phone-only control,
+   and at any width with room for one row nothing moves at all. */
 .tabbar {
   position: sticky;
   top: 0;
   z-index: 5;
   display: flex;
+  flex-wrap: wrap;
   min-height: var(--bar);
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  row-gap: 4px;
   padding: 4px var(--gutter);
   background: var(--header);
   border-bottom: 1px solid var(--line);
   margin-bottom: var(--content-gap);
 }
 
-.tab-group { display: flex; align-items: center; gap: 6px; }
+.tab-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; row-gap: 2px; }
 
 .tabbar .tab {
   display: inline-flex;
@@ -170,9 +179,13 @@ a.button[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 
 .brand-tab .tab-version { color: var(--dim); font-size: 0.72rem; font-weight: 400; }
 
+/* `margin-left: auto` keeps this at the right edge whether it shares the tab
+   row or has wrapped onto one of its own, so the selector is found at the same
+   corner on a laptop and on a phone. */
 .tab-meta {
   display: flex;
   align-items: center;
+  margin-left: auto;
   gap: 16px;
   font-size: 0.85rem;
   color: var(--muted);
@@ -190,12 +203,15 @@ a.button[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 
 @media (max-width: 860px) { .tab-host { display: none; } }
 @media (max-width: 560px) {
-  .tabbar { padding: 4px 10px; gap: 6px; }
+  .tabbar { padding: 4px 10px 6px; gap: 6px; row-gap: 4px; }
   .tabbar .tab { padding: 10px 10px; font-size: 0.92rem; }
   .tabbar .brand-tab { padding-left: 6px; font-size: 1rem; }
   .brand-tab .tab-version { display: none; }
   .operator-control span { display: none; }
-  .operator-control select { min-width: 7rem; }
+  /* The selector may shrink to the width the row leaves it, but never past
+     the point where "Read only" stops being readable. */
+  .operator-control { min-width: 0; }
+  .operator-control select { min-width: 6.5rem; max-width: 100%; }
 }
 
 /* -- page grid --------------------------------------------------------- */
@@ -453,9 +469,16 @@ details.command pre {
 }
 .tl-row:hover { background: rgba(255, 255, 255, 0.05); border-color: transparent; }
 .tl-row[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent); font-weight: 400; }
-.tl-time { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.tl-id { font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tl-pill { min-width: 2.4em; text-align: center; }
+.tl-time { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; align-self: start; padding-top: 1px; }
+/* Component names wrap rather than clip. A key fitted on one line and a name
+   does not, and half a name ("Plasma gate valv…") is exactly the reading the
+   names were added to end; the card this list sits in scrolls inside itself,
+   so a taller row costs the rail nothing. */
+.tl-id { font-size: 0.84rem; line-height: 1.25; overflow-wrap: anywhere; }
+/* A component the current diagram no longer carries: the history keeps the
+   name it was recorded under, and the page says so rather than inventing one. */
+.tl-id--retired { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-style: normal; }
+.tl-pill { min-width: 2.4em; text-align: center; align-self: start; }
 
 /* -- plot -------------------------------------------------------------- */
 
