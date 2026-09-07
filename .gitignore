@@ -1,5 +1,8 @@
 private/
 build/
+# queezz's own drop folder for drawings in progress; Dropbox carries it, git
+# does not (Fleet RULES.md §7 keeps `local/` out of every repository here).
+local/
 
 elements_state.json
 logs.json
