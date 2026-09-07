@@ -71,9 +71,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.11.2"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.11.2"}
-    assert b"v0.11.2" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.12.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.12.0"}
+    assert b"v0.12.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -684,7 +684,7 @@ def test_pipe_colour_is_predicted_from_the_valves_and_says_air_first(client):
     assert pumping["volumes"]["plasma-turbo-line"] == "high-vacuum"
     assert pumping["volumes"]["plasma-foreline"] == "rough-vacuum"
     assert pumping["volumes"]["qms-vessel"] == "isolated"
-    assert pumping["elements"]["plasma-vacuum"]["stroke"] == colours["high-vacuum"]
+    assert pumping["elements"]["plasma-vacuum"]["fill"] == colours["high-vacuum"]
     assert pumping["air"] == []
 
     vented = plumbing_map.predict(
@@ -771,51 +771,168 @@ def test_the_membrane_element_opens_the_way_every_other_valve_does(client):
     assert shut["volumes"]["probe-line"] == "isolated"
 
 
-def test_the_two_vessels_carry_a_light_tint_of_their_predicted_state(client):
-    """A vessel is a volume you can see into, so it says its state by its fill.
+def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):
+    """A vessel says its state by its body, and so does a tee and a cross.
 
-    queezz, 2026-09-08: "the plasma-vacuum and qms-vacuum shapes should change
-    the fill color, too." They are the drawing's only two vessel shapes; every
-    other element the map names is a line and keeps its authored fill.
+    queezz, 2026-09-08: "main vessels shape fill is a bit too quiet. We can go
+    very loud, why not? Color it the color of the vacuum I say. Or gas. Or
+    air." — which supersedes the light tint of 0.11.2. And, the same morning:
+    "the Ts and Cross in the bypass don't get colored, stay white. Bad." Those
+    three are the drawing's only opaque white junction shapes, so no white tee
+    or cross can survive in any state. Every other element the map names is a
+    line and keeps its authored fill.
     """
     plumbing = client.get("/plumbing").json
-    tints = {state["id"]: state["tint"] for state in plumbing["states"]}
+    colours = {state["id"]: state["color"] for state in plumbing["states"]}
     svg_root = ET.parse(PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").getroot()
-    svg_ids = {element.get("id") for element in svg_root.iter() if element.get("id")}
-
-    vessels = {
-        volume["vessel"]: name
-        for name, volume in plumbing["volumes"].items()
-        if volume.get("vessel")
+    authored = {
+        element.get("id"): element.get("style") or ""
+        for element in svg_root.iter()
+        if element.get("id")
     }
-    assert set(vessels) == {"plasma-vacuum", "qms-vacuum"}
-    for element_id, name in vessels.items():
-        assert element_id in svg_ids
-        assert element_id in plumbing["volumes"][name]["elements"]
+
+    bodies = {}
+    for name, volume in plumbing["volumes"].items():
+        for element_id in list(volume.get("junctions") or ()) + (
+            [volume["vessel"]] if volume.get("vessel") else []
+        ):
+            bodies[element_id] = name
+    assert set(bodies) == {
+        "plasma-vacuum",
+        "qms-vacuum",
+        "bypass-manifold-t-downstream-t",
+        "bypass-manifold-t-upstream",
+        "probe-pipe-cross",
+    }
+    for element_id, name in bodies.items():
+        assert element_id in authored, element_id
+        assert element_id in plumbing["volumes"][name]["elements"], element_id
+    # Exactly the shapes queezz drew with an opaque body, and nothing else.
+    white = sorted(
+        element_id for element_id, style in authored.items() if "fill:#ffffff" in style
+    )
+    assert set(white) <= set(bodies)
 
     prediction = plumbing_map.predict(
-        plumbing, {"TMPU": "active", "GVU": "active", "RoughU": "active"}, "open"
+        plumbing,
+        {"TMPU": "active", "GVU": "active", "RoughU": "active", "GVBU": "active"},
+        "open",
     )
-    assert prediction["elements"]["plasma-vacuum"]["fill"] == tints["high-vacuum"]
-    assert prediction["elements"]["qms-vacuum"]["fill"] == tints["isolated"]
+    assert prediction["elements"]["plasma-vacuum"]["fill"] == colours["high-vacuum"]
+    assert prediction["elements"]["qms-vacuum"]["fill"] == colours["isolated"]
+    assert prediction["elements"]["bypass-manifold-t-upstream"]["fill"] == colours["high-vacuum"]
+    assert prediction["elements"]["probe-pipe-cross"]["fill"] == colours["isolated"]
+    # A body says its state with its body; its outline stays the one he drew.
+    for element_id in bodies:
+        assert "stroke" not in prediction["elements"][element_id], element_id
     assert "fill" not in prediction["elements"]["plasma-vacuum-gate-port"]
     assert "fill" not in prediction["elements"]["upstream-to-downstream-narrow-pipe"]
 
 
+def test_every_gauge_stem_takes_the_colour_of_the_volume_it_reads(client):
+    """The short line from a gauge to what it reads is part of that volume.
+
+    queezz, 2026-09-08: "all gauges stems don't have colors. They are inside a
+    gauge group. If we can work with that, fine. If not, I'll name them." It
+    can be worked with, and this test is why it is not a guess: each recorded
+    stem is the one plain line that is either the gauge's own sibling inside its
+    group, or the line drawn immediately before the gauge at the top level. A
+    regroup in Inkscape that moved a stem away from its gauge fails here rather
+    than quietly colouring the wrong pipe.
+    """
+    plumbing = client.get("/plumbing").json
+    svg_root = ET.parse(PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").getroot()
+    svg = "{http://www.w3.org/2000/svg}"
+    parents = {child: parent for parent in svg_root.iter() for child in parent}
+
+    by_id = {element.get("id"): element for element in svg_root.iter() if element.get("id")}
+    mapped = {
+        element_id
+        for volume in plumbing["volumes"].values()
+        for element_id in volume["elements"]
+    }
+    seen = set()
+    for gauge in plumbing["gauges"]:
+        stem_id = gauge["stem"]
+        assert gauge["volume"] in plumbing["volumes"], gauge
+        assert stem_id not in seen, stem_id
+        seen.add(stem_id)
+        assert stem_id not in mapped, stem_id
+        stem, symbol = by_id.get(stem_id), by_id.get(gauge["id"])
+        assert stem is not None and symbol is not None, gauge
+        assert stem.tag == f"{svg}path", stem_id
+        siblings = list(parents[symbol])
+        assert parents[stem] is parents[symbol], stem_id
+        assert siblings.index(stem) == siblings.index(symbol) - 1, stem_id
+
+    prediction = plumbing_map.predict(
+        plumbing, {"TMPD": "active", "GVD": "active", "RoughD": "active"}, "open"
+    )
+    colours = {state["id"]: state["color"] for state in plumbing["states"]}
+    for gauge in plumbing["gauges"]:
+        item = prediction["elements"][gauge["stem"]]
+        assert item["volume"] == gauge["volume"], gauge
+        assert item["stroke"] == colours[prediction["volumes"][gauge["volume"]]], gauge
+    assert prediction["elements"]["path1464-1-2-8-9-3-8"]["state"] == "high-vacuum"
+    assert prediction["elements"]["path1464-1-2-8-9-7"]["state"] == "isolated"
+
+
+def test_a_coloured_pipe_is_widened_solidly_and_an_isolated_one_is_not(client):
+    """The band replaces the glow queezz called ugly, and it is solid.
+
+    "That's more readable, yes. Also way more ugly" (2026-09-08), of the 0.11.2
+    halo: a translucent 2.8x clone under every pipe, the same weight whatever
+    the state, which read as a neon sign. What replaces it is a plain multiple
+    of the width he drew each line with — his own thin-tubing-thick-pipe
+    hierarchy survives it — with no second layer, no opacity, and nothing at all
+    added to an isolated line.
+    """
+    plumbing = client.get("/plumbing").json
+    band = plumbing["drawing"]["band"]
+    assert 1 < band <= 2, band
+
+    prediction = plumbing_map.predict(
+        plumbing, {"TMPU": "active", "GVU": "active", "RoughU": "active"}, "open"
+    )
+    assert prediction["elements"]["plasma-vacuum-gv-to-tmp-pipe"]["band"] == band
+    assert "band" not in prediction["elements"]["qms-sensor-pipe"]
+    assert prediction["elements"]["qms-sensor-pipe"]["state"] == "isolated"
+
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    assert 'box.id = "pipe-band"' in script
+    assert "authored * item.band" in script
+    # No clone layer, no translucency, and the drawing itself is never edited.
+    assert "pipe-halo-layer" not in script and "pipe-halo-layer" not in css
+    assert "strokeOpacity" not in script
+    svg = (PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").read_text(encoding="utf-8")
+    assert "pipe-band" not in svg
+
+
 def test_every_state_colour_is_readable_on_the_diagram_ground(client):
-    """The five colours are checked against the coral field, not judged by eye.
+    """The five colours are checked against the field, not judged by eye.
 
     queezz, 2026-09-08: "it's impossible to see colors. Too similar?" The
-    0.11.1 teal stood at 1.38:1 against the drawing's own ground and the violet
-    at 2.18:1, which is why two of them read as one. Every colour here clears
-    the 3:1 that WCAG asks of a graphical object, and so does every light
-    vessel tint against its own stroke.
+    0.11.1 teal stood at 1.38:1 against the drawing's own coral ground and the
+    violet at 2.18:1, which is why two of them read as one; 0.11.2 got all five
+    over 3:1 but no higher than 4.13, because coral leaves only 8.4:1 of
+    headroom to black. He then gave permission to change the field itself, so
+    0.11.3 chose the ground and the five colours as one palette: every colour
+    clears 3:1, the four that make a claim clear 4:1, and no two of them sit at
+    the same lightness, so they differ twice over rather than by hue alone.
     """
     css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
         encoding="utf-8"
     )
-    assert "--diagram-ground: coral;" in css
-    ground = "#ff7f50"  # coral
+    plumbing_ground = client.get("/plumbing").json["drawing"]["ground"]
+    # One field, recorded in two places because CSS paints it and the map
+    # documents it; they may never drift apart.
+    assert f"--diagram-ground: {plumbing_ground};" in css
+    ground = plumbing_ground
 
     def luminance(value):
         channels = [int(value.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)]
@@ -828,10 +945,19 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
 
     plumbing = client.get("/plumbing").json
     for state in plumbing["states"]:
-        assert contrast(state["color"], ground) >= 3.0, state["id"]
-        assert contrast(state["tint"], state["color"]) >= 4.5, state["id"]
+        floor = 3.0 if state["id"] == "isolated" else 4.0
+        assert contrast(state["color"], ground) >= floor, state["id"]
     colours = [state["color"] for state in plumbing["states"]]
     assert len(set(colours)) == len(colours)
+    # Isolated is the quietest of the five on purpose: it is the absence of a
+    # claim, not a sixth thing competing for the eye.
+    quietest = min(plumbing["states"], key=lambda state: contrast(state["color"], ground))
+    assert quietest["id"] == "isolated"
+    # And no two of them sit at the same lightness, so a reader who cannot tell
+    # two hues apart can still tell the two colours apart.
+    steps = sorted(luminance(state["color"]) for state in plumbing["states"])
+    for lighter, darker in zip(steps, steps[1:]):
+        assert (darker + 0.05) / (lighter + 0.05) >= 1.15, steps
 
 
 def test_a_saved_render_really_carries_the_prediction(client):
@@ -848,32 +974,140 @@ def test_a_saved_render_really_carries_the_prediction(client):
     assert rendered.count("!important") > len(plumbing["volumes"])
     colours = {state["color"] for state in plumbing["states"]}
     assert any(f"stroke:{colour} !important" in rendered for colour in colours)
-    tints = {state["tint"] for state in plumbing["states"]}
     assert "#plasma-vacuum{" in rendered
-    assert any(f"fill:{tint} !important" in rendered for tint in tints)
-
-
-def test_the_halo_is_drawn_under_the_pipes_and_has_a_switch():
-    """The reading aid the owner may turn off once he widens the pipes himself.
-
-    Pipe geometry is queezz's; the halo is the app's own band beneath each
-    pipe, so `diagram.svg` is never edited for it. It lives in its own
-    transform-free layer at the front of each pipe's own parent — same
-    coordinates, painted underneath — and the key that explains the colours
-    carries its switch.
-    """
-    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
-        encoding="utf-8"
+    assert any(f"fill:{colour} !important" in rendered for colour in colours)
+    # A saved render carries the band too, or it reads differently from the
+    # screen it was saved from. The width is a multiple of the authored one.
+    widths = plumbing_map.authored_stroke_widths(
+        (PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").read_text(encoding="utf-8")
     )
+    assert widths["upstream-tmp-to-rotary-pipe"] == pytest.approx(3.77953)
+    banded = round(widths["upstream-tmp-to-rotary-pipe"] * plumbing["drawing"]["band"], 3)
+    assert f"stroke-width:{banded} !important" in rendered
+
+
+def test_the_guide_beacons_keep_their_ring_under_the_colour_layer():
+    """The numbered beacons, and the one cascade rule that broke them.
+
+    queezz, 2026-09-08: "pic 2, the beacon css broken in the vent guide". The
+    ring behind a current step is a `<circle class="halo">` that must stay
+    unfilled — but `.operation-marker.current circle` is one element more
+    specific than `.operation-marker .halo`, so its fill won and the ring was a
+    solid disc of the step's colour breathing outward. Every disc rule now says
+    `circle:not(.halo)`, and this test fails if one is ever written without it.
+    """
     css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
         encoding="utf-8"
     )
-    assert 'setAttribute("class", "pipe-halo-layer")' in script
-    assert "parent.insertBefore(layer, parent.firstChild)" in script
-    assert 'box.id = "pipe-halo"' in script
-    assert "#diagram-container.no-halo .pipe-halo-layer { display: none; }" in css
-    svg = (PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").read_text(encoding="utf-8")
-    assert "pipe-halo-layer" not in svg
+    marker_rules = [
+        line
+        for line in css.splitlines()
+        if line.startswith(".operation-marker") and "circle" in line
+    ]
+    assert len(marker_rules) >= 4
+    for rule in marker_rules:
+        assert "circle:not(.halo)" in rule, rule
+    assert ".operation-marker .halo { display: none; fill: none;" in css
+    # The ring is drawn in the marker's own ink: white vanished on the field
+    # that replaced coral.
+    assert "stroke: #1c1f26; stroke-width: 3; opacity: 0.9; }" in css
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    # The beacons are still drawn last, so nothing the colour layer fills can
+    # ever be painted over them.
+    assert script.index("svg.appendChild(overlay)") > script.index('overlay.id = "operation-guide-overlay"')
+
+
+def test_each_vessel_says_in_words_what_it_is_joined_to(client):
+    """The readout queezz asked for, in his own order and from one prediction.
+
+    "I'd like to see if upstream and downstream are connected to a) each other
+    b) gas c) vent air" (2026-09-08). The facts come from the same open valves
+    the colours come from; the page turns them into a sentence using the names
+    a person uses at the rig.
+
+    One difference from the colouring, and it matters here: the room is not a
+    pipe. Two separately vented lines share the ``atmosphere`` volume and are
+    both honestly painted red, but they are not plumbed to each other, so the
+    reach used for this readout never runs through open air.
+    """
+    plumbing = client.get("/plumbing").json
+
+    shut = plumbing_map.predict(plumbing, {}, "membrane")["connections"]
+    assert list(shut) == ["plasma-vessel", "qms-vessel"]
+    assert shut["plasma-vessel"]["label"] == "Plasma vessel"
+    for vessel in shut.values():
+        assert vessel["state"] == "isolated"
+        assert (vessel["joined"], vessel["gas"], vessel["air"], vessel["pumps"]) == ([], [], [], [])
+
+    joined = plumbing_map.predict(
+        plumbing,
+        {
+            "bypass-vcr-u": "active",
+            "bypass-vcr-d": "active",
+            "TMPU": "active",
+            "GVU": "active",
+            "gasline-main": "active",
+            "gasline-ar": "active",
+            "argon-bottle": "active",
+        },
+        "open",
+    )["connections"]
+    assert joined["plasma-vessel"]["joined"] == ["qms-vessel"]
+    assert joined["qms-vessel"]["joined"] == ["plasma-vessel"]
+    assert [source["gas"] for source in joined["plasma-vessel"]["gas"]] == ["argon"]
+    assert [pump["id"] for pump in joined["qms-vessel"]["pumps"]] == ["TMPU"]
+    assert joined["plasma-vessel"]["state"] == "gas"
+
+    # Air reaches the plasma vessel down the gas line, which is a route; it does
+    # not reach it through a running turbo, which is a boundary.
+    through_the_gas_line = {
+        "gaspanel-valve-vent": "active",
+        "gaspanel-valve-ar": "active",
+        "gasline-ar": "active",
+        "gasline-main": "active",
+    }
+    vented = plumbing_map.predict(plumbing, through_the_gas_line, "membrane")["connections"]
+    assert [valve["id"] for valve in vented["plasma-vessel"]["air"]] == ["gaspanel-valve-vent"]
+    assert vented["plasma-vessel"]["state"] == "air"
+    assert vented["qms-vessel"]["state"] == "isolated"
+    not_through_a_turbo = plumbing_map.predict(
+        plumbing, {"GVU": "active", "upstream-pumpline-vent-valve": "active"}, "membrane"
+    )["connections"]
+    assert not_through_a_turbo["plasma-vessel"]["air"] == []
+
+    # Both vessels open to air, and still not joined to each other: the room is
+    # not a pipe, so the reach behind this readout never runs through open air.
+    both_vented = plumbing_map.predict(
+        plumbing,
+        dict(
+            through_the_gas_line,
+            **{
+                "bypass-pumpline-vent-valve": "active",
+                "bypass-l2": "active",
+                "bypass-l1": "active",
+                "GVBD": "active",
+            },
+        ),
+        "membrane",
+    )["connections"]
+    assert both_vented["plasma-vessel"]["state"] == "air"
+    assert both_vented["qms-vessel"]["state"] == "air"
+    assert both_vented["plasma-vessel"]["joined"] == []
+    assert [valve["id"] for valve in both_vented["qms-vessel"]["air"]] == [
+        "bypass-pumpline-vent-valve"
+    ]
+
+    # The page renders it, and says once that the whole card is a prediction.
+    page = client.get("/").data.decode("utf-8")
+    assert 'id="vacuum-connections"' in page
+    assert page.count("not measured") == 1
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    for phrase in ("Open to the ", "Vent air through the ", "Pumped by the ", "Nothing open to it."):
+        assert phrase in script, phrase
 
 
 def test_a_replayed_moment_uses_the_line_configuration_of_that_moment(tmp_path):
@@ -897,7 +1131,7 @@ def test_a_replayed_moment_uses_the_line_configuration_of_that_moment(tmp_path):
 def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     live = client.get("/predicted-vacuum")
     assert live.status_code == 200
-    assert set(live.json) == {"volumes", "elements", "air"}
+    assert set(live.json) == {"volumes", "elements", "air", "connections"}
     assert client.get("/predicted-vacuum", query_string={"at": "bad"}).status_code == 400
     identify(client)
     client.post("/update", json={"id": "upstream-pumpline-vent-valve", "status": "active"})

@@ -29,9 +29,10 @@
             <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">Current guide</button>
         </div>
         <div id="diagram-container" aria-label="PIHTI vacuum system diagram"></div>
-        <section class="diagram-legend" aria-label="What a pipe colour means">
-            <h2 class="rail-label">Pipe colour</h2>
+        <section class="diagram-legend" aria-label="What the drawing predicts">
+            <h2 class="rail-label">Predicted state</h2>
             <p class="rail-lead">Predicted from the valve positions, not measured.</p>
+            <ul id="vacuum-connections" class="vacuum-connections"></ul>
             <ul id="vacuum-legend" class="vacuum-legend"></ul>
             <button type="button" class="tiny" id="vacuum-more" aria-expanded="false" aria-controls="vacuum-legend-detail">More</button>
             <div id="vacuum-legend-detail" hidden></div>

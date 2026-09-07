@@ -35,8 +35,18 @@
   --brick-bg: rgba(150, 70, 62, 0.18);
 
   /* The ground the authored diagram is drawn on. The legend's swatches stand
-     on the same ground, so a colour reads there exactly as it reads on a pipe. */
-  --diagram-ground: coral;
+     on the same ground, so a colour reads there exactly as it reads on a pipe.
+
+     It was `coral` until 0.12.0. On a field that bright and that saturated the
+     five state colours had 8.4:1 of headroom between them and black, so all
+     five had to be dark and could differ only by hue — which is why they kept
+     reading alike and needed a glow to be seen at all. queezz gave permission
+     to change it ("no harm in that if it helps readability"), so the field is
+     now a quiet warm stone: the colours have 15.8:1 of headroom, differ in
+     lightness as well as hue, and are the loudest thing on the page. The same
+     value is recorded in `plumbing.json` under `drawing.ground`, and a test
+     fails if the two ever drift apart. */
+  --diagram-ground: #e3dfd6;
 
   --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
   --gutter: 20px;
@@ -395,17 +405,27 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 
 .guide-alert { margin: 0 0 10px; }
 
-/* Guide markers sit on the authored orange diagram, so they are the one
-   thing drawn in the page's own dark ink with a white rim: nothing on the
-   diagram itself looks like them. The current step's markers carry a
-   breathing halo; pointing at a step in the rail swells its markers. */
+/* Guide markers — the numbered beacons — sit on the authored diagram, so they
+   are the one thing drawn in the page's own dark ink with a white rim: nothing
+   on the diagram itself looks like them. The current step's markers carry a
+   breathing ring; pointing at a step in the rail swells its markers.
+
+   Every rule that fills a disc says `circle:not(.halo)`, and that is the whole
+   repair of 0.12.0. The ring is a `<circle class="halo">` that must stay
+   unfilled, but `.operation-marker.current circle` is one element more specific
+   than `.operation-marker .halo`, so its fill won the cascade and the ring was
+   a solid disc of the step's own colour, breathing outward to r:34 — the
+   misdrawn beacons queezz saw once the coloured pipes gave him a reason to look
+   ("pic 2, the beacon css broken in the vent guide"). The ring is also drawn in
+   the marker's dark ink rather than white now: white was invisible on the coral
+   field's replacement. */
 .operation-marker { pointer-events: none; transition: transform 120ms ease-out; }
-.operation-marker circle { fill: #1c1f26; stroke: #ffffff; stroke-width: 3.5; }
+.operation-marker circle:not(.halo) { fill: #1c1f26; stroke: #ffffff; stroke-width: 3.5; }
 .operation-marker text { fill: #ffffff; font: bold 18px sans-serif; }
-.operation-marker .halo { display: none; fill: none; stroke: #ffffff; stroke-width: 3; opacity: 0.9; }
-.operation-marker.current circle { fill: #e0513e; }
+.operation-marker .halo { display: none; fill: none; stroke: #1c1f26; stroke-width: 3; opacity: 0.9; }
+.operation-marker.current circle:not(.halo) { fill: #e0513e; }
 .operation-marker.current .halo { display: block; animation: marker-halo 1.6s ease-out infinite; }
-.operation-marker.complete circle { fill: #2f7d4f; }
+.operation-marker.complete circle:not(.halo) { fill: #2f7d4f; }
 .operation-marker.spot circle:not(.halo) { stroke-width: 6; }
 .operation-marker.spot text { font-size: 22px; }
 @keyframes marker-halo {
@@ -728,15 +748,33 @@ button.tiny {
   transform: translateY(2px);
 }
 
-.vacuum-swatch i { display: block; height: 4px; }
+.vacuum-swatch i { display: block; height: 5px; }
 
-/* The halo is a reading aid the reader may switch off once the pipes
-   themselves are wide enough (owner review 2026-09-08). The switch hides the
-   band; the pipe keeps its colour either way. */
-#diagram-container.no-halo .pipe-halo-layer { display: none; }
+/* The two vessel lines: what the prediction finds each one joined to, in
+   words, above the key that explains the colour beside them. queezz asked for
+   it on 2026-09-08 — "I'd like to see if upstream and downstream are connected
+   to a) each other b) gas c) vent air" — and it reads rather than acts, so it
+   stands in the main column under the drawing with the key, not in a rail. */
+.vacuum-connections {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
 
-#vacuum-legend-detail p.halo-switch { margin: 9px 0 0; color: var(--fg); }
-.halo-switch label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.vacuum-connections li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+
+.vacuum-connections b { font-weight: 600; }
+
+#vacuum-legend-detail p.band-switch { margin: 9px 0 0; color: var(--fg); }
+.band-switch label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 
 /* The warning names every volume it found; on a short rail it scrolls inside
    itself rather than pushing the guide card's own text out of its box. */

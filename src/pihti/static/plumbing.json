@@ -1,40 +1,40 @@
 {
     "note": "Which drawn pipe belongs to which vacuum volume, and which valve joins which two volumes. Read from the names queezz gave the pipes in diagram.svg, never from where the lines happen to sit on the page. The vacuum state derived from this is a prediction from the valve positions an operator has entered, not a pressure measurement.",
     "prototype": true,
+    "drawing": {
+        "note": "The field the drawing is painted on, and how much wider a coloured pipe is drawn than queezz authored it. The field is a quiet warm stone so the five state colours are the loudest thing on the page (owner permission 2026-09-08); the band is a solid widening of the pipe's own stroke, never a translucent glow. An isolated pipe is not widened at all: the absence of a claim should not shout.",
+        "ground": "#e3dfd6",
+        "band": 1.6
+    },
     "states": [
         {
             "id": "air",
             "label": "Air",
-            "color": "#8a0036",
-            "tint": "#e8ccd7",
+            "color": "#8a0026",
             "meaning": "a vent is open"
         },
         {
             "id": "gas",
             "label": "Gas",
-            "color": "#6a00b0",
-            "tint": "#e1ccef",
+            "color": "#6a1fb5",
             "meaning": "a bottle or N2 is open"
         },
         {
             "id": "high-vacuum",
             "label": "High vacuum",
-            "color": "#003bc4",
-            "tint": "#ccd8f3",
+            "color": "#1150cc",
             "meaning": "a turbo is running"
         },
         {
             "id": "rough-vacuum",
             "label": "Rough vacuum",
-            "color": "#00544a",
-            "tint": "#ccdddb",
+            "color": "#0a7268",
             "meaning": "a rough pump only"
         },
         {
             "id": "isolated",
             "label": "Isolated, unknown",
-            "color": "#463f3b",
-            "tint": "#dad9d8",
+            "color": "#7f7b75",
             "meaning": "nothing open to it"
         }
     ],
@@ -105,6 +105,10 @@
         "bypass-manifold": {
             "label": "Bypass manifold",
             "group": "pipes-bypass-manifold",
+            "junctions": [
+                "bypass-manifold-t-downstream-t",
+                "bypass-manifold-t-upstream"
+            ],
             "elements": [
                 "bypass-manifold-downstream-line",
                 "bypass-manifold-main",
@@ -125,6 +129,9 @@
         "probe-line": {
             "label": "Probe line",
             "group": "pipes-probe",
+            "junctions": [
+                "probe-pipe-cross"
+            ],
             "elements": [
                 "probe-pipe",
                 "probe-pipe-cross",
@@ -258,12 +265,13 @@
             "unknown": {"label": "Not recorded", "connects": false}
         }
     },
+    "gauges_note": "`stem` is the short line from a gauge symbol to the pipe or vessel it reads. queezz drew each one as an Inkscape-named path beside its gauge and asked whether the app could work with that rather than name six more elements (2026-09-08). It can: three sit inside their gauge's own group as its only plain line, and three are the plain line drawn immediately before their gauge at the top level of the drawing. Nothing was guessed — each id below is that one line, and a test proves it is still the gauge's own neighbour so a regroup in Inkscape cannot silently point a stem at the wrong volume.",
     "gauges": [
-        {"id": "upstream-single-gauge", "volume": "plasma-vessel"},
-        {"id": "upstream-baratron", "volume": "plasma-vessel"},
-        {"id": "bypass-absolute-gauge", "volume": "bypass-manifold"},
-        {"id": "bypass-ionization-gauge", "volume": "bypass-manifold"},
-        {"id": "downstream-ionization-gauge", "volume": "qms-vessel"},
-        {"id": "downstream-baratron", "volume": "qms-vessel"}
+        {"id": "upstream-single-gauge", "volume": "plasma-vessel", "stem": "path1464-1-2-8-9-3-9"},
+        {"id": "upstream-baratron", "volume": "plasma-vessel", "stem": "path1464-1-2-8-9-7"},
+        {"id": "bypass-absolute-gauge", "volume": "bypass-manifold", "stem": "path1464-1-2-8-9"},
+        {"id": "bypass-ionization-gauge", "volume": "bypass-manifold", "stem": "path1464-1-2-8-9-3"},
+        {"id": "downstream-ionization-gauge", "volume": "qms-vessel", "stem": "path1464-1-2-8-9-3-8"},
+        {"id": "downstream-baratron", "volume": "qms-vessel", "stem": "path1464-1-2-8-9-7-3"}
     ]
 }

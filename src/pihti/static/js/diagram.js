@@ -16,6 +16,10 @@
      * cannot disagree. */
     let plumbing = null;
     let predictionPending = false;
+    /* The last prediction the server sent, so the band switch can repaint from
+     * it without asking again. */
+    let lastPrediction = null;
+    let bandOn = true;
 
     function normalizedStatus(value) {
         return value === "active" || value === true ? "active" : "inactive";
@@ -234,9 +238,6 @@
             swatch.className = "vacuum-swatch";
             const line = document.createElement("i");
             line.style.background = state.color;
-            /* The swatch wears the halo the drawing wears, so a colour reads
-             * here exactly as wide as it reads on a pipe. */
-            line.style.boxShadow = `0 0 0 2px ${state.color}99`;
             swatch.appendChild(line);
             const label = document.createElement("span");
             label.textContent = state.label;
@@ -252,17 +253,18 @@
             });
             const vessels = document.createElement("p");
             vessels.className = "muted";
-            vessels.textContent = "The two vessels are filled with a light tint of the same colour.";
+            vessels.textContent =
+                "The two vessels, and the manifold tees and cross, are filled with the same colour.";
             lines.push(vessels);
-            const halo = document.createElement("p");
-            halo.className = "halo-switch";
+            const band = document.createElement("p");
+            band.className = "band-switch";
             const label = document.createElement("label");
             const box = document.createElement("input");
             box.type = "checkbox";
-            box.id = "pipe-halo";
-            label.append(box, document.createTextNode(" Wide band behind each pipe"));
-            halo.appendChild(label);
-            lines.push(halo);
+            box.id = "pipe-band";
+            label.append(box, document.createTextNode(" Draw coloured pipes wider"));
+            band.appendChild(label);
+            lines.push(band);
             detail.replaceChildren(...lines);
         }
         if (more && !more.dataset.wired) {
@@ -276,90 +278,145 @@
         }
     }
 
-    /* The halo: a wider, translucent band of the same colour drawn *under* each
-     * pipe, so a 2px line reads as a colour on the drawing's orange ground
-     * without anyone editing the drawing (queezz, 2026-09-08: "it's impossible
-     * to see colors... need bigger pipes (that's on me)"). Pipe geometry is his;
-     * this is the app's own reading aid, and the legend can switch it off so he
-     * can judge the colours again once he has widened the pipes himself.
-     *
-     * Each halo is a clone of its pipe, placed in a transform-free <g> at the
-     * front of that pipe's own parent. Same parent means the same coordinate
-     * system, so nothing moves; first child means it paints underneath. */
-    const haloByElement = new Map();
+    /* The width queezz drew each line with, read once before anything of ours
+     * has been written over it. The band is a multiple of it, so his own
+     * hierarchy — thin gas tubing, thicker vacuum pipe — survives the widening,
+     * and switching the band off restores exactly what he drew. */
+    const authoredWidth = new Map();
 
-    function haloLayerFor(element) {
-        const parent = element.parentNode;
-        if (!parent || parent.nodeType !== 1) return null;
-        let layer = parent.querySelector(":scope > g.pipe-halo-layer");
-        if (!layer) {
-            layer = document.createElementNS(SVG_NS, "g");
-            layer.setAttribute("class", "pipe-halo-layer");
-            layer.setAttribute("pointer-events", "none");
-            parent.insertBefore(layer, parent.firstChild);
+    function widthOf(element) {
+        if (!authoredWidth.has(element.id)) {
+            authoredWidth.set(
+                element.id, parseFloat(window.getComputedStyle(element).strokeWidth) || 0
+            );
         }
-        return layer;
-    }
-
-    function haloFor(element) {
-        if (haloByElement.has(element.id)) return haloByElement.get(element.id);
-        const layer = haloLayerFor(element);
-        if (!layer) return null;
-        const clone = element.cloneNode(true);
-        clone.removeAttribute("id");
-        clone.querySelectorAll("[id]").forEach((child) => child.removeAttribute("id"));
-        const width = parseFloat(window.getComputedStyle(element).strokeWidth) || 3;
-        clone.style.fill = "none";
-        clone.style.strokeWidth = String(width * 2.8);
-        clone.style.strokeOpacity = "0.6";
-        clone.style.strokeLinecap = "round";
-        clone.style.strokeLinejoin = "round";
-        clone.style.pointerEvents = "none";
-        layer.appendChild(clone);
-        haloByElement.set(element.id, clone);
-        return clone;
+        return authoredWidth.get(element.id);
     }
 
     /* Paint each pipe with what its volume most likely holds. The prediction is
      * the server's, from the same volume map the legend reads, so one rule
-     * decides both. A vessel is a volume you can see into, so it also takes a
-     * light tint of the same colour: the plasma cross and the QMS rectangle are
-     * the drawing's only two (queezz, 2026-09-08). The warning for air is the
-     * colour itself, named once in the legend: a sentence repeating it in the
-     * rail was a second telling of the same fact, and it grew with the number
-     * of volumes until it took the guide's own room (measured 2026-09-08). */
+     * decides both.
+     *
+     * A vessel is a volume you can see into, and a tee or a cross is a small
+     * one, so those say their state by their body: the full state colour as a
+     * fill, keeping the dark outline queezz drew (2026-09-08, "we can go very
+     * loud, why not? Color it the color of the vacuum I say"). Every other
+     * element is a line, and a coloured line is simply drawn wider — a solid
+     * widening of his own stroke, never the translucent glow of 0.11.2, which
+     * he read as a neon sign. An isolated line is not widened at all.
+     *
+     * The warning for air is the colour itself, named once in the key: a
+     * sentence repeating it in the rail was a second telling of the same fact,
+     * and it grew with the number of volumes until it took the guide's own
+     * room (measured 2026-09-08). */
     function paintPrediction(prediction) {
+        lastPrediction = prediction;
         Object.entries(prediction.elements || {}).forEach(([id, item]) => {
             const element = document.getElementById(id);
             if (!element) return;
-            element.style.stroke = item.stroke;
             if (item.fill) {
                 element.style.fill = item.fill;
                 return;
             }
-            const halo = haloFor(element);
-            if (halo) halo.style.stroke = item.stroke;
+            const authored = widthOf(element);
+            element.style.stroke = item.stroke;
+            if (!authored) return;
+            element.style.strokeWidth = String(bandOn && item.band ? authored * item.band : authored);
+        });
+        renderConnections(prediction.connections || {});
+    }
+
+    /* The band is a reading aid, not a claim, so it has a switch and the switch
+     * lives with the key that explains the colours. The choice is this reader's
+     * own, so it stays in this browser. */
+    function setupBandToggle() {
+        const toggle = document.getElementById("pipe-band");
+        if (!toggle) return;
+        let stored = null;
+        try { stored = window.localStorage.getItem("pihti.pipeBand"); } catch (error) { stored = null; }
+        bandOn = stored !== "off";
+        toggle.checked = bandOn;
+        toggle.addEventListener("change", () => {
+            bandOn = toggle.checked;
+            if (lastPrediction) paintPrediction(lastPrediction);
+            try {
+                window.localStorage.setItem("pihti.pipeBand", bandOn ? "on" : "off");
+            } catch (error) { /* a browser that refuses storage still draws */ }
         });
     }
 
-    /* The halo is a reading aid, not a claim, so it has a switch and the switch
-     * lives with the key that explains the colours. The choice is this reader's
-     * own, so it stays in this browser. */
-    function setupHaloToggle() {
-        const toggle = document.getElementById("pipe-halo");
-        const container = document.getElementById("diagram-container");
-        if (!toggle || !container) return;
-        let stored = null;
-        try { stored = window.localStorage.getItem("pihti.pipeHalo"); } catch (error) { stored = null; }
-        const on = stored !== "off";
-        toggle.checked = on;
-        container.classList.toggle("no-halo", !on);
-        toggle.addEventListener("change", () => {
-            container.classList.toggle("no-halo", !toggle.checked);
-            try {
-                window.localStorage.setItem("pihti.pipeHalo", toggle.checked ? "on" : "off");
-            } catch (error) { /* a browser that refuses storage still draws */ }
-        });
+    /* A label as it reads inside a sentence: "the plasma vessel", but "the QMS
+     * vessel" — a designation the rig spells in capitals keeps them. */
+    function inSentence(label) {
+        if (!label) return label;
+        return /^[A-Z]{2}/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
+    }
+
+    function joinWords(words) {
+        if (words.length < 2) return words.join("");
+        return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+    }
+
+    /* What the prediction finds each vessel joined to, in words. queezz asked
+     * the question in this order — "if upstream and downstream are connected to
+     * a) each other b) gas c) vent air" — so the sentence answers it in that
+     * order, then names the pumps. It is the same prediction the colours come
+     * from, and the card says once that all of it is predicted, not measured. */
+    function connectionSentence(item) {
+        const clauses = [];
+        if ((item.joined || []).length) {
+            clauses.push(`Open to the ${joinWords(item.joined.map(
+                (name) => inSentence(plumbing?.volumes?.[name]?.label || name)
+            ))}.`);
+        }
+        if ((item.gas || []).length) {
+            const gases = joinWords(item.gas.map((source) => source.gas));
+            clauses.push(`${gases.charAt(0).toUpperCase()}${gases.slice(1)} ${item.gas.length > 1 ? "are" : "is"} open into it.`);
+        }
+        if ((item.air || []).length) {
+            clauses.push(`Vent air through the ${joinWords(item.air.map(
+                (valve) => inSentence(displayName(valve.id))
+            ))}.`);
+        }
+        if ((item.pumps || []).length) {
+            clauses.push(`Pumped by the ${joinWords(item.pumps.map(
+                (pump) => inSentence(displayName(pump.id))
+            ))}.`);
+        }
+        if (!clauses.length) clauses.push("Nothing open to it.");
+        return clauses.join(" ");
+    }
+
+    function renderConnections(connections) {
+        const list = document.getElementById("vacuum-connections");
+        if (!list) return;
+        // History carries no prediction until a moment is chosen, and an empty
+        // list under a heading reads as "nothing is connected" rather than as
+        // "nothing has been asked yet". Say which it is.
+        if (!Object.keys(connections).length) {
+            const empty = document.createElement("li");
+            empty.className = "muted";
+            empty.textContent = window.historyMode
+                ? "Choose a moment in the timeline to read what each vessel was joined to."
+                : "Not read yet.";
+            list.replaceChildren(empty);
+            return;
+        }
+        const states = Object.fromEntries((plumbing?.states || []).map((state) => [state.id, state]));
+        list.replaceChildren(...Object.values(connections).map((item) => {
+            const row = document.createElement("li");
+            const swatch = document.createElement("span");
+            swatch.className = "vacuum-swatch";
+            const line = document.createElement("i");
+            line.style.background = states[item.state]?.color || "#000000";
+            swatch.appendChild(line);
+            const text = document.createElement("span");
+            const name = document.createElement("b");
+            name.textContent = `${item.label} — ${(states[item.state]?.label || item.state).toLowerCase()}.`;
+            text.append(name, document.createTextNode(` ${connectionSentence(item)}`));
+            row.append(swatch, text);
+            return row;
+        }));
     }
 
     async function refreshPrediction(moment) {
@@ -482,9 +539,10 @@
         );
         plumbing = await fetch("/plumbing").then((response) => response.ok ? response.json() : null).catch(() => null);
         renderVacuumLegend();
-        setupHaloToggle();
+        setupBandToggle();
         if (window.historyMode) {
             container.style.pointerEvents = "none";
+            renderConnections({});
             await fetchAndUpdateStates();
             attachElementListeners();
             document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));

@@ -2,7 +2,7 @@
 
 PIHTI is a LAN-native, operator-annotated vacuum-system diagram with state history and control-unit plots. The diagram is an operating aid, not a control panel, pressure measurement, safety interlock, or source of hardware truth.
 
-Current release: **0.11.2**. The same version appears in the navigation bar and at `/version`.
+Current release: **0.12.0**. The same version appears in the navigation bar and at `/version`.
 
 ## What the landing page does
 
@@ -16,7 +16,9 @@ Current release: **0.11.2**. The same version appears in the navigation bar and 
 
 The vent sequences live in `src/pihti/static/operationGuides.json` and are intentionally provisional pending hands-on owner correction.
 
-Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. The five states are chosen against the drawing's coral ground by measured contrast, each pipe carries a wider band of its own colour beneath it so a thin line still reads as a colour, and the two vessels take a light tint of their state. The band has a switch in the key under the drawing. All of it is a prediction from the entered valve positions, never a measurement.
+Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. The field and the five state colours are one palette, chosen by measured contrast: the field is a quiet warm stone so the colours are the loudest thing on the page, and every colour clears 3:1 against it while differing in lightness as well as hue. A coloured line is drawn wider than authored — a plain multiple of queezz's own stroke, with a switch in the key under the drawing — and an isolated line is not widened at all. The two vessels, the two bypass tees and the cross take the full state colour as their fill and keep the outline he drew. Each gauge's stem takes the colour of the volume it reads.
+
+Under the drawing, one line per vessel says in words what the prediction finds it joined to: the other vessel, a gas, vent air through a named valve, a pump, or nothing. All of it is a prediction from the entered valve positions, never a measurement.
 
 ## Run and test
 

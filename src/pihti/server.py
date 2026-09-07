@@ -244,13 +244,20 @@ def render_state_svg(
     """Return the authored SVG with operator-entered fills applied as a style block.
 
     With a volume map, the pipes also carry their predicted vacuum state as a
-    stroke colour and the two vessels their light tint of it — the same
-    prediction the page draws, so a saved or historical render reads the same
-    way. The page's halo is a screen affordance and is not baked in here.
+    stroke colour, the solid band that widens them, and the two vessels and the
+    manifold junctions their state colour as a fill — the same prediction the
+    page draws, so a saved or historical render reads the same way.
     """
     rules = []
     if plumbing:
-        rules.append(plumbing_map.style_rules(plumbing, state, line_mode))
+        rules.append(
+            plumbing_map.style_rules(
+                plumbing,
+                state,
+                line_mode,
+                plumbing_map.authored_stroke_widths(svg_text),
+            )
+        )
     for item in element_config:
         element_id = item.get("id")
         colors = item.get("colors") or {}
