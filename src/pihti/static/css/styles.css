@@ -487,27 +487,17 @@ details.command pre {
 
 .plot-empty { padding: 40px 20px; text-align: center; color: var(--muted); }
 
-#loading-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(7, 10, 15, 0.6);
+/* The plot is a framed document of its own: Plotly's megabytes parse there,
+   not in this page, so the tabs and both rails stay live while it draws. */
+#plot-frame {
+  display: block;
+  width: 100%;
+  height: min(72vh, 760px);
+  min-height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
 }
-
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 
 /* -- the rails on a narrow screen -------------------------------------- */
 

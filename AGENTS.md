@@ -44,6 +44,8 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
 - Every page uses the one `.page` grid: left rail for controls, main column for content, right rail for context. Rail widths and the sticky offset (`--bar` + `--content-gap`) are shared, so rails stand at the same address on every tab and never move on scroll.
 - The palette is Fleet's dark paperlib set; lecturedeck is never the model for this UI. The authored SVG keeps its own colours.
 - Any UI change runs Fleet's Perimeter Walk on a scratch `lab` service before it ships.
+- Static files are cached by release, everything else is `no-store` (0.9.0). A template writes a static URL with `asset('css/styles.css')`, never `url_for('static', ...)`, and JavaScript that fetches a static file stamps it with `document.body.dataset.assetVersion`. An unstamped or stale-stamped static URL is deliberately uncacheable, so a stale asset cannot outlive its release.
+- The last control-unit plot is served as its own document (`/plot/last.html`) and framed, never injected into the page: Plotly's bundle is measured in megabytes and injecting it froze the tab. `X-Frame-Options` is `SAMEORIGIN` for that frame alone.
 
 ## Deployment
 

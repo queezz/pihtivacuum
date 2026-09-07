@@ -290,7 +290,10 @@
     async function loadDiagram() {
         const container = document.getElementById("diagram-container");
         if (!container) return;
-        const svgResponse = await fetch("/static/diagram.svg");
+        // Stamped with the release so the browser may keep it: the drawing is
+        // 185 kB and every tab that shows it used to re-fetch it.
+        const stamp = document.body.dataset.assetVersion || "";
+        const svgResponse = await fetch(`/static/diagram.svg?v=${encodeURIComponent(stamp)}`);
         container.innerHTML = await svgResponse.text();
         document.querySelectorAll(".non-clickable").forEach((element) => { element.style.pointerEvents = "none"; });
         const configResponse = await fetch("/elements-config");

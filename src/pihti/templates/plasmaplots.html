@@ -47,7 +47,8 @@
         <p class="notice" style="margin-bottom: 16px;"><strong>No control-unit CSV files found.</strong> The configured directory holds no files beginning with <code>cu_</code>.</p>
         {% endif %}
         <div id="plotArea">
-            <p id="plotPlaceholder" class="plot-empty">Loading the last plot…</p>
+            <p id="plot-status" class="plot-empty">Loading the last plot…</p>
+            <iframe id="plot-frame" title="Control-unit plot" hidden></iframe>
         </div>
     </main>
 
@@ -67,10 +68,9 @@
         </section>
     </aside>
 </div>
-<div id="loading-overlay" hidden><div class="spinner" role="status" aria-label="Loading"></div></div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/calendar.js') }}"></script>
-<script src="{{ url_for('static', filename='js/plasmaplots.js') }}"></script>
+<script src="{{ asset('js/calendar.js') }}"></script>
+<script src="{{ asset('js/plasmaplots.js') }}"></script>
 {% endblock %}

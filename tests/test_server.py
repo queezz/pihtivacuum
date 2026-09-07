@@ -70,9 +70,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.8.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.8.1"}
-    assert b"v0.8.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.9.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.9.0"}
+    assert b"v0.9.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -91,7 +91,10 @@ def test_every_page_shares_the_rail_grid_and_marks_its_tab(client):
         response = client.get(path)
         assert response.status_code == 200
         assert response.headers["Cache-Control"] == "no-store"
-        assert response.headers["X-Frame-Options"] == "DENY"
+        # SAMEORIGIN, not DENY, since 0.9.0: the Plot tab frames its own plot
+        # document so Plotly parses outside this page. Other origins still may
+        # not frame us.
+        assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
         page = response.data.decode("utf-8")
         assert 'class="page"' in page
         assert page.count('class="rail rail-left"') == 1
@@ -355,6 +358,23 @@ def test_pages_carry_this_project_s_own_icon(client):
     assert icon.status_code == 200 and b"<svg" in icon.data
 
 
+def test_static_assets_are_cacheable_only_when_they_carry_the_release(client):
+    # Before 0.9.0 every response was `no-store`, so each tab switch re-fetched
+    # the 185 kB drawing, the stylesheet and every script. Now a static URL
+    # stamped with the running release may be kept, and one without it may not,
+    # so a stale asset can never outlive its release.
+    stamped = client.get(f"/static/css/styles.css?v={__version__}")
+    assert stamped.status_code == 200
+    assert stamped.headers["Cache-Control"] == "public, max-age=31536000, immutable"
+    for url in ("/static/css/styles.css", f"/static/css/styles.css?v={__version__}-old"):
+        assert client.get(url).headers["Cache-Control"] == "no-store"
+    page = client.get("/").data.decode("utf-8")
+    assert f"styles.css?v={__version__}" in page
+    assert 'href="/static/css/styles.css"' not in page
+    # Pages and data stay uncacheable whatever else changes.
+    assert client.get("/elements-state").headers["Cache-Control"] == "no-store"
+
+
 def test_health_endpoint_keeps_the_ensemble_contract(client):
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -428,6 +448,8 @@ def test_missing_plot_folder_has_friendly_notice(tmp_path):
     last = app.test_client().get("/get_last_plot")
     assert last.status_code == 200
     assert last.json == {"plot": None}
+    assert app.test_client().get("/plot/meta").json["has_plot"] is False
+    assert app.test_client().get("/plot/last.html").status_code == 404
 
 
 def test_plot_records_which_file_it_shows(client, app, tmp_path):
@@ -440,8 +462,17 @@ def test_plot_records_which_file_it_shows(client, app, tmp_path):
     assert response.json["file"] == "cu_20260102_080000.csv"
     assert response.json["linear"] == ["Ip_c"]
     assert response.json["log"] == ["Pu_c", "Pd_c", "Bu_c"]
-    assert "plotly" in response.json["plot"]
-    assert '<script src="https://cdn.plot.ly' not in response.json["plot"]
+    # The megabytes of Plotly never ride in this answer: the page frames the
+    # plot's own document instead (0.9.0).
+    assert "plot" not in response.json
+    document = client.get("/plot/last.html")
+    assert document.status_code == 200 and document.mimetype == "text/html"
+    body = document.data.decode("utf-8")
+    assert "plotly" in body
+    assert '<script src="https://cdn.plot.ly' not in body
+    meta = client.get("/plot/meta").json
+    assert meta["has_plot"] is True and meta["file"] == "cu_20260102_080000.csv"
+    assert "plot" not in meta
     last = client.get("/get_last_plot").json
     assert last["file"] == "cu_20260102_080000.csv"
     meta = json.loads(Path(app.config["LAST_PLOT_META_FILE"]).read_text(encoding="utf-8"))

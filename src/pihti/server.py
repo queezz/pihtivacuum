@@ -399,6 +399,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         return {
             "hostinfo": get_hostinfo(),
             "app_version": __version__,
+            # Every static URL a template writes carries the release, which is
+            # what makes the long cache above safe.
+            "asset": lambda filename: url_for("static", filename=filename, v=__version__),
             "active_nav": request.endpoint,
             "operators": operators,
             "roster_source": roster_source,
@@ -413,9 +416,23 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.after_request
     def security_headers(response):
-        response.headers["Cache-Control"] = "no-store"
+        # Static files carry `?v=<release>`, so every release is a new URL and
+        # a browser may keep the old copy for a year. Before this, `no-store`
+        # on everything meant each tab switch re-fetched the 185 kB diagram,
+        # the stylesheet and every script over the lab's WiFi — queezz, on all
+        # three tabs, 2026-09-07: "always the lag". A static URL that arrives
+        # without the current release on it stays uncacheable, so a stale asset
+        # can never outlive the release it belongs to. Pages, data and the plot
+        # are never stored.
+        versioned = request.endpoint == "static" and request.args.get("v") == __version__
+        response.headers["Cache-Control"] = (
+            "public, max-age=31536000, immutable" if versioned else "no-store"
+        )
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        # The last plot is a document of its own, framed by the Plot tab from
+        # this same origin so Plotly's megabytes parse outside the page's
+        # document instead of freezing it. Other origins still may not frame us.
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
@@ -695,7 +712,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         Path(app.config["LAST_PLOT_META_FILE"]).write_text(
             json.dumps(last_plot_meta, indent=4) + "\n", encoding="utf-8"
         )
-        return jsonify(plot=last_plot_html, **last_plot_meta)
+        # The plot itself is not sent back here: it is megabytes of Plotly, and
+        # the page loads it into its own frame instead (see `/plot/last.html`).
+        return jsonify(**last_plot_meta)
 
     @app.route("/get_last_plot")
     def get_last_plot():
@@ -708,6 +727,37 @@ def create_app(test_config: dict | None = None) -> Flask:
             return jsonify({"plot": None})
         meta = _load_json(Path(app.config["LAST_PLOT_META_FILE"]), {})
         return jsonify({"plot": plot, **(meta if isinstance(meta, dict) else {})})
+
+    def stored_plot_html() -> str:
+        """The last plot's HTML, from memory or from the file it was saved to."""
+        if last_plot_html:
+            return last_plot_html
+        try:
+            return Path(app.config["LAST_PLOT_FILE"]).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return ""
+
+    @app.route("/plot/meta")
+    def plot_meta():
+        """What the last plot is, without the plot: a few hundred bytes."""
+        meta = last_plot_meta
+        if meta is None:
+            stored = _load_json(Path(app.config["LAST_PLOT_META_FILE"]), {})
+            meta = stored if isinstance(stored, dict) else {}
+        return jsonify({"has_plot": bool(stored_plot_html()), **meta})
+
+    @app.route("/plot/last.html")
+    def plot_last_html():
+        """The last plot as its own document, for the Plot tab's frame.
+
+        Plotly's bundle rides inside this HTML and is measured in megabytes.
+        Injected into the page it froze the whole tab while it parsed, so the
+        plot is framed instead and the page around it stays usable.
+        """
+        html = stored_plot_html()
+        if not html:
+            abort(404)
+        return Response(html, mimetype="text/html")
 
     @app.route("/download_controlunit_csv")
     def download_controlunit_csv():

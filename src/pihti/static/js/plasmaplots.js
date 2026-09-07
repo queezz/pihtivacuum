@@ -5,8 +5,8 @@
 (function () {
     "use strict";
 
-    const plotArea = document.getElementById("plotArea");
-    const overlay = document.getElementById("loading-overlay");
+    const status = document.getElementById("plot-status");
+    const frame = document.getElementById("plot-frame");
     const download = document.getElementById("downloadBtn");
     const calendar = window.pihtiCalendar;
 
@@ -37,8 +37,14 @@
         return dayKeys.find((day) => days[day].some((entry) => entry.name === file)) || null;
     }
 
-    function setLoading(isLoading) {
-        if (overlay) overlay.hidden = !isLoading;
+    /* Status is a line above the plot, never a veil over the page. A modal
+     * overlay used to cover the tab bar and both rails while the last plot
+     * loaded, which is what made arriving here feel like waiting for a door to
+     * open (queezz, 2026-09-07: "Plot tab blocks UI until it loads. Bad."). */
+    function showStatus(text) {
+        if (!status) return;
+        status.textContent = text || "";
+        status.hidden = !text;
     }
 
     function recordedFromName(name) {
@@ -46,19 +52,19 @@
         return match ? `${match[1]}-${match[2]}-${match[3]} ${match[4]}:${match[5]}:${match[6]}` : "—";
     }
 
-    function installPlotHtml(html) {
-        if (!plotArea) return;
-        plotArea.innerHTML = html;
-        plotArea.querySelectorAll("script").forEach((oldScript) => {
-            const script = document.createElement("script");
-            for (const attribute of oldScript.attributes) script.setAttribute(attribute.name, attribute.value);
-            script.textContent = oldScript.textContent;
-            oldScript.replaceWith(script);
-        });
+    /* The plot is a document of its own, framed. Plotly's bundle is megabytes;
+     * parsed inside this page it froze every control on it, and framed it
+     * parses in its own document while the tabs, the calendar and the rails
+     * stay live. The stamp only makes the frame reload when the plot changed. */
+    function showPlot(stamp) {
+        if (!frame) return;
+        frame.src = `/plot/last.html?t=${encodeURIComponent(stamp || Date.now())}`;
+        frame.hidden = false;
     }
 
     function showEmpty(text) {
-        if (plotArea) plotArea.innerHTML = `<p class="plot-empty">${text}</p>`;
+        if (frame) { frame.hidden = true; frame.removeAttribute("src"); }
+        showStatus(text);
     }
 
     function renderContext(meta) {
@@ -150,40 +156,42 @@
     }
 
     async function fetchPlot(file) {
-        setLoading(true);
+        // The previous plot stays on screen while this one is drawn, so the
+        // page never empties out under the reader.
+        showStatus(`Plotting ${file}…`);
         try {
             const response = await fetch("/plot", {method: "POST", body: new URLSearchParams({file})});
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
-            installPlotHtml(payload.plot);
+            showPlot(payload.generated);
+            showStatus("");
             renderContext(payload);
         } catch (error) {
             console.error("The plot could not be generated", error);
             showEmpty(`This file could not be plotted. ${error.message || ""}`.trim());
-        } finally {
-            setLoading(false);
         }
     }
 
+    /* Only the few hundred bytes of "what is the last plot" are read here. The
+     * plot's own megabytes arrive in the frame, after this page is already
+     * usable. */
     async function fetchLastPlot() {
-        setLoading(true);
         try {
-            const response = await fetch("/get_last_plot");
+            const response = await fetch("/plot/meta");
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
-            if (!payload.plot) {
+            if (!payload.has_plot) {
                 showEmpty(dayKeys.length ? "No plot yet. Choose a day and a recording on the left." : "No plot available.");
                 renderContext(null);
                 return;
             }
-            installPlotHtml(payload.plot);
+            showPlot(payload.generated);
+            showStatus("");
             renderContext(payload);
             if (payload.file && dayOfFile(payload.file)) selectFile(payload.file);
         } catch (error) {
             console.error("The last plot could not be loaded", error);
             showEmpty("The last plot could not be loaded.");
-        } finally {
-            setLoading(false);
         }
     }
 
