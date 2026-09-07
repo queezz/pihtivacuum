@@ -71,9 +71,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.12.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.12.0"}
-    assert b"v0.12.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.12.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.12.1"}
+    assert b"v0.12.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -713,9 +713,8 @@ def test_the_line_between_the_vessels_follows_the_line_configuration(client):
 
     queezz, 2026-09-08: "membrane open/closed is flipped". With a membrane
     installed the pipe between the two vessels is not a route — the membrane is
-    what separates them — and only ``Pipe open`` is. Boron deposition also has
-    something mounted in that line, and a configuration nobody has recorded is
-    not a licence to claim a connection.
+    what separates them — and only ``Pipe open`` is. A configuration nobody has
+    recorded is not a licence to claim a connection either.
     """
     plumbing = client.get("/plumbing").json
     both_vcr_open = {
@@ -730,7 +729,7 @@ def test_the_line_between_the_vessels_follows_the_line_configuration(client):
     assert connected["volumes"]["qms-vessel"] == "high-vacuum"
     assert connected["volumes"]["vessel-crossover"] == "high-vacuum"
 
-    for shut in ("membrane", "boron", "unknown", None):
+    for shut in ("membrane", "unknown", None):
         divided = plumbing_map.predict(plumbing, both_vcr_open, shut)
         assert divided["volumes"]["plasma-vessel"] == "high-vacuum", shut
         assert divided["volumes"]["qms-vessel"] == "isolated", shut
@@ -750,25 +749,125 @@ def test_the_line_between_the_vessels_follows_the_line_configuration(client):
     assert plumbing["line_configuration"]["volume"] in plumbing["volumes"]
 
 
-def test_the_membrane_element_opens_the_way_every_other_valve_does(client):
-    """Green is open on this drawing, and the membrane element is no exception.
+def test_boron_deposition_leaves_the_pipe_a_dead_end_on_the_plasma_side(client):
+    """Boron uses the same pipe, but its downstream end is never joined.
 
-    0.11.0 recorded it inverted — a barrier that let gas past only when marked
-    off — on the reasoning that "membrane installed" is a barrier. The Line
-    configuration now carries that meaning for the pipe it really applies to,
-    so this element follows the drawing's own vocabulary again.
+    queezz, 2026-09-08 (letter `20260907-dc825e44-e6d89e`): "Boron uses same
+    pipe. But other end not connected to downstream. Could be pumped from
+    plasma side via bypass." Unlike a membrane -- which divides the pipe into
+    two private sides that may happen to agree -- Boron deposition's
+    downstream valve never reaches the pipe at all, whatever position it is
+    in, so the pipe simply mirrors the plasma vessel.
     """
     plumbing = client.get("/plumbing").json
-    membrane = next(valve for valve in plumbing["valves"] if valve["id"] == "Membrane")
-    assert "open_when" not in membrane
-    joined = plumbing_map.predict(
-        plumbing, {"Membrane": "active", "Rough-Bypass": "active", "bypass-l2": "active"}, "open"
+    both_vcr_open = {
+        "TMPU": "active",
+        "GVU": "active",
+        "RoughU": "active",
+        "bypass-vcr-u": "active",
+        "bypass-vcr-d": "active",
+    }
+
+    # The plasma side is pumped and the downstream valve is open too, but
+    # under Boron deposition that downstream valve reaches nothing: the pipe
+    # takes the plasma vessel's own state, not "isolated", and the QMS vessel
+    # never joins it even though its own valve is open.
+    boron = plumbing_map.predict(plumbing, both_vcr_open, "boron")
+    assert boron["volumes"]["plasma-vessel"] == "high-vacuum"
+    assert boron["volumes"]["vessel-crossover"] == "high-vacuum"
+    assert boron["volumes"]["qms-vessel"] == "isolated"
+
+    # Even when the QMS side is independently pumped to a *different* state,
+    # the pipe still only ever reads the plasma side -- never an "isolated"
+    # disagreement the way a membrane would show, and never the QMS state.
+    qms_pumped_differently = dict(
+        both_vcr_open,
+        **{"hydrogen-bottle": "active", "gasline-h": "active", "gasline-main": "active"},
     )
-    assert joined["volumes"]["probe-line"] == "rough-vacuum"
-    shut = plumbing_map.predict(
-        plumbing, {"Rough-Bypass": "active", "bypass-l2": "active"}, "open"
-    )
-    assert shut["volumes"]["probe-line"] == "isolated"
+    boron_disagreeing = plumbing_map.predict(plumbing, qms_pumped_differently, "boron")
+    assert boron_disagreeing["volumes"]["plasma-vessel"] == "gas"
+    assert boron_disagreeing["volumes"]["vessel-crossover"] == "gas"
+
+    # With the plasma-side valve shut, the dead end has nothing to mirror.
+    plasma_side_shut = {"TMPU": "active", "GVU": "active", "RoughU": "active", "bypass-vcr-d": "active"}
+    isolated = plumbing_map.predict(plumbing, plasma_side_shut, "boron")
+    assert isolated["volumes"]["vessel-crossover"] == "isolated"
+
+    modes = plumbing["line_configuration"]["modes"]
+    assert modes["boron"]["dead_end_valve"] == "bypass-vcr-d"
+
+
+def test_the_readout_never_claims_the_qms_vessel_during_boron_deposition(client):
+    """The plasma vessel's own sentence may not say it is joined to the QMS one.
+
+    Both crossover valves can be open at once during Boron deposition -- the
+    downstream one simply reaches nothing -- and the readout ("I'd like to see
+    if upstream and downstream are connected to a) each other...") would be
+    lying if it still said "Open to the QMS vessel." from that.
+    """
+    plumbing = client.get("/plumbing").json
+    both_vcr_open_and_pumped = {
+        "TMPU": "active",
+        "GVU": "active",
+        "RoughU": "active",
+        "bypass-vcr-u": "active",
+        "bypass-vcr-d": "active",
+        "TMPD": "active",
+        "GVD": "active",
+        "RoughD": "active",
+    }
+    connections = plumbing_map.predict(plumbing, both_vcr_open_and_pumped, "boron")["connections"]
+    assert connections["plasma-vessel"]["joined"] == []
+    assert connections["qms-vessel"]["joined"] == []
+    # The same valve positions under "open", for contrast: the sentence would
+    # be right to say so there, because the pipe genuinely joins them.
+    open_mode = plumbing_map.predict(plumbing, both_vcr_open_and_pumped, "open")["connections"]
+    assert open_mode["plasma-vessel"]["joined"] == ["qms-vessel"]
+
+
+def test_the_membrane_element_follows_the_line_configuration_not_a_press(client):
+    """One source of truth: the drawn valve has no press that could disagree.
+
+    0.11.0 recorded the `Membrane` ellipse inverted, on the reasoning that
+    "membrane installed" is a barrier; 0.11.2 corrected that but still let it
+    be pressed on its own. queezz, 2026-09-08 (letter `20260907-dc825e44-e6d89e`):
+    "Membrane installed and the membrane 'valve' should be linked." It is now
+    display-only, closed under *Membrane installed* and open under every other
+    configuration, whatever a stored `elements_state.json` says for it.
+    """
+    plumbing = client.get("/plumbing").json
+    element_config = client.get("/elements-config").json
+    membrane_config = next(item for item in element_config if item["id"] == "Membrane")
+    assert membrane_config["followsLineMode"] is True
+
+    linked = plumbing["line_configuration"]["linked_valve"]
+    assert linked == {"id": "Membrane", "closed_mode": "membrane"}
+
+    # A stale "active" (open) press recorded for Membrane is overridden by the
+    # configuration on every mode -- it never gets a say.
+    stale_state = {"Membrane": "active", "Rough-Bypass": "active", "bypass-l2": "active"}
+    for mode, expect_open in (("membrane", False), ("open", True), ("boron", True), ("unknown", True), (None, True)):
+        prediction = plumbing_map.predict(plumbing, stale_state, mode)
+        assert prediction["linked_valve"] == {
+            "id": "Membrane",
+            "status": "active" if expect_open else "inactive",
+        }, mode
+        assert prediction["volumes"]["probe-line"] == (
+            "rough-vacuum" if expect_open else "isolated"
+        ), mode
+
+    # And the reverse: a stale "inactive" (closed) press is overridden too.
+    stale_closed = {"Membrane": "inactive", "Rough-Bypass": "active", "bypass-l2": "active"}
+    open_from_configuration = plumbing_map.predict(plumbing, stale_closed, "open")
+    assert open_from_configuration["volumes"]["probe-line"] == "rough-vacuum"
+
+
+def test_membrane_cannot_be_set_directly(client):
+    """`/update` refuses the linked valve outright -- no press of its own."""
+    identify(client)
+    response = client.post("/update", json={"id": "Membrane", "status": "active"})
+    assert response.status_code == 400
+    assert "Line configuration" in response.json["error"]
 
 
 def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):
@@ -813,10 +912,13 @@ def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):
     )
     assert set(white) <= set(bodies)
 
+    # "membrane" here (rather than "open") keeps the linked `Membrane` valve
+    # closed (0.12.1), so probe-pipe-cross stays genuinely isolated from the
+    # high-vacuum bypass manifold beside it rather than joining through it.
     prediction = plumbing_map.predict(
         plumbing,
         {"TMPU": "active", "GVU": "active", "RoughU": "active", "GVBU": "active"},
-        "open",
+        "membrane",
     )
     assert prediction["elements"]["plasma-vacuum"]["fill"] == colours["high-vacuum"]
     assert prediction["elements"]["qms-vacuum"]["fill"] == colours["isolated"]
@@ -1131,7 +1233,14 @@ def test_a_replayed_moment_uses_the_line_configuration_of_that_moment(tmp_path):
 def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     live = client.get("/predicted-vacuum")
     assert live.status_code == 200
-    assert set(live.json) == {"volumes", "elements", "air", "connections"}
+    assert set(live.json) == {
+        "volumes",
+        "elements",
+        "air",
+        "connections",
+        "line_mode",
+        "linked_valve",
+    }
     assert client.get("/predicted-vacuum", query_string={"at": "bad"}).status_code == 400
     identify(client)
     client.post("/update", json={"id": "upstream-pumpline-vent-valve", "status": "active"})

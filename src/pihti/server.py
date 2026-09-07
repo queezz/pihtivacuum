@@ -247,9 +247,15 @@ def render_state_svg(
     stroke colour, the solid band that widens them, and the two vessels and the
     manifold junctions their state colour as a fill — the same prediction the
     page draws, so a saved or historical render reads the same way.
+
+    A drawn valve the map links to the Line configuration (the ``Membrane``
+    element) is read through that configuration here too, so its own fill in
+    a saved render can never disagree with what it did to the prediction next
+    to it.
     """
     rules = []
     if plumbing:
+        state = plumbing_map.apply_line_mode_to_state(plumbing, state, line_mode)
         rules.append(
             plumbing_map.style_rules(
                 plumbing,
@@ -439,6 +445,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     valid_elements = {
         item["id"] for item in element_config if isinstance(item, dict) and "id" in item
     }
+    # The drawn valve the Line configuration links to itself (queezz,
+    # 2026-09-08: "the membrane 'valve' should be linked"). It has no press of
+    # its own: `/update` refuses it outright, so the configuration is the only
+    # way its state can ever change.
+    _linked = plumbing_map.linked_valve(plumbing)
+    linked_valve_id = _linked[0] if _linked else None
     last_plot_html: str | None = None
     last_plot_meta: dict | None = None
 
@@ -622,6 +634,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         status = data.get("status")
         if element_id not in valid_elements or status not in {"active", "inactive"}:
             return jsonify({"error": "Invalid element or status"}), 400
+        if element_id == linked_valve_id:
+            return jsonify(
+                {"error": f"{element_id} follows the Line configuration and cannot be set directly."}
+            ), 400
         if elements_state.get(element_id, "inactive") == status:
             return jsonify({"message": "State unchanged", "state": elements_state})
 
@@ -652,6 +668,11 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.route("/state")
     def get_state():
+        # Raw stored state, including whatever a pre-0.12.1 press left for the
+        # linked `Membrane` valve. Nothing here disagrees with the Line
+        # configuration in practice: the page never colours that element from
+        # this endpoint any more (paintPrediction does, from `/predicted-vacuum`),
+        # and `/update` refuses to write it going forward.
         return jsonify(elements_state)
 
     @app.route("/elements-state")

@@ -72,6 +72,66 @@ def _divided_volume(plumbing: dict, line_mode: str | None) -> str | None:
     return volume
 
 
+def _dead_end_valve(plumbing: dict, line_mode: str | None) -> str | None:
+    """The valve this mode treats as never reaching the divided volume at all.
+
+    Boron deposition leaves the pipe's far end a dead end on the plasma side
+    (queezz, 2026-09-08: "Boron uses same pipe. But other end not connected to
+    downstream."). That is not the same as a *closed* valve: a closed valve
+    would still read as isolated the moment it opened, where this one never
+    reaches the pipe in this mode, whatever position it is actually in. Every
+    other valve on the divided volume keeps the ordinary private-side-of-the-
+    barrier treatment ``predict`` already gives it.
+    """
+    config = plumbing.get("line_configuration") or {}
+    modes = config.get("modes") or {}
+    mode = modes.get(line_mode or "unknown", modes.get("unknown") or {})
+    return mode.get("dead_end_valve")
+
+
+def linked_valve(plumbing: dict) -> tuple[str, str] | None:
+    """The drawn valve the Line configuration overrides, and the mode that shuts it.
+
+    ``None`` when the map declares no such link.
+    """
+    config = plumbing.get("line_configuration") or {}
+    linked = config.get("linked_valve") or {}
+    valve_id = linked.get("id")
+    closed_mode = linked.get("closed_mode")
+    if not valve_id or not closed_mode:
+        return None
+    return valve_id, closed_mode
+
+
+def linked_valve_status(plumbing: dict, line_mode: str | None) -> dict | None:
+    """The linked valve's id and its Line-configuration-derived status, or ``None``."""
+    linked = linked_valve(plumbing)
+    if not linked:
+        return None
+    valve_id, closed_mode = linked
+    status = "inactive" if (line_mode or "unknown") == closed_mode else "active"
+    return {"id": valve_id, "status": status}
+
+
+def apply_line_mode_to_state(plumbing: dict, state: dict, line_mode: str | None) -> dict:
+    """``state`` with the Line-configuration-linked valve overridden on read.
+
+    queezz, 2026-09-08: "Membrane installed and the membrane 'valve' should be
+    linked." The drawn ``Membrane`` element has no press of its own any more:
+    whatever ``elements_state.json`` or a historical log recorded for it, the
+    Line configuration always wins when the state is read back, so the
+    valve's own colour and what it does to the diagram's connectivity can
+    never disagree. A map that declares no ``linked_valve`` is returned
+    unchanged.
+    """
+    status = linked_valve_status(plumbing, line_mode)
+    if not status:
+        return state
+    overridden = dict(state)
+    overridden[status["id"]] = status["status"]
+    return overridden
+
+
 def _connections(
     plumbing: dict, state: dict, names: list[str], edges: list, by_volume: dict[str, str]
 ) -> dict:
@@ -141,8 +201,18 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     each valve on it opens onto its own side of the barrier, so the two vessels
     never join through it. The one drawn pipe then takes the state both sides
     agree on, or ``isolated`` when they differ — a single line cannot honestly
-    carry two answers.
+    carry two answers. Boron deposition divides it the same way, except the
+    downstream valve named by that mode's ``dead_end_valve`` never reaches the
+    pipe at all, in any position: the pipe can then only ever take what the
+    plasma side gives it (queezz, 2026-09-08, "other end not connected to
+    downstream").
+
+    The state is read through :func:`apply_line_mode_to_state` first, so a
+    drawn valve the Line configuration links to itself (the ``Membrane``
+    element) cannot disagree with the configuration that governs it, whatever
+    ``elements_state.json`` or a historical log says.
     """
+    state = apply_line_mode_to_state(plumbing, state, line_mode)
     volumes: dict = plumbing.get("volumes") or {}
     names = list(volumes)
     divided = _divided_volume(plumbing, line_mode)
@@ -150,6 +220,7 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         names = [name for name in names if name != divided]
     else:
         divided = None
+    dead_end = _dead_end_valve(plumbing, line_mode) if divided else None
     edges = []
     stubs: list[str] = []
     for valve in plumbing.get("valves") or []:
@@ -157,6 +228,10 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         if len(joins) != 2 or not _is(state, valve["id"], valve.get("open_when", "active")):
             continue
         if divided and divided in joins:
+            if valve["id"] == dead_end:
+                # Boron deposition: this end is a dead end on purpose, so the
+                # valve reaches nothing through it, whatever position it is in.
+                continue
             # One side of the barrier, private to this valve: an open valve
             # reaches the pipe, and the pipe reaches nothing through it.
             stub = f"{divided}@{valve['id']}"
@@ -233,6 +308,8 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         "elements": elements,
         "air": air,
         "connections": _connections(plumbing, state, list(dict.fromkeys(names)), edges, by_volume),
+        "line_mode": line_mode or "unknown",
+        "linked_valve": linked_valve_status(plumbing, line_mode),
     }
 
 

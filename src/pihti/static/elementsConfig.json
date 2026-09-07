@@ -96,7 +96,8 @@
             "active": "#9bf08d",
             "inactive": "gray"
         },
-        "confirmToggle": false
+        "confirmToggle": false,
+        "followsLineMode": true
     },
     {
         "id": "bypass-l1",

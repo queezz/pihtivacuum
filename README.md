@@ -2,12 +2,12 @@
 
 PIHTI is a LAN-native, operator-annotated vacuum-system diagram with state history and control-unit plots. The diagram is an operating aid, not a control panel, pressure measurement, safety interlock, or source of hardware truth.
 
-Current release: **0.12.0**. The same version appears in the navigation bar and at `/version`.
+Current release: **0.12.1**. The same version appears in the navigation bar and at `/version`.
 
 ## What the landing page does
 
 - Shows the existing SVG and operator-entered component states.
-- Records whether the line is configured with a membrane, open pipe, or for boron deposition, and colours the diagram accordingly: only *Pipe open* makes the narrow pipe between the two vessels a route.
+- Records whether the line is configured with a membrane, open pipe, or for boron deposition, and colours the diagram accordingly: only *Pipe open* makes the narrow pipe a route joining both vessels; *Boron deposition* leaves its downstream end a dead end, so the pipe mirrors the plasma vessel alone and never the QMS one. The drawn `Membrane` valve on the probe line follows this same annotation rather than its own press: closed only under *Membrane installed*.
 - Provides prototype `Vent Plasma` and `Vent QMS` guides as numbered circles over the diagram plus an ordered list in the right rail.
 - Derives completed and next steps from the current diagram state. It never sends device commands.
 - Uses Fleet's web UI grammar: a sticky tab bar, a calm dark palette, and one three-track grid on every page. Controls stand in the left rail, context in the right rail, and the rails never move on scroll. Below 1200 px the same rails open as drawers.

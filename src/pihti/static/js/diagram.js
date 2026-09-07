@@ -89,10 +89,10 @@
         const tooltip = document.getElementById("tooltip");
         if (!container || !tooltip) return;
         const configById = Object.fromEntries(elementsConfig.map((item) => [item.id, item]));
-        elementsConfig.forEach(({id}) => {
+        elementsConfig.forEach(({id, followsLineMode}) => {
             const element = document.getElementById(id);
             if (!element) return;
-            element.style.cursor = operatorIdentified ? "pointer" : "not-allowed";
+            element.style.cursor = followsLineMode ? "default" : (operatorIdentified ? "pointer" : "not-allowed");
             element.addEventListener("mouseenter", (event) => showTooltip(tooltip, event, displayName(id)));
             element.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
         });
@@ -100,6 +100,10 @@
             let target = event.target;
             while (target && target !== container && !configById[target.id]) target = target.parentElement;
             if (!target || target === container || !configById[target.id]) return;
+            // Some elements have no press of their own: the Line configuration
+            // card sets them instead (queezz, 2026-09-08, "the membrane 'valve'
+            // should be linked").
+            if (configById[target.id].followsLineMode) return;
             if (!operatorIdentified) {
                 window.location.assign("/identify");
                 return;
@@ -323,6 +327,16 @@
             if (!authored) return;
             element.style.strokeWidth = String(bandOn && item.band ? authored * item.band : authored);
         });
+        // The drawn valve the Line configuration links to itself (the
+        // `Membrane` element): its colour is this configuration's own operator
+        // colour, read here rather than from a press, so it can never disagree
+        // with what the configuration just did to the prediction beside it.
+        if (prediction.linked_valve) {
+            const {id, status} = prediction.linked_valve;
+            const element = document.getElementById(id);
+            const config = elementsConfig.find((item) => item.id === id);
+            if (element && config) element.style.fill = config.colors[status];
+        }
         renderConnections(prediction.connections || {});
     }
 
@@ -437,6 +451,11 @@
     function applyState(state, moment) {
         if (!elementsConfig.length) return;
         elementsConfig.forEach((element) => {
+            // The Line configuration sets this element's fill in
+            // paintPrediction, from the same annotation it has no press of its
+            // own to disagree with — a raw press-state fill here would only be
+            // overwritten, and could flash first.
+            if (element.followsLineMode) return;
             const diagramElement = document.getElementById(element.id);
             if (!diagramElement) return;
             const status = normalizedStatus(state[element.id]);

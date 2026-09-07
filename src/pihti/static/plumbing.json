@@ -256,14 +256,15 @@
         {"id": "gaspanel-valve-n", "volume": "gas-panel-manifold", "gas": "nitrogen"}
     ],
     "line_configuration": {
-        "note": "What sits in the narrow pipe between the two vessels, from the Line configuration annotation an operator sets on the Vacuum page. Only 'Pipe open' is a connection: with a membrane, or with the line set up for boron deposition, something is mounted in it and the two vessels are separate spaces (owner review 2026-09-08). Until an operator has recorded which it is, the prediction does not claim a connection it has not been told about.",
+        "note": "What sits in the narrow pipe between the two vessels, from the Line configuration annotation an operator sets on the Vacuum page. Only 'Pipe open' is a connection: with a membrane installed, something is mounted across the whole pipe and each valve on it opens onto its own private side of the barrier, so the two vessels are separate spaces (owner review 2026-09-08). Boron deposition uses the same pipe, but its far (downstream) end is not joined at all: queezz, 2026-09-08 (letter 20260907-dc825e44-e6d89e) -- 'Boron uses same pipe. But other end not connected to downstream. Could be pumped from plasma side via bypass.' -- so `dead_end_valve` names the downstream valve that never reaches this pipe in that mode, whatever position it is in; the pipe then simply takes the plasma side's own predicted state (or isolated, if even that side is shut), and it can still be pumped from the plasma side through the bypass manifold because that reach never ran through this pipe's far end. Until an operator has recorded which configuration applies, the prediction does not claim a connection nobody has told it about. `linked_valve` names the drawn valve this whole annotation also governs directly (owner decision 2026-09-08, same letter: 'Membrane installed and the membrane valve should be linked') -- it has no press of its own any more, closed only under `closed_mode` and open under every other configuration, so its own colour and what it does to the diagram's connectivity can never disagree.",
         "volume": "vessel-crossover",
         "modes": {
             "membrane": {"label": "Membrane installed", "connects": false},
             "open": {"label": "Pipe open", "connects": true},
-            "boron": {"label": "Boron deposition", "connects": false},
+            "boron": {"label": "Boron deposition", "connects": false, "dead_end_valve": "bypass-vcr-d"},
             "unknown": {"label": "Not recorded", "connects": false}
-        }
+        },
+        "linked_valve": {"id": "Membrane", "closed_mode": "membrane"}
     },
     "gauges_note": "`stem` is the short line from a gauge symbol to the pipe or vessel it reads. queezz drew each one as an Inkscape-named path beside its gauge and asked whether the app could work with that rather than name six more elements (2026-09-08). It can: three sit inside their gauge's own group as its only plain line, and three are the plain line drawn immediately before their gauge at the top level of the drawing. Nothing was guessed — each id below is that one line, and a test proves it is still the gauge's own neighbour so a regroup in Inkscape cannot silently point a stem at the wrong volume.",
     "gauges": [
