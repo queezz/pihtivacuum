@@ -31,6 +31,7 @@ from flask import (
 from plotly.subplots import make_subplots
 from pihti import __version__
 from pihti import neighbours as ensemble
+from pihti import plumbing as plumbing_map
 from pihti.roster import default_private_dir as _default_private_dir
 from pihti.roster import env_path as _env_path
 from pihti.roster import resolve_operators, roster_path
@@ -177,9 +178,21 @@ def index_at_timestamp(events: list[dict], moment: datetime) -> int | None:
     return idx
 
 
-def render_state_svg(svg_text: str, element_config: list[dict], state: dict) -> str:
-    """Return the authored SVG with operator-entered fills applied as a style block."""
+def render_state_svg(
+    svg_text: str,
+    element_config: list[dict],
+    state: dict,
+    plumbing: dict | None = None,
+) -> str:
+    """Return the authored SVG with operator-entered fills applied as a style block.
+
+    With a volume map, the pipes also carry their predicted vacuum state as a
+    stroke colour — the same prediction the page draws, so a saved or historical
+    render reads the same way.
+    """
     rules = []
+    if plumbing:
+        rules.append(plumbing_map.style_rules(plumbing, state))
     for item in element_config:
         element_id = item.get("id")
         colors = item.get("colors") or {}
@@ -355,6 +368,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     elements_state: dict[str, str] = _load_json(state_file, {})
     logs = load_logs_from_csv(Path(app.config["LOG_FILE"]))[-MAX_LOGS:]
     element_config = _load_json(Path(app.config["ELEMENTS_CONFIG_FILE"]), [])
+    plumbing = plumbing_map.load_plumbing(app.static_folder)
     valid_elements = {
         item["id"] for item in element_config if isinstance(item, dict) and "id" in item
     }
@@ -521,7 +535,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             state = state_at_index(events, current_state_flags(), idx)
         svg_text = (Path(app.static_folder) / "diagram.svg").read_text(encoding="utf-8")
         return Response(
-            render_state_svg(svg_text, element_config, state), mimetype="image/svg+xml"
+            render_state_svg(svg_text, element_config, state, plumbing),
+            mimetype="image/svg+xml",
         )
 
     @app.route("/update", methods=["POST"])
@@ -571,6 +586,30 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.route("/elements-config")
     def serve_config():
         return send_from_directory(directory=app.static_folder, path="elementsConfig.json")
+
+    @app.route("/plumbing")
+    def serve_plumbing():
+        return send_from_directory(directory=app.static_folder, path="plumbing.json")
+
+    @app.route("/predicted-vacuum")
+    def predicted_vacuum():
+        """What each volume most likely holds, read off the entered valve positions.
+
+        A prediction from the diagram's own connectivity, never a measurement.
+        ``?at=YYYY-MM-DD HH:MM:SS`` answers for that moment instead of now, so a
+        replayed diagram is coloured by the state it is replaying.
+        """
+        state: dict = elements_state
+        if raw_moment := request.args.get("at"):
+            moment = parse_timestamp(raw_moment)
+            if moment is None:
+                return jsonify({"error": "at must be YYYY-MM-DD HH:MM:SS"}), 400
+            events = load_history_events(Path(app.config["LOG_FILE"]))
+            idx = index_at_timestamp(events, moment)
+            if idx is None:
+                return jsonify({"error": "No diagram change at or before that moment"}), 404
+            state = state_at_index(events, current_state_flags(), idx)
+        return jsonify(plumbing_map.predict(plumbing, state))
 
     @app.route("/operation-guides")
     def serve_operation_guides():

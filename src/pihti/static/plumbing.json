@@ -1,0 +1,251 @@
+{
+    "note": "Which drawn pipe belongs to which vacuum volume, and which valve joins which two volumes. Read from the names queezz gave the pipes in diagram.svg, never from where the lines happen to sit on the page. The vacuum state derived from this is a prediction from the valve positions an operator has entered, not a pressure measurement.",
+    "prototype": true,
+    "states": [
+        {
+            "id": "air",
+            "label": "Air",
+            "color": "#8c0b12",
+            "meaning": "a vent is open"
+        },
+        {
+            "id": "gas",
+            "label": "Gas",
+            "color": "#7a4fd0",
+            "meaning": "a bottle or N2 is open"
+        },
+        {
+            "id": "high-vacuum",
+            "label": "High vacuum",
+            "color": "#1f4fa8",
+            "meaning": "a turbo is running"
+        },
+        {
+            "id": "rough-vacuum",
+            "label": "Rough vacuum",
+            "color": "#0f9b8e",
+            "meaning": "a rough pump only"
+        },
+        {
+            "id": "isolated",
+            "label": "Isolated, unknown",
+            "color": "#000000",
+            "meaning": "nothing open to it"
+        }
+    ],
+    "volumes": {
+        "plasma-vessel": {
+            "label": "Plasma vessel",
+            "group": "pipes-plasma-vacuum",
+            "elements": [
+                "plasma-vacuum",
+                "plasma-vacuum-gas-manifold",
+                "plasma-vacuum-gate-port",
+                "plasma-vacuum-gauge-manifold",
+                "plasma-vacuum-pump-manifold",
+                "plasma-vacuum-pump-portt"
+            ]
+        },
+        "plasma-turbo-line": {
+            "label": "Plasma turbo line",
+            "group": "pipes-plasma-turbo-line",
+            "elements": [
+                "plasma-vacuum-gv-to-tmp-pipe"
+            ]
+        },
+        "plasma-foreline": {
+            "label": "Plasma backing line",
+            "group": "pipes-upstream-pumpline",
+            "elements": [
+                "upstream-tmp-to-rotary-pipe",
+                "upstream-tmp-to-rotary-pipe-vent"
+            ]
+        },
+        "qms-vessel": {
+            "label": "QMS vessel",
+            "group": "pipes-qms-vacuum",
+            "elements": [
+                "qms-vacuum",
+                "qms-vacuum-gauges-port",
+                "qms-vacuum-gauges-port-1",
+                "qms-vacuum-pumping-bypass-port",
+                "qms-vacuum-pumping-port",
+                "qms-vacuum-upstream-port"
+            ]
+        },
+        "qms-sensor-line": {
+            "label": "QMS sensor line",
+            "group": "pipes-qms-sensor",
+            "elements": [
+                "qms-sensor-pipe"
+            ]
+        },
+        "qms-turbo-line": {
+            "label": "QMS turbo line",
+            "group": "pipes-qms-turbo-line",
+            "elements": [
+                "qms-vacuum-gv-to-tmp-pipe"
+            ]
+        },
+        "qms-foreline": {
+            "label": "QMS backing line",
+            "group": "pipes-downstream-pumpline",
+            "elements": [
+                "downstream-tmp-to-scroll-pipe",
+                "downstream-tmp-to-scroll-pipe-to-vent"
+            ]
+        },
+        "bypass-manifold": {
+            "label": "Bypass manifold",
+            "group": "pipes-bypass-manifold",
+            "elements": [
+                "bypas-manifold-downstream-line",
+                "bypas-manifold-main",
+                "bypas-manifold-t-downstream-t",
+                "bypas-manifold-t-upsteram",
+                "bypas-manifold-upstream-gv",
+                "bypas-manifold-upstream-t-to-pipe"
+            ]
+        },
+        "bypass-pumpline": {
+            "label": "Bypass pumping line",
+            "group": "pipes-bypass-pumpline",
+            "elements": [
+                "bypas-pumpline",
+                "bypas-pumpline-vent"
+            ]
+        },
+        "probe-line": {
+            "label": "Probe line",
+            "group": "pipes-probe",
+            "elements": [
+                "probe-pipe",
+                "probe-pipe-cross",
+                "probe-pipe-cross-line"
+            ]
+        },
+        "vessel-crossover": {
+            "label": "Narrow pipe between the vessels",
+            "group": "pipes-crossover",
+            "elements": [
+                "upstream-to-downstream-narrow-pipe"
+            ]
+        },
+        "gas-manifold": {
+            "label": "Gas manifold to the plasma vessel",
+            "group": "pipes-gasline-manifold",
+            "elements": [
+                "gasline-manifold",
+                "gasline-manifold-argon",
+                "gasline-manifold-hydrogen",
+                "gasline-manifold-oxygen"
+            ]
+        },
+        "argon-line": {
+            "label": "Argon line",
+            "group": "pipes-gasline-argon",
+            "elements": [
+                "gasline-argon",
+                "gasline-argon-to-downstream"
+            ]
+        },
+        "oxygen-line": {
+            "label": "Oxygen line",
+            "group": "pipes-gasline-oxygen",
+            "elements": [
+                "gasline-oxygen",
+                "gasline-oxygen-1",
+                "gasline-oxygen-to-cutoff-valve"
+            ]
+        },
+        "hydrogen-line": {
+            "label": "Hydrogen line",
+            "group": "pipes-gasline-hydrogen",
+            "elements": [
+                "gasline-hydrogen",
+                "gasline-hydrogen-1",
+                "gasline-hydrogen-to-cutoff-valve"
+            ]
+        },
+        "gas-panel-manifold": {
+            "label": "Gas panel manifold",
+            "group": "pipes-gaspanel-manifold",
+            "elements": [
+                "gasapanel-manifold-argon",
+                "gaspanel-manifold",
+                "gaspanel-manifold-hydrogen",
+                "gaspanel-manifold-oxygen",
+                "gaspanel-manifold-pump"
+            ]
+        },
+        "gas-panel-pumpline": {
+            "label": "Gas panel pumping line",
+            "group": "pipes-gaspanel-pumpline",
+            "elements": [
+                "gasline-pumping",
+                "gasline-pumping-to-vent"
+            ]
+        },
+        "atmosphere": {
+            "label": "Open to air",
+            "group": "pipes-vent-air",
+            "always": "air",
+            "elements": [
+                "bypas-pumpline-vent-air-side",
+                "downstream-tmp-to-scroll-pipe-vent-air-side",
+                "gaspanel-air-vent",
+                "gasline-pumping-air-vent",
+                "upstream-tmp-to-rotary-pipe-vent-air-side"
+            ]
+        }
+    },
+    "valves": [
+        {"id": "GVU", "joins": ["plasma-vessel", "plasma-turbo-line"]},
+        {"id": "GVD", "joins": ["qms-vessel", "qms-turbo-line"]},
+        {"id": "GVBU", "joins": ["plasma-vessel", "bypass-manifold"]},
+        {"id": "GVBD", "joins": ["probe-line", "qms-vessel"]},
+        {"id": "Membrane", "joins": ["bypass-manifold", "probe-line"], "open_when": "inactive"},
+        {"id": "bypass-l1", "joins": ["bypass-manifold", "probe-line"]},
+        {"id": "bypass-l2", "joins": ["bypass-manifold", "bypass-pumpline"]},
+        {"id": "bypass-vcr-u", "joins": ["plasma-vessel", "vessel-crossover"]},
+        {"id": "bypass-vcr-d", "joins": ["vessel-crossover", "qms-vessel"]},
+        {"id": "valve_qms", "joins": ["qms-vessel", "qms-sensor-line"]},
+        {"id": "flow-calibration-valve", "joins": ["probe-line", "argon-line"]},
+        {"id": "gasline-main", "joins": ["gas-manifold", "plasma-vessel"]},
+        {"id": "gasline-ar", "joins": ["gas-manifold", "argon-line"]},
+        {"id": "gasline-o", "joins": ["gas-manifold", "oxygen-line"]},
+        {"id": "gasline-h", "joins": ["gas-manifold", "hydrogen-line"]},
+        {"id": "gaspanel-valve-ar", "joins": ["gas-panel-manifold", "argon-line"]},
+        {"id": "gaspanel-valve-o", "joins": ["gas-panel-manifold", "oxygen-line"]},
+        {"id": "gaspanel-valve-h", "joins": ["gas-panel-manifold", "hydrogen-line"]},
+        {"id": "gaspanel-valve-pump", "joins": ["gas-panel-manifold", "gas-panel-pumpline"]},
+        {"id": "gaspanel-valve-vent", "joins": ["gas-panel-manifold", "atmosphere"], "vent": true},
+        {"id": "gaspanel-pump-vent", "joins": ["gas-panel-pumpline", "atmosphere"], "vent": true},
+        {"id": "GVU-6", "joins": ["plasma-foreline", "atmosphere"], "vent": true},
+        {"id": "GVU-6-9", "joins": ["qms-foreline", "atmosphere"], "vent": true},
+        {"id": "Rough-bypass-vent", "joins": ["bypass-pumpline", "atmosphere"], "vent": true}
+    ],
+    "pumps": [
+        {"id": "TMPU", "kind": "turbo", "volume": "plasma-turbo-line", "backed_by": "plasma-foreline"},
+        {"id": "TMPD", "kind": "turbo", "volume": "qms-turbo-line", "backed_by": "qms-foreline"},
+        {"id": "RoughU", "kind": "rough", "volume": "plasma-foreline"},
+        {"id": "RoughD", "kind": "rough", "volume": "qms-foreline"},
+        {"id": "Rough-Bypass", "kind": "rough", "volume": "bypass-pumpline"},
+        {"id": "gaspanel-pump", "kind": "rough", "volume": "gas-panel-pumpline"}
+    ],
+    "gas_sources": [
+        {"id": "hydrogen-bottle", "volume": "hydrogen-line", "gas": "hydrogen"},
+        {"id": "oxygen-bottle", "volume": "oxygen-line", "gas": "oxygen"},
+        {"id": "argon-bottle", "volume": "argon-line", "gas": "argon"},
+        {"id": "helium-bottle", "volume": "argon-line", "gas": "helium"},
+        {"id": "gaspanel-valve-n", "volume": "gas-panel-manifold", "gas": "nitrogen"}
+    ],
+    "gauges": [
+        {"id": "upstream-single-gauge", "volume": "plasma-vessel"},
+        {"id": "upstream-baratron", "volume": "plasma-vessel"},
+        {"id": "bypass-absolute-gauge", "volume": "bypass-manifold"},
+        {"id": "bypass-ionization-gauge", "volume": "bypass-manifold"},
+        {"id": "downstream-ionization-gauge", "volume": "qms-vessel"},
+        {"id": "downstream-baratron", "volume": "qms-vessel"}
+    ]
+}

@@ -340,5 +340,32 @@
             "inactive": "white"
         },
         "confirmToggle": false
+    },
+    {
+        "id": "GVU-6",
+        "label": "Plasma backing line vent valve",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "GVU-6-9",
+        "label": "QMS backing line vent valve",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
+    },
+    {
+        "id": "Rough-bypass-vent",
+        "label": "Bypass pumping line vent valve",
+        "colors": {
+            "active": "#9bf08d",
+            "inactive": "gray"
+        },
+        "confirmToggle": true
     }
 ]

@@ -10,6 +10,7 @@ import pytest
 from cryptography.fernet import Fernet
 
 from pihti import __version__
+from pihti import plumbing as plumbing_map
 from pihti import roster
 from pihti.cli import main as cli_main
 from pihti.server import _load_or_create_session_secret, create_app
@@ -70,9 +71,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.10.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.10.0"}
-    assert b"v0.10.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.11.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.11.0"}
+    assert b"v0.11.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -627,3 +628,96 @@ def test_two_spellings_of_one_operator_never_become_two_identical_options(tmp_pa
     assert roster.read_roster(roster_file) == ["Kaoru Hayashi"]
     page = make_app(tmp_path, OPERATORS_FILE=roster_file).test_client().get("/").data.decode("utf-8")
     assert page.count('<option value="Kaoru Hayashi"') == 1
+
+
+def test_every_pipe_in_the_volume_map_is_really_on_the_diagram(client):
+    """The map names drawn elements, and every valve it uses can be toggled.
+
+    A volume map that names a pipe the drawing does not carry would colour
+    nothing and say nothing about it, which is the quiet kind of wrong.
+    """
+    plumbing = client.get("/plumbing").json
+    svg_root = ET.parse(PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").getroot()
+    svg_ids = {element.get("id") for element in svg_root.iter() if element.get("id")}
+    config_ids = {item["id"] for item in client.get("/elements-config").json}
+
+    named = [
+        element
+        for volume in plumbing["volumes"].values()
+        for element in volume["elements"]
+    ]
+    assert named, "the volume map is empty"
+    assert len(named) == len(set(named)), "an element belongs to two volumes"
+    missing = sorted(element for element in named if element not in svg_ids)
+    assert missing == [], missing
+
+    for volume in plumbing["volumes"].values():
+        assert volume["group"] in svg_ids, volume["group"]
+
+    operable = [item["id"] for item in plumbing["valves"]]
+    operable += [item["id"] for item in plumbing["pumps"]]
+    operable += [item["id"] for item in plumbing["gas_sources"]]
+    operable += [item["id"] for item in plumbing["gauges"]]
+    assert sorted(set(operable) - config_ids) == []
+
+    volume_names = set(plumbing["volumes"])
+    for valve in plumbing["valves"]:
+        assert set(valve["joins"]) <= volume_names, valve
+    for pump in plumbing["pumps"]:
+        assert pump["volume"] in volume_names, pump
+
+
+def test_pipe_colour_is_predicted_from_the_valves_and_says_air_first(client):
+    """Three valve configurations, and the honest order of the five states."""
+    plumbing = client.get("/plumbing").json
+    colours = {state["id"]: state["color"] for state in plumbing["states"]}
+
+    everything_shut = plumbing_map.predict(plumbing, {})["volumes"]
+    assert everything_shut["plasma-vessel"] == "isolated"
+    assert everything_shut["qms-vessel"] == "isolated"
+    assert everything_shut["atmosphere"] == "air"
+
+    pumping = plumbing_map.predict(
+        plumbing, {"TMPU": "active", "GVU": "active", "RoughU": "active"}
+    )
+    assert pumping["volumes"]["plasma-vessel"] == "high-vacuum"
+    assert pumping["volumes"]["plasma-turbo-line"] == "high-vacuum"
+    assert pumping["volumes"]["plasma-foreline"] == "rough-vacuum"
+    assert pumping["volumes"]["qms-vessel"] == "isolated"
+    assert pumping["elements"]["plasma-vacuum"]["stroke"] == colours["high-vacuum"]
+    assert pumping["air"] == []
+
+    vented = plumbing_map.predict(
+        plumbing,
+        {"TMPU": "active", "GVU": "active", "RoughU": "active", "GVU-6": "active"},
+    )
+    assert vented["volumes"]["plasma-foreline"] == "air"
+    assert vented["volumes"]["plasma-vessel"] == "high-vacuum"
+    assert vented["air"] == ["Plasma backing line"]
+    assert vented["elements"]["upstream-tmp-to-rotary-pipe"]["stroke"] == colours["air"]
+
+    gas = plumbing_map.predict(
+        plumbing, {"hydrogen-bottle": "active", "gasline-h": "active", "gasline-main": "active"}
+    )
+    assert gas["volumes"]["hydrogen-line"] == "gas"
+    assert gas["volumes"]["plasma-vessel"] == "gas"
+
+
+def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
+    live = client.get("/predicted-vacuum")
+    assert live.status_code == 200
+    assert set(live.json) == {"volumes", "elements", "air"}
+    assert client.get("/predicted-vacuum", query_string={"at": "bad"}).status_code == 400
+    identify(client)
+    client.post("/update", json={"id": "GVU-6", "status": "active"})
+    stamp = client.get("/history/events").json[-1]["ts"]
+    replayed = client.get("/predicted-vacuum", query_string={"at": stamp})
+    assert replayed.json["volumes"]["plasma-foreline"] == "air"
+    # The key sits under the drawing on both pages that draw it, and each page
+    # states the prediction once — a second telling is the textbook defect.
+    for path in ("/", "/history"):
+        page = client.get(path).data.decode("utf-8")
+        assert page.count("Predicted from the valve positions") == 1, path
+        assert 'id="vacuum-legend"' in page, path
+        assert 'class="diagram-legend"' in page, path
+        assert "measure pressure" not in page, path

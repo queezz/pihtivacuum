@@ -11,6 +11,11 @@
     /* id -> the name a person uses at the rig, from elementsConfig. A page
      * shows the name; the key stays in the file and the log. */
     let nameById = {};
+    /* The volume map (static/plumbing.json) and the last prediction the server
+     * made from it. The colours live in the map, so the legend and the pipes
+     * cannot disagree. */
+    let plumbing = null;
+    let predictionPending = false;
 
     function normalizedStatus(value) {
         return value === "active" || value === true ? "active" : "inactive";
@@ -214,7 +219,75 @@
         renderGuideMarkers(stepStates);
     }
 
-    function applyState(state) {
+    /* The legend teaches the five predicted states once, for the whole page:
+     * the colour and its name at a glance, what each one means behind More.
+     * Nothing else on the surface explains them again. */
+    function renderVacuumLegend() {
+        const list = document.getElementById("vacuum-legend");
+        const detail = document.getElementById("vacuum-legend-detail");
+        const more = document.getElementById("vacuum-more");
+        if (!list || !plumbing) return;
+        const states = plumbing.states || [];
+        list.replaceChildren(...states.map((state) => {
+            const item = document.createElement("li");
+            const swatch = document.createElement("span");
+            swatch.className = "vacuum-swatch";
+            const line = document.createElement("i");
+            line.style.background = state.color;
+            swatch.appendChild(line);
+            const label = document.createElement("span");
+            label.textContent = state.label;
+            item.append(swatch, label);
+            return item;
+        }));
+        if (detail) {
+            detail.replaceChildren(...states.map((state) => {
+                const line = document.createElement("p");
+                line.className = "muted";
+                line.textContent = `${state.label}: ${state.meaning}.`;
+                return line;
+            }));
+        }
+        if (more && !more.dataset.wired) {
+            more.dataset.wired = "1";
+            more.addEventListener("click", () => {
+                const open = more.getAttribute("aria-expanded") === "true";
+                more.setAttribute("aria-expanded", String(!open));
+                more.textContent = open ? "More" : "Less";
+                if (detail) detail.hidden = open;
+            });
+        }
+    }
+
+    /* Paint each pipe with what its volume most likely holds. The prediction is
+     * the server's, from the same volume map the legend reads, so one rule
+     * decides both. The warning for air is the colour itself, named once in
+     * the legend: a sentence repeating it in the rail was a second telling of
+     * the same fact, and it grew with the number of volumes until it took the
+     * guide's own room (measured 2026-09-08). */
+    function paintPrediction(prediction) {
+        Object.entries(prediction.elements || {}).forEach(([id, item]) => {
+            const element = document.getElementById(id);
+            if (element) element.style.stroke = item.stroke;
+        });
+    }
+
+    async function refreshPrediction(moment) {
+        if (!plumbing || predictionPending) return;
+        if (window.historyMode && !moment) return;
+        predictionPending = true;
+        try {
+            const query = moment ? `?at=${encodeURIComponent(moment)}` : "";
+            const response = await fetch(`/predicted-vacuum${query}`);
+            if (response.ok) paintPrediction(await response.json());
+        } catch (error) {
+            console.error("Predicted vacuum state could not be read", error);
+        } finally {
+            predictionPending = false;
+        }
+    }
+
+    function applyState(state, moment) {
         if (!elementsConfig.length) return;
         elementsConfig.forEach((element) => {
             const diagramElement = document.getElementById(element.id);
@@ -223,6 +296,7 @@
             diagramElement.style.fill = element.colors[status];
         });
         renderGuide();
+        refreshPrediction(moment);
     }
 
     async function fetchAndUpdateStates() {
@@ -316,6 +390,8 @@
         nameById = Object.fromEntries(
             elementsConfig.filter((item) => item.label).map((item) => [item.id, item.label])
         );
+        plumbing = await fetch("/plumbing").then((response) => response.ok ? response.json() : null).catch(() => null);
+        renderVacuumLegend();
         if (window.historyMode) {
             container.style.pointerEvents = "none";
             await fetchAndUpdateStates();

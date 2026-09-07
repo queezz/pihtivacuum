@@ -34,6 +34,10 @@
   --brick-border: #7b3f38;
   --brick-bg: rgba(150, 70, 62, 0.18);
 
+  /* The ground the authored diagram is drawn on. The legend's swatches stand
+     on the same ground, so a colour reads there exactly as it reads on a pipe. */
+  --diagram-ground: coral;
+
   --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
   --gutter: 20px;
   /* Measured tab-bar height. Every sticky offset on the page is this plus the
@@ -277,6 +281,12 @@ a.button[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
+  /* A squeezed card clips its own words rather than painting them over the
+     card below. Measured 2026-09-08: a second rail card cut the guide card to
+     85px and its last two lines carried on 113px past its own border, behind
+     the neighbour, because `min-height: 0` lets a flex item shrink under its
+     content and nothing was stopping the paint. */
+  overflow: hidden;
 }
 
 .rail-card--growing > .scrolls {
@@ -291,6 +301,11 @@ a.button[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
    stays `auto` — a growing card's `0` basis with no growth collapses the box
    to nothing and spills its own contents onto the page. */
 .rail-card--fit { flex: 0 1 auto; }
+
+/* Only the scrolling part of a shrinking card gives ground; its heading, its
+   lead line and its footer note keep their height, so a squeezed rail never
+   swallows the words a reader needs. */
+.rail-card--growing > :not(.scrolls) { flex: 0 0 auto; }
 
 .stack { display: grid; gap: 8px; }
 
@@ -347,7 +362,7 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
-  background-color: coral; /* the authored diagram's own ground */
+  background-color: var(--diagram-ground); /* the authored diagram's own ground */
 }
 
 #diagram-container svg { display: block; width: 100%; height: auto; }
@@ -650,3 +665,70 @@ button.tiny {
 
 /* The command sits under its own sentence, so showing it moves nothing. */
 .start-command { display: block; margin-top: 5px; }
+
+/* The predicted-vacuum legend: one swatch in the colour the pipes actually
+   carry, the state's name, and its meaning in four or five words. It is the
+   only place on the Vacuum page that explains what a pipe colour means. */
+/* The key to the drawing sits under the drawing, where a map's legend goes.
+   It began as a third rail card and was measured out again: at a 700px window
+   the right rail already holds a guide whose summary, alert and steps need
+   every pixel of it, and both left-rail cards leave 94px, so a fifth card
+   anywhere in the rails could only be built by crushing something a reader
+   needs (2026-09-08). It is read, not pressed, so the main column is also
+   where the rail law puts it.
+
+   Five chips that wrap, the way the Services legend wears its six: the colour
+   and its name at a glance, the meanings behind More. */
+.diagram-legend {
+  max-width: 830px;
+  margin: 14px auto 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.diagram-legend .rail-lead { margin-bottom: 10px; }
+.vacuum-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vacuum-legend li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--elevated);
+  font-size: 0.8rem;
+  color: var(--fg);
+}
+
+#vacuum-legend-detail { margin-top: 10px; }
+#vacuum-legend-detail p { margin: 0 0 6px; font-size: 0.8rem; }
+#vacuum-legend-detail p:last-child { margin-bottom: 0; }
+#vacuum-more { margin-top: 10px; }
+
+/* The swatch stands on the diagram's own ground, so the colour in the legend
+   is the colour the eye will meet on the drawing. */
+.vacuum-swatch {
+  display: grid;
+  align-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--diagram-ground);
+  transform: translateY(2px);
+}
+
+.vacuum-swatch i { display: block; height: 4px; }
+
+/* The warning names every volume it found; on a short rail it scrolls inside
+   itself rather than pushing the guide card's own text out of its box. */

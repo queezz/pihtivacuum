@@ -32,6 +32,13 @@
             <button type="button" data-drawer="history-context" aria-controls="history-context" aria-expanded="false">Selected moment</button>
         </div>
         <div id="diagram-container" aria-label="Diagram state at the selected moment"></div>
+        <section class="diagram-legend" aria-label="What a pipe colour means">
+            <h2 class="rail-label">Pipe colour</h2>
+            <p class="rail-lead">Predicted from the valve positions at the selected moment, not measured.</p>
+            <ul id="vacuum-legend" class="vacuum-legend"></ul>
+            <button type="button" class="tiny" id="vacuum-more" aria-expanded="false" aria-controls="vacuum-legend-detail">More</button>
+            <div id="vacuum-legend-detail" hidden></div>
+        </section>
         <div id="tooltip"></div>
     </main>
 

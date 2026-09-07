@@ -163,7 +163,7 @@
         if (!diagramReady || !pendingState || typeof window.applyState !== "function") return;
         const stateForApply = {};
         for (const [id, value] of Object.entries(pendingState)) stateForApply[id] = value ? "active" : "inactive";
-        window.applyState(stateForApply);
+        window.applyState(stateForApply, selectedIdx === null ? null : events[selectedIdx].ts);
     }
 
     function selectDate(dateStr) {

@@ -29,6 +29,13 @@
             <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">Current guide</button>
         </div>
         <div id="diagram-container" aria-label="PIHTI vacuum system diagram"></div>
+        <section class="diagram-legend" aria-label="What a pipe colour means">
+            <h2 class="rail-label">Pipe colour</h2>
+            <p class="rail-lead">Predicted from the valve positions, not measured.</p>
+            <ul id="vacuum-legend" class="vacuum-legend"></ul>
+            <button type="button" class="tiny" id="vacuum-more" aria-expanded="false" aria-controls="vacuum-legend-detail">More</button>
+            <div id="vacuum-legend-detail" hidden></div>
+        </section>
         <div id="tooltip"></div>
     </main>
 
@@ -42,7 +49,7 @@
             <div class="scrolls">
                 <ol id="guide-step-list" class="guide-steps"></ol>
             </div>
-            <p class="muted" style="margin-top: 12px;">Prototype diagram guidance only. It does not operate hardware, measure pressure, or replace an interlock.</p>
+            <p class="muted" style="margin-top: 12px;">Prototype diagram guidance only. It does not operate hardware or replace an interlock.</p>
         </section>
     </aside>
 </div>
