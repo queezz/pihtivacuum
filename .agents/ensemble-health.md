@@ -91,10 +91,16 @@ release settles for all three:
 - **A card says how its service starts, and invents nothing.** Lab knows
   `pihti-diagram` and `pihti-log`, so those cards carry a `lab` line. Lab has
   no `controlunit` alias anywhere in this lab: that web server is opened by
-  the rig's own GUI on the Raspberry Pi, and until 0.8.0 the card printed
+  the rig's own launcher on the Raspberry Pi, and until 0.8.0 the card printed
   `lab controlunit`, a command nobody can run (queezz, 2026-09-07: "we should
   teach that the rig's GUI starts the webserver"). A start line is a fact
-  about a machine, never an alias guessed from a name.
+  about a machine, never an alias guessed from a name. The exact chain, read
+  in the ControlUnit checkout on 2026-09-07 after `code/pihti-log` letter
+  `20260907-c39f87ab-3afa0a` named it: the Pi's `~/Desktop/aktest.sh` calls
+  that repository's `scripts/run_controlunit.sh`, which runs
+  `python -m controlunit.main --web`, so the control unit serves its own web
+  view. 0.8.1 says "the desktop launcher on the rig's Raspberry Pi" on the
+  card, because that is the thing a person at the rig actually presses.
 - The PIHTI Log adapter that reads this project stays read-only and never
   calls a device mutation route.
 

@@ -106,6 +106,24 @@ parses, `git diff --check` clean.
   I'll point you there when I'm in the lab." Recorded as an owner decision in
   `.agents/directions.md`, which now waits only on the location; collected.
 
+## 0.8.1: the rig's launcher, named exactly
+
+Second letter from `code/pihti-log` the same afternoon
+(`20260907-c39f87ab-3afa0a`), carrying queezz's correction "ControlUnit starts
+with their GUI. See in the repo." It confirms 0.8.0's card rather than
+contradicting it, and adds the concrete step. Verified in the ControlUnit
+checkout rather than taken on the letter's word: `AGENTS.md` "Running on the
+rig" and `scripts/run_controlunit.sh` agree that the Pi's `~/Desktop/aktest.sh`
+calls that script, which runs `python -m controlunit.main --web`.
+
+The card now reads "Start it from the desktop launcher on the rig's Raspberry
+Pi; it serves its own web view" — the launcher is what a person at the rig
+presses. Content only, no UI code touched, so the 0.8.0 walk stands; the new
+sentence was still rendered on scratch 48934 to confirm it costs one wrapped
+line (ControlUnit's card 237 px against the others' 219 px), no horizontal
+overflow, rails at 76 px, both rails free of overflow. pytest 25 passed.
+Letter recorded here and collected.
+
 ## Still open
 
 - The Pi runs 0.7.0 and does not yet have this. Deploying is a push and a pull

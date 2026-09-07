@@ -37,8 +37,11 @@ DISPLAY_NAMES = {
 
 #: How each service is started, in plain words first and a command only where
 #: one exists. ControlUnit has no ``lab`` alias anywhere in this lab: the rig's
-#: own GUI opens its web server, so a card that printed ``lab controlunit``
-#: was naming a command nobody can run. A machine whose layout differs corrects
+#: Raspberry Pi starts it from ``~/Desktop/aktest.sh``, which calls that
+#: repository's own ``scripts/run_controlunit.sh`` and passes ``--web``, so the
+#: control unit serves its view itself (verified in the ControlUnit checkout,
+#: 2026-09-07, after ``code/pihti-log`` letter ``20260907-c39f87ab-3afa0a``).
+#: A card that printed ``lab controlunit`` was naming a command nobody can run. A machine whose layout differs corrects
 #: the sentence in its own settings (``{"controlunit": {"url": ..., "start":
 #: "..."}}``); the command stays this repository's, because it is the tool's.
 START_HINTS = {
@@ -51,7 +54,7 @@ START_HINTS = {
         "lab pihti-log",
     ),
     "controlunit": (
-        "Start the rig's GUI on its Raspberry Pi; the GUI opens the web server itself.",
+        "Start it from the desktop launcher on the rig's Raspberry Pi; it serves its own web view.",
         "",
     ),
 }
