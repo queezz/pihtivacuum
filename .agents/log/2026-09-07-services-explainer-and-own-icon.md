@@ -124,8 +124,19 @@ line (ControlUnit's card 237 px against the others' 219 px), no horizontal
 overflow, rails at 76 px, both rails free of overflow. pytest 25 passed.
 Letter recorded here and collected.
 
+## Deployed to the Pi
+
+queezz: "Wen done, update Pi and start new version." Keys-only over the Windows
+agent service (`& "$env:WINDIR\System32\OpenSSH\ssh.exe" pi@pihti` — the
+socket form `.agents/README.md` records is the work PC's, not this box's).
+`git pull --ff-only` on `/home/pi/pihtivacuum` took it 402ee13 -> 99b0452,
+`systemctl restart pihti`, service active. The Pi answers `/version` 0.8.1,
+serves `favicon.svg` as `image/svg+xml`, and `/services` renders the five-row
+legend. Its board on arrival: diagram ok 0.8.1, PIHTI Log ok 0.37.0,
+ControlUnit **down** — the rig's control unit is not running, and the card that
+used to say `lab controlunit` now tells whoever reads it to start it from the
+rig's desktop launcher. The new wording earned its keep on its first day.
+
 ## Still open
 
-- The Pi runs 0.7.0 and does not yet have this. Deploying is a push and a pull
-  on the Pi; nothing was pushed by this session without queezz saying so.
 - The vent guides, the `zone-*` split and colour-by-vacuum stand unchanged.
