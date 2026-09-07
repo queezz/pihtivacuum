@@ -730,5 +730,13 @@ button.tiny {
 
 .vacuum-swatch i { display: block; height: 4px; }
 
+/* The halo is a reading aid the reader may switch off once the pipes
+   themselves are wide enough (owner review 2026-09-08). The switch hides the
+   band; the pipe keeps its colour either way. */
+#diagram-container.no-halo .pipe-halo-layer { display: none; }
+
+#vacuum-legend-detail p.halo-switch { margin: 9px 0 0; color: var(--fg); }
+.halo-switch label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+
 /* The warning names every volume it found; on a short rail it scrolls inside
    itself rather than pushing the guide card's own text out of its box. */

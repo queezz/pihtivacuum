@@ -2,19 +2,21 @@
 
 PIHTI is a LAN-native, operator-annotated vacuum-system diagram with state history and control-unit plots. The diagram is an operating aid, not a control panel, pressure measurement, safety interlock, or source of hardware truth.
 
-Current release: **0.11.1**. The same version appears in the navigation bar and at `/version`.
+Current release: **0.11.2**. The same version appears in the navigation bar and at `/version`.
 
 ## What the landing page does
 
 - Shows the existing SVG and operator-entered component states.
-- Records whether the line is configured with a membrane, open pipe, or for boron deposition.
+- Records whether the line is configured with a membrane, open pipe, or for boron deposition, and colours the diagram accordingly: only *Pipe open* makes the narrow pipe between the two vessels a route.
 - Provides prototype `Vent Plasma` and `Vent QMS` guides as numbered circles over the diagram plus an ordered list in the right rail.
 - Derives completed and next steps from the current diagram state. It never sends device commands.
 - Uses Fleet's web UI grammar: a sticky tab bar, a calm dark palette, and one three-track grid on every page. Controls stand in the left rail, context in the right rail, and the rails never move on scroll. Below 1200 px the same rails open as drawers.
 - History picks a day in the calendar and a moment in the timeline, both in the left rail, and replays the diagram in the main column. The address bar carries the selection, so `/history?at=YYYY-MM-DD HH:MM:SS` is a stable link to a moment.
 - Plot picks a control-unit file in the left rail and states which file and channels the plot shows in the right rail.
 
-The vent sequences live in `src/pihti/static/operationGuides.json` and are intentionally provisional pending hands-on owner correction. Live connected-volume coloring still requires the SVG to be split into stable `zone-*` plumbing groups.
+The vent sequences live in `src/pihti/static/operationGuides.json` and are intentionally provisional pending hands-on owner correction.
+
+Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. The five states are chosen against the drawing's coral ground by measured contrast, each pipe carries a wider band of its own colour beneath it so a thin line still reads as a colour, and the two vessels take a light tint of their state. The band has a switch in the key under the drawing. All of it is a prediction from the entered valve positions, never a measurement.
 
 ## Run and test
 
@@ -66,7 +68,7 @@ error.
 
 ## Machine-readable state
 
-- `/state.svg` returns the authored diagram with the operator-entered fills applied. `/state.svg?at=YYYY-MM-DD HH:MM:SS` renders the state at that moment.
+- `/state.svg` returns the authored diagram with the operator-entered fills applied, and the predicted vacuum state as pipe strokes and vessel tints. `/state.svg?at=YYYY-MM-DD HH:MM:SS` renders the state at that moment, with the line configuration recorded then.
 - `/history/state-at?ts=YYYY-MM-DD HH:MM:SS` returns the absolute element state at that moment as JSON.
 - Both are operator-entered annotation, never a pressure measurement.
 
@@ -74,7 +76,7 @@ error.
 
 Interactive equipment IDs and colors are defined in `src/pihti/static/elementsConfig.json`. Existing valve, pump, and gauge fills represent operator-entered operational state and are not pressure-domain colors.
 
-Future live vacuum indication must use stable `zone-*` groups rather than inferred path geometry. Actual pressure evidence must show instrument ID, units, timestamp, and stale/unknown state.
+Connectivity is read from `plumbing.json`, which maps the names queezz gave the pipes in `diagram.svg`, never from inferred path geometry. Actual pressure evidence must show instrument ID, units, timestamp, and stale/unknown state.
 
 ## Raspberry Pi deployment
 

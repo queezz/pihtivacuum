@@ -213,21 +213,44 @@ def index_at_timestamp(events: list[dict], moment: datetime) -> int | None:
     return idx
 
 
+def line_mode_at(context_log: Path, moment: datetime) -> str:
+    """The Line configuration recorded at or before ``moment``.
+
+    A replayed diagram is coloured by the state it is replaying, and what was
+    mounted in the pipe between the two vessels is part of that state. Before
+    the first recorded change the honest answer is ``unknown``.
+    """
+    mode = "unknown"
+    if not context_log.is_file():
+        return mode
+    try:
+        with context_log.open(newline="", encoding="utf-8") as csvfile:
+            for row in csv.DictReader(csvfile):
+                stamp = parse_timestamp(row.get("timestamp"))
+                if stamp is not None and stamp <= moment and row.get("line_mode"):
+                    mode = row["line_mode"]
+    except (OSError, csv.Error):
+        return "unknown"
+    return mode
+
+
 def render_state_svg(
     svg_text: str,
     element_config: list[dict],
     state: dict,
     plumbing: dict | None = None,
+    line_mode: str | None = None,
 ) -> str:
     """Return the authored SVG with operator-entered fills applied as a style block.
 
     With a volume map, the pipes also carry their predicted vacuum state as a
-    stroke colour — the same prediction the page draws, so a saved or historical
-    render reads the same way.
+    stroke colour and the two vessels their light tint of it — the same
+    prediction the page draws, so a saved or historical render reads the same
+    way. The page's halo is a screen affordance and is not baked in here.
     """
     rules = []
     if plumbing:
-        rules.append(plumbing_map.style_rules(plumbing, state))
+        rules.append(plumbing_map.style_rules(plumbing, state, line_mode))
     for item in element_config:
         element_id = item.get("id")
         colors = item.get("colors") or {}
@@ -527,6 +550,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     def current_state_flags() -> dict[str, bool]:
         return {key: value == "active" for key, value in elements_state.items()}
 
+    def current_line_mode() -> str:
+        """What an operator last said is mounted in the line between the vessels."""
+        context = _load_json(Path(app.config["OPERATION_CONTEXT_FILE"]), {})
+        mode = context.get("line_mode")
+        return mode if isinstance(mode, str) and mode else "unknown"
+
     @app.route("/history/state/<int:idx>")
     def get_history_state(idx):
         events = load_history_events(Path(app.config["LOG_FILE"]))
@@ -561,6 +590,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         pressure measurement.
         """
         state: dict = elements_state
+        mode = current_line_mode()
         if raw_moment := request.args.get("at"):
             moment = parse_timestamp(raw_moment)
             if moment is None:
@@ -570,9 +600,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             if idx is None:
                 return jsonify({"error": "No diagram change at or before that moment"}), 404
             state = state_at_index(events, current_state_flags(), idx)
+            mode = line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment)
         svg_text = (Path(app.static_folder) / "diagram.svg").read_text(encoding="utf-8")
         return Response(
-            render_state_svg(svg_text, element_config, state, plumbing),
+            render_state_svg(svg_text, element_config, state, plumbing, mode),
             mimetype="image/svg+xml",
         )
 
@@ -634,9 +665,12 @@ def create_app(test_config: dict | None = None) -> Flask:
 
         A prediction from the diagram's own connectivity, never a measurement.
         ``?at=YYYY-MM-DD HH:MM:SS`` answers for that moment instead of now, so a
-        replayed diagram is coloured by the state it is replaying.
+        replayed diagram is coloured by the state it is replaying — including
+        what the Line configuration said was mounted between the two vessels
+        then.
         """
         state: dict = elements_state
+        mode = current_line_mode()
         if raw_moment := request.args.get("at"):
             moment = parse_timestamp(raw_moment)
             if moment is None:
@@ -646,7 +680,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             if idx is None:
                 return jsonify({"error": "No diagram change at or before that moment"}), 404
             state = state_at_index(events, current_state_flags(), idx)
-        return jsonify(plumbing_map.predict(plumbing, state))
+            mode = line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment)
+        return jsonify(plumbing_map.predict(plumbing, state, mode))
 
     @app.route("/operation-guides")
     def serve_operation_guides():

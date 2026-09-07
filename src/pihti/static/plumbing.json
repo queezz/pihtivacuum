@@ -5,31 +5,36 @@
         {
             "id": "air",
             "label": "Air",
-            "color": "#8c0b12",
+            "color": "#8a0036",
+            "tint": "#e8ccd7",
             "meaning": "a vent is open"
         },
         {
             "id": "gas",
             "label": "Gas",
-            "color": "#7a4fd0",
+            "color": "#6a00b0",
+            "tint": "#e1ccef",
             "meaning": "a bottle or N2 is open"
         },
         {
             "id": "high-vacuum",
             "label": "High vacuum",
-            "color": "#1f4fa8",
+            "color": "#003bc4",
+            "tint": "#ccd8f3",
             "meaning": "a turbo is running"
         },
         {
             "id": "rough-vacuum",
             "label": "Rough vacuum",
-            "color": "#0f9b8e",
+            "color": "#00544a",
+            "tint": "#ccdddb",
             "meaning": "a rough pump only"
         },
         {
             "id": "isolated",
             "label": "Isolated, unknown",
-            "color": "#000000",
+            "color": "#463f3b",
+            "tint": "#dad9d8",
             "meaning": "nothing open to it"
         }
     ],
@@ -37,6 +42,7 @@
         "plasma-vessel": {
             "label": "Plasma vessel",
             "group": "pipes-plasma-vacuum",
+            "vessel": "plasma-vacuum",
             "elements": [
                 "plasma-vacuum",
                 "plasma-vacuum-gas-manifold",
@@ -63,6 +69,7 @@
         },
         "qms-vessel": {
             "label": "QMS vessel",
+            "vessel": "qms-vacuum",
             "group": "pipes-qms-vacuum",
             "elements": [
                 "qms-vacuum",
@@ -205,7 +212,7 @@
         {"id": "GVD", "joins": ["qms-vessel", "qms-turbo-line"]},
         {"id": "GVBU", "joins": ["plasma-vessel", "bypass-manifold"]},
         {"id": "GVBD", "joins": ["probe-line", "qms-vessel"]},
-        {"id": "Membrane", "joins": ["bypass-manifold", "probe-line"], "open_when": "inactive"},
+        {"id": "Membrane", "joins": ["bypass-manifold", "probe-line"]},
         {"id": "bypass-l1", "joins": ["bypass-manifold", "probe-line"]},
         {"id": "bypass-l2", "joins": ["bypass-manifold", "bypass-pumpline"]},
         {"id": "bypass-vcr-u", "joins": ["plasma-vessel", "vessel-crossover"]},
@@ -241,6 +248,16 @@
         {"id": "helium-bottle", "volume": "argon-line", "gas": "helium"},
         {"id": "gaspanel-valve-n", "volume": "gas-panel-manifold", "gas": "nitrogen"}
     ],
+    "line_configuration": {
+        "note": "What sits in the narrow pipe between the two vessels, from the Line configuration annotation an operator sets on the Vacuum page. Only 'Pipe open' is a connection: with a membrane, or with the line set up for boron deposition, something is mounted in it and the two vessels are separate spaces (owner review 2026-09-08). Until an operator has recorded which it is, the prediction does not claim a connection it has not been told about.",
+        "volume": "vessel-crossover",
+        "modes": {
+            "membrane": {"label": "Membrane installed", "connects": false},
+            "open": {"label": "Pipe open", "connects": true},
+            "boron": {"label": "Boron deposition", "connects": false},
+            "unknown": {"label": "Not recorded", "connects": false}
+        }
+    },
     "gauges": [
         {"id": "upstream-single-gauge", "volume": "plasma-vessel"},
         {"id": "upstream-baratron", "volume": "plasma-vessel"},

@@ -71,9 +71,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.11.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.11.1"}
-    assert b"v0.11.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.11.2"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.11.2"}
+    assert b"v0.11.2" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -706,6 +706,192 @@ def test_pipe_colour_is_predicted_from_the_valves_and_says_air_first(client):
     )
     assert gas["volumes"]["hydrogen-line"] == "gas"
     assert gas["volumes"]["plasma-vessel"] == "gas"
+
+
+def test_the_line_between_the_vessels_follows_the_line_configuration(client):
+    """One configuration per button, and what each means for the narrow pipe.
+
+    queezz, 2026-09-08: "membrane open/closed is flipped". With a membrane
+    installed the pipe between the two vessels is not a route — the membrane is
+    what separates them — and only ``Pipe open`` is. Boron deposition also has
+    something mounted in that line, and a configuration nobody has recorded is
+    not a licence to claim a connection.
+    """
+    plumbing = client.get("/plumbing").json
+    both_vcr_open = {
+        "TMPU": "active",
+        "GVU": "active",
+        "RoughU": "active",
+        "bypass-vcr-u": "active",
+        "bypass-vcr-d": "active",
+    }
+
+    connected = plumbing_map.predict(plumbing, both_vcr_open, "open")
+    assert connected["volumes"]["qms-vessel"] == "high-vacuum"
+    assert connected["volumes"]["vessel-crossover"] == "high-vacuum"
+
+    for shut in ("membrane", "boron", "unknown", None):
+        divided = plumbing_map.predict(plumbing, both_vcr_open, shut)
+        assert divided["volumes"]["plasma-vessel"] == "high-vacuum", shut
+        assert divided["volumes"]["qms-vessel"] == "isolated", shut
+        # One drawn line, a barrier partway along it: it may only claim a state
+        # both sides agree on.
+        assert divided["volumes"]["vessel-crossover"] == "isolated", shut
+
+    both_sides_pumped = dict(both_vcr_open, TMPD="active", GVD="active", RoughD="active")
+    agreed = plumbing_map.predict(plumbing, both_sides_pumped, "membrane")
+    assert agreed["volumes"]["vessel-crossover"] == "high-vacuum"
+    assert agreed["volumes"]["qms-vessel"] == "high-vacuum"
+
+    # Every button the page offers is a configuration the map knows.
+    modes = plumbing["line_configuration"]["modes"]
+    assert {"membrane", "open", "boron", "unknown"} == set(modes)
+    assert [name for name, mode in modes.items() if mode["connects"]] == ["open"]
+    assert plumbing["line_configuration"]["volume"] in plumbing["volumes"]
+
+
+def test_the_membrane_element_opens_the_way_every_other_valve_does(client):
+    """Green is open on this drawing, and the membrane element is no exception.
+
+    0.11.0 recorded it inverted — a barrier that let gas past only when marked
+    off — on the reasoning that "membrane installed" is a barrier. The Line
+    configuration now carries that meaning for the pipe it really applies to,
+    so this element follows the drawing's own vocabulary again.
+    """
+    plumbing = client.get("/plumbing").json
+    membrane = next(valve for valve in plumbing["valves"] if valve["id"] == "Membrane")
+    assert "open_when" not in membrane
+    joined = plumbing_map.predict(
+        plumbing, {"Membrane": "active", "Rough-Bypass": "active", "bypass-l2": "active"}, "open"
+    )
+    assert joined["volumes"]["probe-line"] == "rough-vacuum"
+    shut = plumbing_map.predict(
+        plumbing, {"Rough-Bypass": "active", "bypass-l2": "active"}, "open"
+    )
+    assert shut["volumes"]["probe-line"] == "isolated"
+
+
+def test_the_two_vessels_carry_a_light_tint_of_their_predicted_state(client):
+    """A vessel is a volume you can see into, so it says its state by its fill.
+
+    queezz, 2026-09-08: "the plasma-vacuum and qms-vacuum shapes should change
+    the fill color, too." They are the drawing's only two vessel shapes; every
+    other element the map names is a line and keeps its authored fill.
+    """
+    plumbing = client.get("/plumbing").json
+    tints = {state["id"]: state["tint"] for state in plumbing["states"]}
+    svg_root = ET.parse(PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").getroot()
+    svg_ids = {element.get("id") for element in svg_root.iter() if element.get("id")}
+
+    vessels = {
+        volume["vessel"]: name
+        for name, volume in plumbing["volumes"].items()
+        if volume.get("vessel")
+    }
+    assert set(vessels) == {"plasma-vacuum", "qms-vacuum"}
+    for element_id, name in vessels.items():
+        assert element_id in svg_ids
+        assert element_id in plumbing["volumes"][name]["elements"]
+
+    prediction = plumbing_map.predict(
+        plumbing, {"TMPU": "active", "GVU": "active", "RoughU": "active"}, "open"
+    )
+    assert prediction["elements"]["plasma-vacuum"]["fill"] == tints["high-vacuum"]
+    assert prediction["elements"]["qms-vacuum"]["fill"] == tints["isolated"]
+    assert "fill" not in prediction["elements"]["plasma-vacuum-gate-port"]
+    assert "fill" not in prediction["elements"]["upstream-to-downstream-narrow-pipe"]
+
+
+def test_every_state_colour_is_readable_on_the_diagram_ground(client):
+    """The five colours are checked against the coral field, not judged by eye.
+
+    queezz, 2026-09-08: "it's impossible to see colors. Too similar?" The
+    0.11.1 teal stood at 1.38:1 against the drawing's own ground and the violet
+    at 2.18:1, which is why two of them read as one. Every colour here clears
+    the 3:1 that WCAG asks of a graphical object, and so does every light
+    vessel tint against its own stroke.
+    """
+    css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    assert "--diagram-ground: coral;" in css
+    ground = "#ff7f50"  # coral
+
+    def luminance(value):
+        channels = [int(value.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+        linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    def contrast(one, other):
+        first, second = luminance(one), luminance(other)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+
+    plumbing = client.get("/plumbing").json
+    for state in plumbing["states"]:
+        assert contrast(state["color"], ground) >= 3.0, state["id"]
+        assert contrast(state["tint"], state["color"]) >= 4.5, state["id"]
+    colours = [state["color"] for state in plumbing["states"]]
+    assert len(set(colours)) == len(colours)
+
+
+def test_a_saved_render_really_carries_the_prediction(client):
+    """The drawing's own inline styles used to win, so nothing was coloured.
+
+    Every pipe in ``diagram.svg`` carries ``stroke:#000000`` in a ``style``
+    attribute, and an inline style beats a stylesheet — so the plain rules
+    ``/state.svg`` used to write were overridden and a saved render came back
+    black. They are ``!important`` now, and a test reads the rendered file.
+    """
+    plumbing = client.get("/plumbing").json
+    rendered = client.get("/state.svg").data.decode("utf-8")
+    assert "#upstream-tmp-to-rotary-pipe{stroke:" in rendered
+    assert rendered.count("!important") > len(plumbing["volumes"])
+    colours = {state["color"] for state in plumbing["states"]}
+    assert any(f"stroke:{colour} !important" in rendered for colour in colours)
+    tints = {state["tint"] for state in plumbing["states"]}
+    assert "#plasma-vacuum{" in rendered
+    assert any(f"fill:{tint} !important" in rendered for tint in tints)
+
+
+def test_the_halo_is_drawn_under_the_pipes_and_has_a_switch():
+    """The reading aid the owner may turn off once he widens the pipes himself.
+
+    Pipe geometry is queezz's; the halo is the app's own band beneath each
+    pipe, so `diagram.svg` is never edited for it. It lives in its own
+    transform-free layer at the front of each pipe's own parent — same
+    coordinates, painted underneath — and the key that explains the colours
+    carries its switch.
+    """
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    assert 'setAttribute("class", "pipe-halo-layer")' in script
+    assert "parent.insertBefore(layer, parent.firstChild)" in script
+    assert 'box.id = "pipe-halo"' in script
+    assert "#diagram-container.no-halo .pipe-halo-layer { display: none; }" in css
+    svg = (PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").read_text(encoding="utf-8")
+    assert "pipe-halo-layer" not in svg
+
+
+def test_a_replayed_moment_uses_the_line_configuration_of_that_moment(tmp_path):
+    """History is coloured by the state it replays, and the line is part of it."""
+    from pihti.server import line_mode_at
+    from pihti.server import parse_timestamp
+
+    log = tmp_path / "operation_context_log.csv"
+    log.write_text(
+        "timestamp,line_mode,user\n"
+        "2026-09-01 10:00:00,open,KAA\n"
+        "2026-09-02 10:00:00,membrane,KAA\n",
+        encoding="utf-8",
+    )
+    assert line_mode_at(log, parse_timestamp("2026-08-31 09:00:00")) == "unknown"
+    assert line_mode_at(log, parse_timestamp("2026-09-01 12:00:00")) == "open"
+    assert line_mode_at(log, parse_timestamp("2026-09-03 12:00:00")) == "membrane"
+    assert line_mode_at(tmp_path / "absent.csv", parse_timestamp("2026-09-03 12:00:00")) == "unknown"
 
 
 def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):

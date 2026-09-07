@@ -234,6 +234,9 @@
             swatch.className = "vacuum-swatch";
             const line = document.createElement("i");
             line.style.background = state.color;
+            /* The swatch wears the halo the drawing wears, so a colour reads
+             * here exactly as wide as it reads on a pipe. */
+            line.style.boxShadow = `0 0 0 2px ${state.color}99`;
             swatch.appendChild(line);
             const label = document.createElement("span");
             label.textContent = state.label;
@@ -241,12 +244,26 @@
             return item;
         }));
         if (detail) {
-            detail.replaceChildren(...states.map((state) => {
+            const lines = states.map((state) => {
                 const line = document.createElement("p");
                 line.className = "muted";
                 line.textContent = `${state.label}: ${state.meaning}.`;
                 return line;
-            }));
+            });
+            const vessels = document.createElement("p");
+            vessels.className = "muted";
+            vessels.textContent = "The two vessels are filled with a light tint of the same colour.";
+            lines.push(vessels);
+            const halo = document.createElement("p");
+            halo.className = "halo-switch";
+            const label = document.createElement("label");
+            const box = document.createElement("input");
+            box.type = "checkbox";
+            box.id = "pipe-halo";
+            label.append(box, document.createTextNode(" Wide band behind each pipe"));
+            halo.appendChild(label);
+            lines.push(halo);
+            detail.replaceChildren(...lines);
         }
         if (more && !more.dataset.wired) {
             more.dataset.wired = "1";
@@ -259,16 +276,89 @@
         }
     }
 
+    /* The halo: a wider, translucent band of the same colour drawn *under* each
+     * pipe, so a 2px line reads as a colour on the drawing's orange ground
+     * without anyone editing the drawing (queezz, 2026-09-08: "it's impossible
+     * to see colors... need bigger pipes (that's on me)"). Pipe geometry is his;
+     * this is the app's own reading aid, and the legend can switch it off so he
+     * can judge the colours again once he has widened the pipes himself.
+     *
+     * Each halo is a clone of its pipe, placed in a transform-free <g> at the
+     * front of that pipe's own parent. Same parent means the same coordinate
+     * system, so nothing moves; first child means it paints underneath. */
+    const haloByElement = new Map();
+
+    function haloLayerFor(element) {
+        const parent = element.parentNode;
+        if (!parent || parent.nodeType !== 1) return null;
+        let layer = parent.querySelector(":scope > g.pipe-halo-layer");
+        if (!layer) {
+            layer = document.createElementNS(SVG_NS, "g");
+            layer.setAttribute("class", "pipe-halo-layer");
+            layer.setAttribute("pointer-events", "none");
+            parent.insertBefore(layer, parent.firstChild);
+        }
+        return layer;
+    }
+
+    function haloFor(element) {
+        if (haloByElement.has(element.id)) return haloByElement.get(element.id);
+        const layer = haloLayerFor(element);
+        if (!layer) return null;
+        const clone = element.cloneNode(true);
+        clone.removeAttribute("id");
+        clone.querySelectorAll("[id]").forEach((child) => child.removeAttribute("id"));
+        const width = parseFloat(window.getComputedStyle(element).strokeWidth) || 3;
+        clone.style.fill = "none";
+        clone.style.strokeWidth = String(width * 2.8);
+        clone.style.strokeOpacity = "0.6";
+        clone.style.strokeLinecap = "round";
+        clone.style.strokeLinejoin = "round";
+        clone.style.pointerEvents = "none";
+        layer.appendChild(clone);
+        haloByElement.set(element.id, clone);
+        return clone;
+    }
+
     /* Paint each pipe with what its volume most likely holds. The prediction is
      * the server's, from the same volume map the legend reads, so one rule
-     * decides both. The warning for air is the colour itself, named once in
-     * the legend: a sentence repeating it in the rail was a second telling of
-     * the same fact, and it grew with the number of volumes until it took the
-     * guide's own room (measured 2026-09-08). */
+     * decides both. A vessel is a volume you can see into, so it also takes a
+     * light tint of the same colour: the plasma cross and the QMS rectangle are
+     * the drawing's only two (queezz, 2026-09-08). The warning for air is the
+     * colour itself, named once in the legend: a sentence repeating it in the
+     * rail was a second telling of the same fact, and it grew with the number
+     * of volumes until it took the guide's own room (measured 2026-09-08). */
     function paintPrediction(prediction) {
         Object.entries(prediction.elements || {}).forEach(([id, item]) => {
             const element = document.getElementById(id);
-            if (element) element.style.stroke = item.stroke;
+            if (!element) return;
+            element.style.stroke = item.stroke;
+            if (item.fill) {
+                element.style.fill = item.fill;
+                return;
+            }
+            const halo = haloFor(element);
+            if (halo) halo.style.stroke = item.stroke;
+        });
+    }
+
+    /* The halo is a reading aid, not a claim, so it has a switch and the switch
+     * lives with the key that explains the colours. The choice is this reader's
+     * own, so it stays in this browser. */
+    function setupHaloToggle() {
+        const toggle = document.getElementById("pipe-halo");
+        const container = document.getElementById("diagram-container");
+        if (!toggle || !container) return;
+        let stored = null;
+        try { stored = window.localStorage.getItem("pihti.pipeHalo"); } catch (error) { stored = null; }
+        const on = stored !== "off";
+        toggle.checked = on;
+        container.classList.toggle("no-halo", !on);
+        toggle.addEventListener("change", () => {
+            container.classList.toggle("no-halo", !toggle.checked);
+            try {
+                window.localStorage.setItem("pihti.pipeHalo", toggle.checked ? "on" : "off");
+            } catch (error) { /* a browser that refuses storage still draws */ }
         });
     }
 
@@ -392,6 +482,7 @@
         );
         plumbing = await fetch("/plumbing").then((response) => response.ok ? response.json() : null).catch(() => null);
         renderVacuumLegend();
+        setupHaloToggle();
         if (window.historyMode) {
             container.style.pointerEvents = "none";
             await fetchAndUpdateStates();
