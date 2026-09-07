@@ -594,10 +594,13 @@ def create_app(test_config: dict | None = None) -> Flask:
     # unauthenticated GET /api/health per service, {service, version, status,
     # detail}, status in ok/degraded/down, no path or secret in the body.
 
-    def neighbour_addresses() -> dict[str, str]:
+    def neighbour_settings() -> dict:
         if isinstance(app.config.get("NEIGHBOURS"), dict):
-            return ensemble.read_addresses({"NEIGHBOURS": app.config["NEIGHBOURS"]})
-        return ensemble.read_addresses(_load_json(Path(app.config["SETTINGS_FILE"]), {}))
+            return {"NEIGHBOURS": app.config["NEIGHBOURS"]}
+        return _load_json(Path(app.config["SETTINGS_FILE"]), {})
+
+    def neighbour_addresses() -> dict[str, str]:
+        return ensemble.read_addresses(neighbour_settings())
 
     board = ensemble.NeighbourBoard(neighbour_addresses, probe=app.config.get("NEIGHBOUR_PROBE") or ensemble.read_health)
 
@@ -632,6 +635,12 @@ def create_app(test_config: dict | None = None) -> Flask:
              "url": "", "state": me["status"], "version": me["version"], "detail": me["detail"]},
             *board.neighbours(),
         ]
+        # How to start each one, in plain words. The command travels only where
+        # one exists: ControlUnit is started by the rig's own GUI.
+        starts = ensemble.read_starts(neighbour_settings())
+        for row in rows:
+            how, command = ensemble.start_hint(row["alias"], starts.get(row["alias"], ""))
+            row["start_how"], row["start_command"] = how, command
         return jsonify({"services": rows, "checked_at": datetime.now().strftime(TIMESTAMP_FORMAT)})
 
     @app.route("/services")

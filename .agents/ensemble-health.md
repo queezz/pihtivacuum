@@ -52,6 +52,30 @@ addresses live only in the machine-local settings file (`NEIGHBOURS` key) or
 `PIHTI_NEIGHBOURS`. On the Pi the diagram answers at port 5000, ControlUnit's
 web view at 4187; PIHTI Log serves from the office PC at 4310.
 
+## The board as the ensemble's reference (0.8.0, 2026-09-07)
+
+queezz, 2026-09-07: *"I like the pihti-diagram way for the services. And we
+need to sync that in all 3 syblings."* PIHTI Log said the same in letter
+`20260907-f4233fa8-a494c0` and is adopting this card board. Two things this
+release settles for all three:
+
+- **The four state meanings, as PIHTI Log proposed and this project already
+  implemented:** an explicit refusal or an HTTP error is `down`; a timeout,
+  a DNS failure or silence is `unreachable`; a malformed health response is
+  `degraded`; an address this machine was never given is `not configured`.
+  ControlUnit read a refusal as `unreachable`; that is the one real drift,
+  and `src/pihti/neighbours.py` is the reference for it.
+- **The explainer teaches once, at a glance.** The right rail carries one
+  lead line, then the same five chips the cards render, each with its meaning
+  in a few words, and the rest of the explanation behind a `More` press.
+  Three muted paragraphs were "too long and too quiet" (queezz, 2026-09-07),
+  and the page is read by people whose English is a second language, which is
+  a reason for short parallel lines rather than prose. Cards **state**; the
+  rail **teaches**, once (Fleet `WEBUI.md`, Teaching).
+- **Start rows lead with meaning; the command waits behind a toggle** and
+  survives the board's thirty-second refresh, so a disclosure never closes
+  under the reader.
+
 ## Invariants this project keeps
 
 - **No service depends on another to run.** A neighbour that is down is shown
@@ -64,8 +88,13 @@ web view at 4187; PIHTI Log serves from the office PC at 4310.
   recorded in `AGENTS.md`): it is served from the lab Raspberry Pi and read on
   laptops and phones. PIHTI Log's letter proposed loopback as each service's
   default; that remains PIHTI Log's own call for PIHTI Log.
-- **`lab <alias>` is how a service starts.** No second launcher is invented;
-  Lab already knows every alias (`pihti-diagram`, `pihti-log`).
+- **A card says how its service starts, and invents nothing.** Lab knows
+  `pihti-diagram` and `pihti-log`, so those cards carry a `lab` line. Lab has
+  no `controlunit` alias anywhere in this lab: that web server is opened by
+  the rig's own GUI on the Raspberry Pi, and until 0.8.0 the card printed
+  `lab controlunit`, a command nobody can run (queezz, 2026-09-07: "we should
+  teach that the rig's GUI starts the webserver"). A start line is a fact
+  about a machine, never an alias guessed from a name.
 - The PIHTI Log adapter that reads this project stays read-only and never
   calls a device mutation route.
 

@@ -6,7 +6,5 @@
   Done when: queezz names the routes, gauges and nitrogen paths, the JSON matches, and the guide loses its prototype flag.
 - Colour the diagram by predicted vacuum state (which volumes are connected to which pump or gauge) once the `zone-*` groups exist; the guides above are a first pass by design ("make a guide first, not a rule", queezz 2026-09-04), and the proper procedure comes after the colour build.
   Done when: each zone renders a connectivity prediction labelled as such, and the vent guides read the prediction instead of a fixed element list.
-- Back up this diagram's runtime data (`logs.csv`, `elements_state.json`, `operators.json`, the operation-context files) from the Pi to the lab NAS. queezz's leaning on 2026-09-04: automatic, rather than a button on the web UI run from his PC; he copies by hand today. — owner decision pending: automatic on the Pi (a timer copying to the NAS share) or a button on the web UI, and where on the NAS.
-  Stakes: automatic needs the NAS share mounted on the Pi and runs unattended; a button needs nothing on the Pi but only works when someone presses it.
-  Recommendation: automatic, a daily copy from the Pi with the date in the folder name, because the data is tiny and the Pi is always on.
-  Safe default: none; hand copies continue.
+- Name the folder on the lab NAS that this diagram's runtime data (`logs.csv`, `elements_state.json`, `operators.json`, the operation-context files) is copied into, so the Pi can copy there on a daily timer — owner work pending. Automatic from the Pi is settled (owner decision 2026-09-07: "Sure. NAS it is. I'll point you there when I'm in the lab"), so only the address is missing; the Pi also needs the share reachable from it.
+  Done when: queezz gives the NAS path and confirms the Pi can write to it, and a dated daily copy lands there without anyone pressing anything.

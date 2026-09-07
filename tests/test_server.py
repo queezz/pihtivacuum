@@ -41,6 +41,11 @@ def make_app(tmp_path, **overrides):
         "USERS_FILE_ENCRYPTED": tmp_path / "users.json.enc",
         "USERS_KEY_FILE": tmp_path / "users.key",
         "CUDATA_DIRECTORY": str(control_data),
+        # Inside the sandbox, never the operator's own machine-local file: the
+        # default settings path is the repository root, whose gitignored
+        # `settings.json` carries this machine's real neighbour addresses, and
+        # a test that reads it passes or fails by whose PC it runs on.
+        "SETTINGS_FILE": tmp_path / "settings.json",
     }
     config.update(overrides)
     return create_app(config)
@@ -65,9 +70,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.7.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.7.0"}
-    assert b"v0.7.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.8.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.8.0"}
+    assert b"v0.8.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -340,6 +345,16 @@ def test_plot_finds_recordings_by_calendar_day_not_by_one_long_list(client, tmp_
     assert groups[0]["label"].startswith("2026-01-01 · ") and groups[0]["files"][0]["time"] == "12:00:00"
 
 
+def test_pages_carry_this_project_s_own_icon(client):
+    # The inherited .ico was another site's mark, and a tab showing it sent the
+    # reader to the wrong project. The tile is this repository's own drawing.
+    page = client.get("/").data.decode("utf-8")
+    assert 'type="image/svg+xml"' in page and "favicon.svg" in page
+    assert "favicon.ico" not in page
+    icon = client.get("/static/favicon.svg")
+    assert icon.status_code == 200 and b"<svg" in icon.data
+
+
 def test_health_endpoint_keeps_the_ensemble_contract(client):
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -370,8 +385,15 @@ def test_services_board_names_five_states_and_never_guesses(tmp_path):
     assert [row["alias"] for row in rows] == ["pihti-diagram", "pihti-log", "controlunit"]
     assert rows[0]["state"] == "ok" and rows[0]["url"] == ""
     assert rows[1] == {"alias": "pihti-log", "name": "PIHTI Log", "url": "http://log.test:4310",
-                       "state": "ok", "version": "0.20.1", "detail": "a session is open"}
+                       "state": "ok", "version": "0.20.1", "detail": "a session is open",
+                       "start_how": "Start it on the PC that keeps the journal.",
+                       "start_command": "lab pihti-log"}
     assert rows[2]["state"] == "unreachable" and rows[2]["url"] == "http://rig.test:4187"
+    # ControlUnit is started by the rig's own GUI: there is no `lab` alias for
+    # it anywhere in this lab, so the card must offer no command at all.
+    assert rows[2]["start_command"] == ""
+    assert "Raspberry Pi" in rows[2]["start_how"] and "lab" not in rows[2]["start_how"]
+    assert rows[0]["start_how"] == "Already running — this page is it."
     page = client.get("/services").data.decode("utf-8")
     assert "has not been told" not in page and 'id="services-board"' in page
 
@@ -383,6 +405,16 @@ def test_services_board_names_five_states_and_never_guesses(tmp_path):
     from pihti import neighbours
 
     assert neighbours.read_addresses({"NEIGHBOURS": {"pihti-log": {"url": "http://a/"}, "x": 3}}) == {"pihti-log": "http://a"}
+
+    # A machine whose layout differs corrects the sentence in its own settings;
+    # the command stays the tool's, never the machine's.
+    settings = {"NEIGHBOURS": {"controlunit": {"url": "http://a", "start": "Ask the rig operator."}}}
+    assert neighbours.read_starts(settings) == {"controlunit": "Ask the rig operator."}
+    assert neighbours.start_hint("controlunit", "Ask the rig operator.") == ("Ask the rig operator.", "")
+    assert neighbours.start_hint("pihti-log")[1] == "lab pihti-log"
+    local = make_app(tmp_path, NEIGHBOURS=settings["NEIGHBOURS"], NEIGHBOUR_PROBE=lambda url: ("ok", "4.0.0", "acquiring"))
+    board = local.test_client().get("/api/neighbours").json["services"]
+    assert board[2]["start_how"] == "Ask the rig operator." and board[2]["start_command"] == ""
 
 
 def test_missing_plot_folder_has_friendly_notice(tmp_path):

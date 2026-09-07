@@ -611,3 +611,29 @@ details.command pre {
 
 .service-actions { margin: 12px 0 0; }
 .service-actions a.button { width: 100%; }
+
+/* A small pressable control inside a card or a fact row. It keeps the base
+   button's border and fill and only loses padding: a control with no border
+   and no hover state is one nobody can see (fleet WEBUI.md, Controls). */
+button.tiny {
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  vertical-align: baseline;
+}
+
+/* The ensemble rail teaches once, and at a glance: one lead line at full
+   contrast, then the same five chips the cards render, each with its meaning
+   in a few words. The longer explanation waits behind More, so the legend a
+   reader actually scans is never buried under prose. */
+.rail-lead { margin: 0 0 12px; font-size: 0.9rem; color: var(--fg); }
+.rail-sub { margin: 0 0 7px; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+
+.legend { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 7px; }
+.legend li { display: flex; gap: 8px; align-items: baseline; font-size: 0.85rem; color: var(--fg); }
+.legend .state-chip { flex: 0 0 auto; }
+
+#ensemble-detail { margin-top: 10px; }
+
+/* The command sits under its own sentence, so showing it moves nothing. */
+.start-command { display: block; margin-top: 5px; }

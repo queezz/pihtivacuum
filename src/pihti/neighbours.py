@@ -35,6 +35,27 @@ DISPLAY_NAMES = {
     "controlunit": "ControlUnit",
 }
 
+#: How each service is started, in plain words first and a command only where
+#: one exists. ControlUnit has no ``lab`` alias anywhere in this lab: the rig's
+#: own GUI opens its web server, so a card that printed ``lab controlunit``
+#: was naming a command nobody can run. A machine whose layout differs corrects
+#: the sentence in its own settings (``{"controlunit": {"url": ..., "start":
+#: "..."}}``); the command stays this repository's, because it is the tool's.
+START_HINTS = {
+    "pihti-diagram": (
+        "Already running — this page is it.",
+        "lab pihti-diagram",
+    ),
+    "pihti-log": (
+        "Start it on the PC that keeps the journal.",
+        "lab pihti-log",
+    ),
+    "controlunit": (
+        "Start the rig's GUI on its Raspberry Pi; the GUI opens the web server itself.",
+        "",
+    ),
+}
+
 #: Five states, never conflated. ``down`` means something at the address
 #: answered and said so (or refused); ``unreachable`` means nothing answered
 #: from this machine at all; ``not configured`` means this machine was never
@@ -46,22 +67,41 @@ STATE_UNREACHABLE = "unreachable"
 STATE_NOT_CONFIGURED = "not configured"
 
 
-def read_addresses(settings: dict | None) -> dict[str, str]:
-    """Alias -> address from the settings mapping, then the environment."""
+def _neighbour_block(settings: dict | None) -> dict:
+    """The machine-local ``NEIGHBOURS`` mapping, environment first."""
     block = (settings or {}).get("NEIGHBOURS") if isinstance(settings, dict) else None
     if env_value := os.environ.get("PIHTI_NEIGHBOURS"):
         try:
             block = json.loads(env_value)
         except json.JSONDecodeError:
             block = None
-    if not isinstance(block, dict):
-        return {}
+    return block if isinstance(block, dict) else {}
+
+
+def read_addresses(settings: dict | None) -> dict[str, str]:
+    """Alias -> address from the settings mapping, then the environment."""
     addresses: dict[str, str] = {}
-    for alias, value in block.items():
+    for alias, value in _neighbour_block(settings).items():
         url = value.get("url") if isinstance(value, dict) else value
         if isinstance(url, str) and url.strip():
             addresses[str(alias).strip()] = url.strip().rstrip("/")
     return addresses
+
+
+def read_starts(settings: dict | None) -> dict[str, str]:
+    """Alias -> this machine's own correction to the start sentence, if any."""
+    starts: dict[str, str] = {}
+    for alias, value in _neighbour_block(settings).items():
+        start = value.get("start") if isinstance(value, dict) else None
+        if isinstance(start, str) and start.strip():
+            starts[str(alias).strip()] = start.strip()
+    return starts
+
+
+def start_hint(alias: str, override: str = "") -> tuple[str, str]:
+    """``(how, command)`` for one service: plain words first, command second."""
+    how, command = START_HINTS.get(alias, ("", ""))
+    return (override or how), command
 
 
 def read_health(url: str, timeout: float = TIMEOUT_SECONDS) -> tuple[str, str, str]:

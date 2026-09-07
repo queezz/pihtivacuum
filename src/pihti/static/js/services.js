@@ -1,6 +1,12 @@
 /* Services: the three PIHTI surfaces, each with its state as this machine
- * could learn it, a link, and the lab line that starts it. The board asks
- * the server, never a neighbour, so no address travels into the page. */
+ * could learn it, a link, and how to start it. The board asks the server,
+ * never a neighbour, so no address travels into the page.
+ *
+ * A start row leads with plain words and keeps the command behind a toggle
+ * (fleet WEBUI.md, "meaning first; machinery behind a toggle"). Services
+ * started another way carry no command at all: ControlUnit's web server is
+ * opened by the rig's own GUI, and printing a `lab` line for it named a
+ * command nobody can run. */
 (function () {
     "use strict";
 
@@ -16,6 +22,42 @@
         "unreachable": "unreachable",
         "not configured": "not configured",
     };
+
+    /* Which commands the reader has opened. The board re-renders every thirty
+     * seconds, and a disclosure that closed under a reader mid-copy would be
+     * the surface taking back something they pressed, so the set outlives the
+     * cards it dresses. */
+    const opened = new Set();
+
+    /* The command sits under its own sentence; the toggle, the sentence and
+     * the row above them keep one position whether it is shown or hidden. */
+    function startCell(row) {
+        const cell = document.createElement("dd");
+        const how = document.createElement("span");
+        how.textContent = row.start_how || "—";
+        cell.append(how);
+        if (!row.start_command) return cell;
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "tiny";
+        const command = document.createElement("code");
+        command.className = "mono start-command";
+        command.textContent = row.start_command;
+        const draw = () => {
+            const open = opened.has(row.alias);
+            command.hidden = !open;
+            toggle.setAttribute("aria-expanded", String(open));
+            toggle.textContent = open ? "hide command" : "show command";
+        };
+        toggle.addEventListener("click", () => {
+            if (opened.has(row.alias)) opened.delete(row.alias);
+            else opened.add(row.alias);
+            draw();
+        });
+        draw();
+        cell.append(" ", toggle, command);
+        return cell;
+    }
 
     function card(row) {
         const article = document.createElement("article");
@@ -40,7 +82,9 @@
         };
         add("Version", row.version || "—", true);
         add("Says", row.detail || "—");
-        add("Start", `lab ${row.alias}`, true);
+        const startTerm = document.createElement("dt");
+        startTerm.textContent = "Start";
+        facts.append(startTerm, startCell(row));
         const actions = document.createElement("p");
         actions.className = "service-actions";
         if (row.alias === "pihti-diagram") {
@@ -74,6 +118,16 @@
             if (refresh) refresh.disabled = false;
         }
     }
+
+    /* The rail's own disclosure: the legend is always readable, the rest of
+     * the explanation waits behind one press and never moves the legend. */
+    const more = document.getElementById("ensemble-more");
+    const detail = document.getElementById("ensemble-detail");
+    more?.addEventListener("click", () => {
+        detail.hidden = !detail.hidden;
+        more.setAttribute("aria-expanded", String(!detail.hidden));
+        more.textContent = detail.hidden ? "More" : "Less";
+    });
 
     refresh?.addEventListener("click", () => load(true));
     load(false);

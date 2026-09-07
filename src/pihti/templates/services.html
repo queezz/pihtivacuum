@@ -28,9 +28,21 @@
         <button class="drawer-close" type="button">Close</button>
         <section class="rail-card">
             <h2 class="rail-label">The ensemble</h2>
-            <p class="muted">Three PIHTI surfaces run side by side: this diagram, the PIHTI Log journal, and the ControlUnit acquisition. Each one carries this tab, so from any of them you can reach the other two.</p>
-            <p class="muted">No service depends on another to run. Each row is what this machine could learn just now: <strong>ok</strong>, <strong>degraded</strong> or <strong>down</strong> is what the service said of itself; <strong>unreachable</strong> means nothing answered from here within two seconds; <strong>not configured</strong> means this machine was never told the address.</p>
-            <p class="muted" style="margin-bottom: 0;">Start a stopped service on its own machine with the <code>lab</code> line shown on its card.</p>
+            <p class="rail-lead">Your three PIHTI surfaces. Open any one and you can reach the other two.</p>
+            <p class="rail-sub">What a chip means</p>
+            <ul class="legend">
+                <li class="state-ok"><span class="state-chip">ok</span><span>running and healthy</span></li>
+                <li class="state-degraded"><span class="state-chip">degraded</span><span>running, something is off</span></li>
+                <li class="state-down"><span class="state-chip">down</span><span>reached, but not serving</span></li>
+                <li class="state-unreachable"><span class="state-chip">unreachable</span><span>nothing answered from here</span></li>
+                <li class="state-not-configured"><span class="state-chip">not configured</span><span>no address on this machine</span></li>
+            </ul>
+            <button type="button" class="tiny" id="ensemble-more" aria-expanded="false" aria-controls="ensemble-detail">More</button>
+            <div id="ensemble-detail" hidden>
+                <p class="muted">None of the three needs the others to run.</p>
+                <p class="muted">This machine keeps the two addresses in its own settings file; the code carries none.</p>
+                <p class="muted" style="margin-bottom: 0;">Each card says how to start that service, on the machine it runs on.</p>
+            </div>
         </section>
     </aside>
 </div>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Vc, the PIHTI vacuum diagram">
+  <!-- A periodic-table tile rather than a logo: the page's own panel and accent
+       colours, and the symbol drawn as strokes rather than set in a typeface,
+       so no font has to be present for the icon to be itself. -->
+  <rect x="4" y="4" width="56" height="56" rx="13" fill="#161b22" stroke="#7eb8f7" stroke-width="4"/>
+  <g fill="none" stroke="#e4eaf2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="14,20 22,42 30,20"/>
+    <path d="M 48.3 28.7 A 7.5 7.5 0 1 0 48.3 39.3"/>
+  </g>
+</svg>
