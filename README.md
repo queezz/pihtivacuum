@@ -2,21 +2,21 @@
 
 PIHTI is a LAN-native, operator-annotated vacuum-system diagram with state history and control-unit plots. The diagram is an operating aid, not a control panel, pressure measurement, safety interlock, or source of hardware truth.
 
-Current release: **0.13.0**. The same version appears in the navigation bar and at `/version`.
+Current release: **0.14.0**. The same version appears in the navigation bar and at `/version`.
 
 ## What the landing page does
 
 - Shows the existing SVG and operator-entered component states.
-- Records whether the line is configured with a membrane, open pipe, or for boron deposition, and colours the diagram accordingly: only *Pipe open* makes the narrow pipe a route joining both vessels; *Boron deposition* leaves its downstream end a dead end, so the pipe mirrors the plasma vessel alone and never the QMS one. The drawn `Membrane` valve on the probe line follows this same annotation rather than its own press: closed only under *Membrane installed*.
-- Provides prototype `Vent Plasma` and `Vent QMS` guides as numbered circles over the diagram plus an ordered list in the right rail.
+- Records whether the line is configured with a membrane, open pipe, or for boron deposition, and colours the diagram accordingly: only *Pipe open* makes the narrow pipe a route joining both vessels; *Boron deposition* leaves its downstream end a dead end, so the pipe mirrors the plasma vessel alone and never the QMS one. The drawn `Membrane` symbol on the probe line follows this same annotation rather than its own press, and it redraws the moment the annotation changes: a solid plug across the line under *Membrane installed*, an empty dashed outline under the other two, where nothing is mounted there.
+- Provides four operator guides — `Vent Plasma`, `Vent QMS`, `Pump down Plasma` and `Pump down QMS` — as numbered beacons over the diagram plus an ordered list in the right rail. The current step's beacon pulses, under `prefers-reduced-motion: reduce` as well: that setting takes the motion out of the ring, never the beacon itself.
 - Derives completed and next steps from the current diagram state. It never sends device commands.
 - Uses Fleet's web UI grammar: a sticky tab bar, a calm dark palette, and one three-track grid on every page. Controls stand in the left rail, context in the right rail, and the rails never move on scroll. Below 1200 px the same rails open as drawers.
 - History picks a day in the calendar and a moment in the timeline, both in the left rail, and replays the diagram in the main column. The address bar carries the selection, so `/history?at=YYYY-MM-DD HH:MM:SS` is a stable link to a moment.
 - Plot picks a control-unit file in the left rail and states which file and channels the plot shows in the right rail.
 
-The vent sequences live in `src/pihti/static/operationGuides.json` and are intentionally provisional pending hands-on owner correction.
+The four sequences live in `src/pihti/static/operationGuides.json`, in queezz's own words after his review of 2026-09-08. A step names the parts the diagram can check in `targets`; `separates` asks the prediction whether two volumes are still joined, so an isolation step cannot go stale when the plumbing map is corrected; `marks` places a beacon on a part the step names without claiming the diagram can judge it, such as a turbo whose stopping is the operator's own choice. `onlyWhen` gates a step on a fact about this rig that no valve position carries — today only `FLOW_CALIBRATION_PIPE_CONNECTED`, below.
 
-Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. The field and the five state colours are one palette, chosen by measured contrast: the field is a quiet warm stone so the colours are the loudest thing on the page, and every colour clears 3:1 against it while differing in lightness as well as hue. A coloured line is drawn wider than authored — a plain multiple of queezz's own stroke, with a switch in the key under the drawing — and an isolated line is not widened at all. The two vessels, the two bypass tees and the cross take the full state colour as their fill and keep the outline he drew. Each gauge's stem takes the colour of the volume it reads.
+Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. The field and the five state colours are one palette, chosen by measured contrast: the field is a quiet warm stone so the colours are the loudest thing on the page, and every colour clears 3:1 against it while differing in lightness as well as hue. A coloured line is drawn wider than authored — a plain multiple of queezz's own stroke, with a switch in the key under the drawing — and an isolated line is not widened at all. The two vessels, the two bypass tees and the cross take the full state colour as their fill and as their outline, so they read as one colour rather than as an outlined shape (owner decision 2026-09-08: "Color speaks vacuum. Black border speaks... shapes?"); valves, pumps and gauges keep the black he drew, because they are equipment rather than volumes. Each gauge's stem takes the colour of the volume it reads.
 
 Under the drawing, one line per vessel says in words what the prediction finds it joined to: the other vessel, a gas, vent air through a named valve, a pump, or nothing. All of it is a prediction from the entered valve positions, never a measurement.
 
@@ -39,6 +39,10 @@ The server binds to `0.0.0.0:5000` by default, so any laptop or phone on the LAN
 - `PIHTI_OPERATORS_FILE` for the operator roster (default `operators.json` in the data root)
 - `PIHTI_USERS_FILE` and `PIHTI_USERS_KEY_FILE` for the legacy encrypted registry, used only when no roster exists
 - `PIHTI_OPERATOR_TIMEOUT_HOURS` for the operator inactivity window (default 12)
+
+The machine-local `settings.json` (`PIHTI_SETTINGS_FILE`) carries facts about the rig this copy serves, beside `CUDATA_DIRECTORY` and `NEIGHBOURS`:
+
+- `FLOW_CALIBRATION_PIPE_CONNECTED` — `false` by default. When it is `false`, `Vent QMS` says to vent with air; set it to `true` on a rig where the flow-calibration pipe is plugged in and the same guide offers nitrogen through it instead.
 
 Long-running and scratch services belong in Fleet Lab. `PIHTI_DEBUG` is loopback-only.
 

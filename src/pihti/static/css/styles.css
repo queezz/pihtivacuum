@@ -429,11 +429,34 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 .operation-marker.spot circle:not(.halo) { stroke-width: 6; }
 .operation-marker.spot text { font-size: 22px; }
 @keyframes marker-halo {
-  from { r: 18; opacity: 0.9; }
-  to { r: 34; opacity: 0; }
+  from { r: 18px; opacity: 0.9; }
+  to { r: 34px; opacity: 0; }
 }
+/* The beacon that would not pulse, and why (0.14.0, measured in a real browser
+   rather than read off this file). queezz, twice: "No beacon still... BEACON,
+   the pulsing. Yes, not working. I know, I wrote it here. But I wrote it before
+   and you dispatched the fix... to no avail." 0.12.0 repaired the ring's *fill*
+   and the pulse was still dead, because the cause was two rules below it: this
+   block said `animation: none`, and Windows with its animation effects switched
+   off makes Chromium — so Brave — answer **true** to `prefers-reduced-motion:
+   reduce`. Measured live on the work PC with Vent Plasma open: the current
+   step's ring had `getAnimations()` empty, computed `animation-name: none`, and
+   sat frozen at r:26px. That switch is his ordinary desktop setting, not an
+   accessibility need, and a beacon that never moves is not a beacon.
+
+   So `reduce` no longer switches the beacon off; it switches the *motion* off
+   and keeps the beacon. The ring holds one radius — nothing grows, nothing
+   travels across the drawing — and only its opacity breathes, slowly. That is
+   what the media query asks for: less motion, not less information. */
 @media (prefers-reduced-motion: reduce) {
-  .operation-marker.current .halo { animation: none; r: 26; opacity: 0.6; }
+  .operation-marker.current .halo {
+    r: 26px;
+    animation: marker-halo-quiet 2.4s ease-in-out infinite;
+  }
+}
+@keyframes marker-halo-quiet {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.12; }
 }
 
 .guide-steps li { cursor: default; outline-offset: 2px; }

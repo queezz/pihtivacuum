@@ -71,9 +71,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.13.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.13.0"}
-    assert b"v0.13.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.14.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.14.0"}
+    assert b"v0.14.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -106,7 +106,11 @@ def test_every_page_shares_the_rail_grid_and_marks_its_tab(client):
     home = client.get("/").data
     assert b'id="guide-controls"' in home
     assert b'id="guide-steps"' in home
-    assert b"Prototype diagram guidance only" in home
+    # The guides stopped being a prototype when queezz corrected them in his own
+    # words (2026-09-08); the half of the sentence that matters stayed.
+    assert b"Operator guidance only" in home
+    assert b"does not operate hardware or replace an interlock" in home
+    assert b"Prototype" not in home
 
 
 def test_operator_roster_is_plain_names_without_passwords(client, app):
@@ -301,30 +305,137 @@ def test_line_configuration_is_attributed_and_persistent(client, app):
 
 
 def test_operation_guide_targets_exist_and_manual_boundary_is_explicit(client):
+    """Four guides, every part they name really on the drawing, in queezz's shape.
+
+    The vent guides stopped being a prototype on 2026-09-08, when he read the
+    deployed 0.13.0 and corrected them line by line (letter
+    ``20260908-7a3c9ac3-bbd7aa``): the QMS valve and the roughing bypass are not
+    routes between the vessels and left the isolation step; the plasma turbo is
+    the operator's own choice, not a required press; nitrogen comes in through
+    the big manual needle valve on the argon line, never the mass-flow
+    controllers. The two pump-down guides are the inverse, from the same letter.
+    """
     guides = client.get("/operation-guides").json
-    assert guides["prototype"] is True
+    assert guides["prototype"] is False
     svg_root = ET.parse(PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").getroot()
     svg_ids = {element.get("id") for element in svg_root.iter() if element.get("id")}
+    plumbing = client.get("/plumbing").json
+    assert [guide["id"] for guide in guides["guides"]] == [
+        "vent-plasma",
+        "vent-qms",
+        "pump-plasma",
+        "pump-qms",
+    ]
     for guide in guides["guides"]:
         assert guide["steps"][-1]["manual"] is True
         for step in guide["steps"]:
-            targets = step.get("targets") or [{"id": step["targetId"]}]
-            assert targets, step
-            assert all(target["id"] in svg_ids for target in targets), step
-            if not step.get("manual"):
+            targets = step.get("targets") or [{"id": step["targetId"]}] if (
+                step.get("targets") or step.get("targetId")
+            ) else []
+            marks = step.get("marks") or []
+            # A step with no beacon at all is allowed only for a manual one that
+            # says why, so nobody drops a marker by accident.
+            assert targets or marks or (step.get("manual") and step.get("note")), step
+            assert all(target["id"] in svg_ids for target in targets + marks), step
+            if step.get("separates"):
+                # An isolation step asks the prediction, not a list of valves.
+                assert not step.get("desiredStatus"), step
+                assert all(name in plumbing["volumes"] for name in step["separates"]), step
+            elif not step.get("manual"):
                 assert step["desiredStatus"] in {"active", "inactive"}
-    # Owner shape 2026-09-04: ionization gauges off first (Baratron, Pirani and
-    # membrane gauges stay on at one atmosphere), then gate valve with its
-    # turbo, then every route between the two vessels, then nitrogen in
-    # through the gas line: venting means letting N2 in, not just opening up.
+                assert targets, step
     plasma = next(guide for guide in guides["guides"] if guide["id"] == "vent-plasma")
-    ids = [[target["id"] for target in step["targets"]] for step in plasma["steps"]]
+    steps = plasma["steps"]
+    ids = [
+        [target["id"] for target in (step.get("targets") or []) + (step.get("marks") or [])]
+        for step in steps
+    ]
+    # Ionization gauges off first; then the gate valve alone, with the turbo
+    # marked but never demanded ("we can just close the gate. No need to stop
+    # TMP... It's up for the operator to select").
     assert ids[0] == ["bypass-ionization-gauge"]
-    assert ids[1] == ["GVU", "TMPU"]
-    assert "valve_qms" in ids[2] and len(ids[2]) == 4
-    assert ids[3] == ["gaspanel-valve-n", "gasline-main"]
-    assert plasma["steps"][3]["desiredStatus"] == "active"
-    assert "upstream-baratron" not in sum(ids[:4], [])
+    assert [target["id"] for target in steps[1]["targets"]] == ["GVU"]
+    assert [mark["id"] for mark in steps[1]["marks"]] == ["TMPU"]
+    # Isolation is read from the prediction, and the two 0.5.0 guesses are gone.
+    assert steps[2]["separates"] == ["plasma-vessel", "qms-vessel"]
+    assert [mark["id"] for mark in steps[2]["marks"]] == ["GVBU", "GVBD"]
+    assert "valve_qms" not in sum(ids, []) and "Rough-Bypass" not in sum(ids, [])
+    # The valve to bypass pumping is checked, on its own step.
+    assert [target["id"] for target in steps[3]["targets"]] == ["bypass-l2"]
+    assert steps[3]["desiredStatus"] == "inactive"
+    # Nitrogen through the argon line's manual needle valve, four parts not two.
+    assert [target["id"] for target in steps[4]["targets"]] == [
+        "gaspanel-valve-n",
+        "gaspanel-valve-ar",
+        "gasline-ar",
+        "gasline-main",
+    ]
+    assert steps[4]["desiredStatus"] == "active"
+    # The Baratron does not read atmosphere, so it is not the gauge to watch.
+    assert "upstream-baratron" not in sum(ids, [])
+    assert ids[5] == ["upstream-single-gauge"]
+
+    # Vent QMS: one valve is the isolation, and the double isolation is gone.
+    qms = next(guide for guide in guides["guides"] if guide["id"] == "vent-qms")
+    isolate = next(step for step in qms["steps"] if step.get("separates"))
+    assert isolate["separates"] == ["qms-vessel", "plasma-vessel"]
+    assert [mark["id"] for mark in isolate["marks"]] == ["GVBD"]
+
+    # Both pump-downs offer the two ways and name the gauge that reads
+    # atmosphere; neither ever asks for a Baratron.
+    for name in ("pump-plasma", "pump-qms"):
+        guide = next(item for item in guides["guides"] if item["id"] == name)
+        words = " ".join(step["action"] for step in guide["steps"]) + guide["summary"]
+        assert "turbo must never see atmosphere" in guide["summary"]
+        assert "bypass" in words and "----" in words
+        assert "bypass-absolute-gauge" in [
+            target["id"]
+            for step in guide["steps"]
+            for target in (step.get("targets") or []) + (step.get("marks") or [])
+        ]
+        assert "baratron" not in " ".join(
+            target["id"]
+            for step in guide["steps"]
+            for target in (step.get("targets") or []) + (step.get("marks") or [])
+        )
+
+
+def test_a_guide_step_can_wait_on_a_fact_this_rig_alone_knows(client, app, tmp_path):
+    """Nitrogen into the QMS vessel only when the flow-calibration pipe is on.
+
+    queezz, 2026-09-08: "venting the downstream is also better with N2, but the
+    flow calibration pipe is currently disconnected. We can connect." Which it
+    is is a fact about this machine's rig, so it lives in the machine-local
+    settings file, defaults to *disconnected*, and reaches the page with the
+    guides. The page shows one step or the other, never both.
+    """
+    guides = client.get("/operation-guides").json
+    assert guides["facts"]["flow-calibration-pipe-connected"] is False
+    qms = next(guide for guide in guides["guides"] if guide["id"] == "vent-qms")
+    gated = [step for step in qms["steps"] if step.get("onlyWhen")]
+    assert len(gated) == 2
+    assert {step["onlyWhen"]["is"] for step in gated} == {True, False}
+    assert all(
+        step["onlyWhen"]["fact"] == "flow-calibration-pipe-connected" for step in gated
+    )
+    nitrogen = next(step for step in gated if step["onlyWhen"]["is"] is True)
+    assert [mark["id"] for mark in nitrogen["marks"]] == [
+        "gaspanel-valve-n",
+        "gaspanel-valve-ar",
+        "flow-calibration-valve",
+        "GVBD",
+    ]
+    air = next(step for step in gated if step["onlyWhen"]["is"] is False)
+    assert "vent with air" in air["action"] and "good base pressure" in air["action"]
+
+    settings = tmp_path / "settings.json"
+    settings.write_text(
+        json.dumps({"FLOW_CALIBRATION_PIPE_CONNECTED": True}), encoding="utf-8"
+    )
+    app.config["SETTINGS_FILE"] = str(settings)
+    assert client.get("/operation-guides").json["facts"][
+        "flow-calibration-pipe-connected"
+    ] is True
 
 
 def test_plot_finds_recordings_by_calendar_day_not_by_one_long_list(client, tmp_path):
@@ -561,7 +672,10 @@ def test_every_component_has_a_readable_name_and_no_page_prints_a_raw_key(client
     guides = client.get("/operation-guides").json
     for guide in guides["guides"]:
         for step in guide["steps"]:
-            for target in step.get("targets") or [{"id": step["targetId"]}]:
+            # `marks` are beacons the step places without asking the diagram
+            # whether they are right, and they are read out loud in the rail
+            # exactly like a target, so they need a name just as much.
+            for target in (step.get("targets") or []) + (step.get("marks") or []):
                 assert labels.get(target["id"]), target
 
     scripts = Path(PROJECT_ROOT / "src" / "pihti" / "static" / "js")
@@ -1085,9 +1199,21 @@ def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):
     assert prediction["elements"]["qms-vacuum"]["fill"] == colours["isolated"]
     assert prediction["elements"]["bypass-manifold-t-upstream"]["fill"] == colours["high-vacuum"]
     assert prediction["elements"]["probe-pipe-cross"]["fill"] == colours["isolated"]
-    # A body says its state with its body; its outline stays the one he drew.
+    # A body says its state with its body, edge and all. queezz, 2026-09-08:
+    # "I think I'd like it without black shape borders. All one color. Why not?
+    # Color speaks vacuum. Black border speaks... shapes?" So the outline takes
+    # the same colour as the fill and stops reading as an outline; valves,
+    # pumps and gauges keep the black he drew.
     for element_id in bodies:
-        assert "stroke" not in prediction["elements"][element_id], element_id
+        item = prediction["elements"][element_id]
+        assert item["stroke"] == item["fill"], element_id
+    rendered = plumbing_map.style_rules(
+        plumbing,
+        {"TMPU": "active", "GVU": "active", "RoughU": "active", "GVBU": "active"},
+        "membrane",
+    )
+    high = colours["high-vacuum"]
+    assert f"#plasma-vacuum{{stroke:{high} !important;fill:{high} !important}}" in rendered
     assert "fill" not in prediction["elements"]["plasma-vacuum-gate-port"]
     assert "fill" not in prediction["elements"]["upstream-to-downstream-narrow-pipe"]
 
@@ -1274,6 +1400,23 @@ def test_the_guide_beacons_keep_their_ring_under_the_colour_layer():
     # The ring is drawn in the marker's own ink: white vanished on the field
     # that replaced coral.
     assert "stroke: #1c1f26; stroke-width: 3; opacity: 0.9; }" in css
+
+    # 0.14.0, and the reason the 0.12.0 repair above did not make the beacon
+    # pulse: `prefers-reduced-motion: reduce` said `animation: none`, and
+    # Windows with its animation effects switched off makes Chromium — so
+    # Brave — answer true to that query. Measured live: `getAnimations()` empty,
+    # computed `animation-name: none`, the ring frozen. Under reduce the beacon
+    # now keeps a pulse and loses only the motion: one radius, opacity alone.
+    reduced = css.split("@media (prefers-reduced-motion: reduce)")[1].split("}\n}")[0]
+    assert "animation: none" not in reduced
+    assert "marker-halo-quiet" in reduced
+    assert "@keyframes marker-halo-quiet" in css
+    quiet = css.split("@keyframes marker-halo-quiet")[1]
+    assert "r:" not in quiet.split("}\n}")[0], "reduced motion must not move the ring"
+    # A CSS length needs its unit; `r: 18` is not one everywhere.
+    for frame in css.split("@keyframes marker-halo {")[1].split("}")[0].split(";"):
+        if frame.strip().startswith("r:"):
+            assert "px" in frame, frame
     script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
         encoding="utf-8"
     )

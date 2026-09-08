@@ -1,10 +1,11 @@
 {
-    "prototype": true,
+    "note": "The four operator guides, in queezz's own words (review of 2026-09-08, letter 20260908-7a3c9ac3-bbd7aa). A step names its parts by `targets` when the diagram can tell whether it is done, by `separates` when the prediction can answer better than a list of valves, and by `marks` when the step only wants a beacon on the drawing. `onlyWhen` gates a step on a fact about this rig that no valve position can carry; the server sends those facts with this file.",
+    "prototype": false,
     "guides": [
         {
             "id": "vent-plasma",
             "label": "Vent Plasma",
-            "summary": "Bring the plasma vessel to atmosphere with nitrogen, so as little water as possible lands on the walls. Ionization gauges off first; Baratrons, Pirani and the membrane gauge stay on, they work at one atmosphere.",
+            "summary": "Bring the plasma vessel to atmosphere with nitrogen, so as little water as possible lands on the walls. Ionization gauges off first; the Baratrons, the Pirani, the Pfeiffer single gauge and the Ulvac membrane gauge all stay on, they work at one atmosphere.",
             "steps": [
                 {
                     "action": "Switch off the ionization gauges that see the plasma vessel.",
@@ -14,36 +15,45 @@
                     ]
                 },
                 {
-                    "action": "Close the plasma gate valve and stop its turbo pump.",
+                    "action": "Close the plasma gate valve. Whether you stop the turbo is your choice: leave it running and the pump-down afterwards has to go through the bypass.",
                     "desiredStatus": "inactive",
                     "targets": [
-                        {"id": "GVU", "markerOffset": [34, 0]},
+                        {"id": "GVU", "markerOffset": [34, 0]}
+                    ],
+                    "marks": [
                         {"id": "TMPU", "markerOffset": [0, -44]}
                     ]
                 },
                 {
-                    "action": "Isolate the plasma vessel from the QMS vessel on every route between them.",
-                    "desiredStatus": "inactive",
-                    "targets": [
-                        {"id": "valve_qms", "markerOffset": [0, -26]},
+                    "action": "Isolate the plasma vessel from the QMS side. Closing the upstream bypass gate valve is enough on its own; with a membrane installed and the bypass shut you are isolated anyway, and closing the downstream bypass gate valve as well costs nothing.",
+                    "separates": ["plasma-vessel", "qms-vessel"],
+                    "marks": [
                         {"id": "GVBU", "markerOffset": [-30, 0]},
-                        {"id": "GVBD", "markerOffset": [30, 0]},
-                        {"id": "Rough-Bypass", "markerOffset": [0, 26]}
+                        {"id": "GVBD", "markerOffset": [30, 0]}
                     ]
                 },
                 {
-                    "action": "Let nitrogen in: open the N2 valve on the gas panel and the gas line into the plasma vessel.",
+                    "action": "Check the valve to bypass pumping is closed, so the nitrogen does not go down the roughing line.",
+                    "desiredStatus": "inactive",
+                    "targets": [
+                        {"id": "bypass-l2", "markerOffset": [-28, -20]}
+                    ]
+                },
+                {
+                    "action": "Let nitrogen in through the big manual needle valve on the argon line, not the mass-flow controllers: open the nitrogen valve, the argon valve on the gas panel, the argon gas line and the main gas line.",
                     "desiredStatus": "active",
                     "targets": [
                         {"id": "gaspanel-valve-n", "markerOffset": [0, -26]},
+                        {"id": "gaspanel-valve-ar", "markerOffset": [0, -26]},
+                        {"id": "gasline-ar", "markerOffset": [0, 26]},
                         {"id": "gasline-main", "markerOffset": [-30, 0]}
                     ]
                 },
                 {
                     "manual": true,
-                    "action": "Watch the Baratron climb to atmosphere, then open the vessel.",
+                    "action": "Watch the pressure climb to atmosphere on the Pfeiffer single gauge, then open the vessel. The Baratron does not read atmosphere and is not the check.",
                     "targets": [
-                        {"id": "upstream-baratron", "markerOffset": [28, 20]}
+                        {"id": "upstream-single-gauge", "markerOffset": [28, 20]}
                     ]
                 }
             ],
@@ -54,7 +64,7 @@
                 },
                 {
                     "when": [{"id": "TMPU", "status": "active"}, {"id": "GVU", "status": "active"}],
-                    "text": "TMPU is marked running with the plasma gate open. Close the gate before the turbo stops."
+                    "text": "TMPU is marked running with the plasma gate open. Close the gate before any gas goes in."
                 },
                 {
                     "when": [{"id": "gasline-main", "status": "active"}, {"id": "GVU", "status": "active"}],
@@ -65,7 +75,7 @@
         {
             "id": "vent-qms",
             "label": "Vent QMS",
-            "summary": "Bring the QMS vessel to atmosphere with nitrogen. Ionization gauge off first; the Baratron stays on, it works at one atmosphere.",
+            "summary": "Bring the QMS vessel to atmosphere. Ionization gauge off first; the Baratron, the Pirani, the Pfeiffer single gauge and the Ulvac membrane gauge all stay on, they work at one atmosphere.",
             "steps": [
                 {
                     "action": "Switch off the QMS ionization gauge.",
@@ -75,28 +85,44 @@
                     ]
                 },
                 {
-                    "action": "Close the QMS gate valve and stop its turbo pump.",
+                    "action": "Close the QMS gate valve. Whether you stop the turbo is your choice: leave it running and the pump-down afterwards has to go through the bypass.",
                     "desiredStatus": "inactive",
                     "targets": [
-                        {"id": "GVD", "markerOffset": [34, 0]},
+                        {"id": "GVD", "markerOffset": [34, 0]}
+                    ],
+                    "marks": [
                         {"id": "TMPD", "markerOffset": [0, -44]}
                     ]
                 },
                 {
-                    "action": "Isolate the QMS vessel from the plasma vessel on every route between them.",
-                    "desiredStatus": "inactive",
-                    "targets": [
-                        {"id": "valve_qms", "markerOffset": [0, -26]},
-                        {"id": "GVBU", "markerOffset": [-30, 0]},
-                        {"id": "GVBD", "markerOffset": [30, 0]},
-                        {"id": "Rough-Bypass", "markerOffset": [0, 26]}
+                    "action": "Isolate the QMS vessel: close the downstream bypass gate valve. That is the isolation — nothing else needs shutting on this side.",
+                    "separates": ["qms-vessel", "plasma-vessel"],
+                    "marks": [
+                        {"id": "GVBD", "markerOffset": [30, 0]}
                     ]
                 },
                 {
                     "manual": true,
-                    "action": "Let nitrogen into the QMS vessel by its own route, watch the Baratron climb to atmosphere, then open the vessel.",
+                    "onlyWhen": {"fact": "flow-calibration-pipe-connected", "is": true},
+                    "action": "Let nitrogen in through the flow-calibration pipe: the nitrogen valve, the argon valve on the gas panel, the flow-calibration valve, then the downstream bypass gate valve. That route comes in through the downstream bypass gate valve itself, so while the nitrogen is flowing hold the isolation at the upstream bypass gate valve instead.",
+                    "marks": [
+                        {"id": "gaspanel-valve-n", "markerOffset": [0, -26]},
+                        {"id": "gaspanel-valve-ar", "markerOffset": [0, -26]},
+                        {"id": "flow-calibration-valve", "markerOffset": [0, -26]},
+                        {"id": "GVBD", "markerOffset": [30, 26]}
+                    ]
+                },
+                {
+                    "manual": true,
+                    "onlyWhen": {"fact": "flow-calibration-pipe-connected", "is": false},
+                    "action": "The flow-calibration pipe is not plugged in on this rig, so vent with air through the vent valve, slowly. Air is acceptable here: this side is pumped for a long time and comes back to a good base pressure. Nitrogen through the flow-calibration pipe is still the better vent if you connect it.",
+                    "note": "No beacon: the drawing carries no vent valve on the QMS vessel itself, and this guide will not point at a valve queezz has not named. The open question is in .agents/directions.md."
+                },
+                {
+                    "manual": true,
+                    "action": "Watch the pressure climb on the Ulvac absolute gauge on the bypass line, or on the Pfeiffer Pirani, then open the vessel. The Baratron does not read atmosphere and is not the check.",
                     "targets": [
-                        {"id": "downstream-baratron", "markerOffset": [28, 20]}
+                        {"id": "bypass-absolute-gauge", "markerOffset": [28, 20]}
                     ]
                 }
             ],
@@ -107,7 +133,121 @@
                 },
                 {
                     "when": [{"id": "TMPD", "status": "active"}, {"id": "GVD", "status": "active"}],
-                    "text": "TMPD is marked running with the QMS gate open. Close the gate before the turbo stops."
+                    "text": "TMPD is marked running with the QMS gate open. Close the gate before any air goes in."
+                }
+            ]
+        },
+        {
+            "id": "pump-plasma",
+            "label": "Pump down Plasma",
+            "summary": "Take the plasma vessel from atmosphere back to vacuum. The turbo must never see atmosphere, so there are two ways to do it and the choice is yours; the gauge is what says when it is safe to open to the turbo.",
+            "steps": [
+                {
+                    "action": "Shut the gas off and close the vessel up: the main gas line, the argon gas line, the argon valve on the gas panel and the nitrogen valve.",
+                    "desiredStatus": "inactive",
+                    "targets": [
+                        {"id": "gasline-main", "markerOffset": [-30, 0]},
+                        {"id": "gasline-ar", "markerOffset": [0, 26]},
+                        {"id": "gaspanel-valve-ar", "markerOffset": [0, -26]},
+                        {"id": "gaspanel-valve-n", "markerOffset": [0, -26]}
+                    ]
+                },
+                {
+                    "action": "Leave the ionization gauges off until the pressure is low.",
+                    "desiredStatus": "inactive",
+                    "targets": [
+                        {"id": "bypass-ionization-gauge", "markerOffset": [26, -22]}
+                    ]
+                },
+                {
+                    "manual": true,
+                    "action": "Read the pressure before anything opens to a turbo. The Ulvac absolute gauge on the bypass line covers roughly 13 kPa down to about a kPa: \"----\" means over range, which is effectively atmosphere, and a reading near zero is safe to open to the turbo. The Pfeiffer single gauge reads the vessel over the same sort of span. The Baratrons do not read atmosphere and are not the check.",
+                    "targets": [
+                        {"id": "bypass-absolute-gauge", "markerOffset": [28, 20]}
+                    ],
+                    "marks": [
+                        {"id": "upstream-single-gauge", "markerOffset": [28, 20]}
+                    ]
+                },
+                {
+                    "manual": true,
+                    "action": "Choose the way. With the plasma turbo pump stopped: open the plasma gate valve, pump the vessel out through it, and start the turbo once the gauge is low. With the turbo running: rough through the bypass first — the roughing bypass pump on, the valve to bypass pumping and the upstream bypass gate valve open — and open the plasma gate valve only after you have read the gauge.",
+                    "targets": [
+                        {"id": "GVU", "markerOffset": [34, 0]}
+                    ],
+                    "marks": [
+                        {"id": "TMPU", "markerOffset": [0, -44]},
+                        {"id": "GVBU", "markerOffset": [-30, 0]},
+                        {"id": "bypass-l2", "markerOffset": [-28, -20]},
+                        {"id": "Rough-Bypass", "markerOffset": [0, 30]}
+                    ]
+                },
+                {
+                    "manual": true,
+                    "action": "With the vessel pumping and the gate open, switch the ionization gauge back on.",
+                    "targets": [
+                        {"id": "bypass-ionization-gauge", "markerOffset": [26, 24]}
+                    ]
+                }
+            ],
+            "alerts": [
+                {
+                    "when": [{"id": "gasline-main", "status": "active"}],
+                    "text": "The main gas line is still open. Shut the gas off before you start pumping down."
+                }
+            ]
+        },
+        {
+            "id": "pump-qms",
+            "label": "Pump down QMS",
+            "summary": "Take the QMS vessel from atmosphere back to vacuum. The turbo must never see atmosphere, so there are two ways to do it and the choice is yours; the gauge is what says when it is safe to open to the turbo.",
+            "steps": [
+                {
+                    "manual": true,
+                    "action": "Close whatever you vented through and shut the vessel up.",
+                    "marks": [
+                        {"id": "flow-calibration-valve", "markerOffset": [0, -26]}
+                    ]
+                },
+                {
+                    "action": "Leave the QMS ionization gauge off until the pressure is low.",
+                    "desiredStatus": "inactive",
+                    "targets": [
+                        {"id": "downstream-ionization-gauge", "markerOffset": [28, -22]}
+                    ]
+                },
+                {
+                    "manual": true,
+                    "action": "Read the pressure before anything opens to a turbo. The Ulvac absolute gauge on the bypass line covers roughly 13 kPa down to about a kPa: \"----\" means over range, which is effectively atmosphere, and a reading near zero is safe to open to the turbo. The Pfeiffer Pirani reads the same sort of span. The Baratrons do not read atmosphere and are not the check.",
+                    "targets": [
+                        {"id": "bypass-absolute-gauge", "markerOffset": [28, 20]}
+                    ]
+                },
+                {
+                    "manual": true,
+                    "action": "Choose the way. With the QMS turbo pump stopped: open the QMS gate valve, pump the vessel out through it, and start the turbo once the gauge is low. With the turbo running: rough through the bypass first — the roughing bypass pump on, the valve to bypass pumping and the downstream bypass gate valve open — and open the QMS gate valve only after you have read the gauge.",
+                    "targets": [
+                        {"id": "GVD", "markerOffset": [34, 0]}
+                    ],
+                    "marks": [
+                        {"id": "TMPD", "markerOffset": [0, -44]},
+                        {"id": "GVBD", "markerOffset": [30, 0]},
+                        {"id": "bypass-l2", "markerOffset": [-28, -20]},
+                        {"id": "Rough-Bypass", "markerOffset": [0, 30]}
+                    ]
+                },
+                {
+                    "manual": true,
+                    "action": "With the vessel pumping and the gate open, switch the QMS ionization gauge back on.",
+                    "targets": [
+                        {"id": "downstream-ionization-gauge", "markerOffset": [28, 24]}
+                    ]
+                }
+            ],
+            "alerts": [
+                {
+                    "when": [{"id": "flow-calibration-valve", "status": "active"}],
+                    "text": "The flow-calibration valve is still open. Close it before you start pumping down."
                 }
             ]
         }

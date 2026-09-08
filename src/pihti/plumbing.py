@@ -278,14 +278,24 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         # one, so they say their state by their body rather than by an outline.
         # queezz, 2026-09-08: "We can go very loud, why not? Color it the color
         # of the vacuum I say. Or gas. Or air." So the fill is the full state
-        # colour, not a tint of it, and the shape keeps the dark outline he drew
-        # so it still reads. Every other element the map names is a line.
+        # colour, not a tint of it — and the outline takes that same colour,
+        # which is to say it stops being an outline at all. His words on the
+        # drawn result, later the same day: "I think I'd like it without black
+        # shape borders. All one color. Why not? Color speaks vacuum. Black
+        # border speaks... shapes?" Valves, pumps and gauges keep the black he
+        # drew: they are equipment, not volumes. Every other element the map
+        # names is a line, and a line was already in its volume's colour.
         bodies = set(volume.get("junctions") or ())
         if volume.get("vessel"):
             bodies.add(volume["vessel"])
         for element_id in volume.get("elements") or []:
             if element_id in bodies:
-                elements[element_id] = {"volume": name, "state": verdict, "fill": colour}
+                elements[element_id] = {
+                    "volume": name,
+                    "state": verdict,
+                    "fill": colour,
+                    "stroke": colour,
+                }
             else:
                 elements[element_id] = _line(name, verdict, colour, band)
     # A gauge's stem is the short line from its symbol to what it reads, and it

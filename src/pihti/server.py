@@ -740,7 +740,26 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.route("/operation-guides")
     def serve_operation_guides():
-        return send_from_directory(directory=app.static_folder, path="operationGuides.json")
+        """The guides, plus the facts about this rig that are not valve positions.
+
+        A guide step can apply only when something is physically plugged in, and
+        that is a fact about this machine's rig rather than about the drawing:
+        queezz, 2026-09-08, "venting the downstream is also better with N2, but
+        the flow calibration pipe is currently disconnected. We can connect."
+        So it lives in the machine-local settings file beside the control-unit
+        directory, defaults to *disconnected*, and travels to the page with the
+        guides — one guide file serving a rig with that pipe plugged in and a
+        rig without it. Nothing about the diagram is read here, and nothing is
+        written anywhere.
+        """
+        guides = _load_json(Path(app.static_folder) / "operationGuides.json", {})
+        settings = _load_json(Path(app.config["SETTINGS_FILE"]), {})
+        guides["facts"] = {
+            "flow-calibration-pipe-connected": bool(
+                settings.get("FLOW_CALIBRATION_PIPE_CONNECTED", False)
+            ),
+        }
+        return jsonify(guides)
 
     @app.route("/operation-context", methods=["GET", "POST"])
     def operation_context():

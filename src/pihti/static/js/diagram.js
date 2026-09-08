@@ -4,6 +4,12 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
     let elementsConfig = [];
     let guideConfig = {guides: []};
+    /* Facts about this rig that are not valve positions and cannot be read off
+     * the drawing — today, only whether the flow-calibration pipe is plugged in.
+     * They travel with the guides from the server, which reads them from the
+     * machine-local settings file, so one guide file serves a rig with the pipe
+     * connected and a rig without it. */
+    let guideFacts = {};
     let vacuumState = {};
     let activeGuide = null;
     let isInteracting = false;
@@ -175,9 +181,43 @@
         return step.targetId ? [{id: step.targetId, markerOffset: step.markerOffset}] : [];
     }
 
+    /* Everything a step puts a beacon on. `marks` are parts the step wants the
+     * eye sent to without claiming the diagram can tell whether they are right:
+     * the turbo whose stopping is the operator's own choice, the two valves an
+     * isolation step names while the prediction decides whether it is done. */
+    function markerTargets(step) {
+        return stepTargets(step).concat(Array.isArray(step.marks) ? step.marks : []);
+    }
+
+    /* The steps of the active guide that apply on this rig. A step may carry
+     * `onlyWhen: {fact, is}`, and a fact the rig does not have takes the step
+     * off the list entirely — markers and all — rather than leaving an
+     * instruction nobody can follow standing on the page. */
+    function guideSteps() {
+        if (!activeGuide) return [];
+        return (activeGuide.steps || []).filter((step) => {
+            const rule = step.onlyWhen;
+            if (!rule || !rule.fact) return true;
+            return Boolean(guideFacts[rule.fact]) === (rule.is !== false);
+        });
+    }
+
     function guideStepSatisfied(step) {
+        if (step.manual) return false;
+        // A step may ask the *prediction* whether two volumes are still joined,
+        // instead of naming the valves that would join them. The map knows which
+        // valve separates which pair, and `predict()` already walks it — so an
+        // isolation step cannot go stale when the plumbing map is corrected, and
+        // one closed valve that really does isolate finishes the step even if
+        // another route's valve is left open (queezz, 2026-09-08: "GVBU closed,
+        // and we are isolated").
+        if (Array.isArray(step.separates) && step.separates.length === 2) {
+            const item = (lastPrediction?.connections || {})[step.separates[0]];
+            if (!item) return false;
+            return !(item.joined || []).includes(step.separates[1]);
+        }
         const targets = stepTargets(step);
-        return !step.manual && targets.length > 0
+        return targets.length > 0
             && targets.every((target) => normalizedStatus(vacuumState[target.id]) === step.desiredStatus);
     }
 
@@ -200,13 +240,21 @@
     function renderGuideMarkers(stepStates) {
         const svg = document.querySelector("#diagram-container svg");
         if (!svg) return;
-        svg.querySelector("#operation-guide-overlay")?.remove();
+        const existing = svg.querySelector("#operation-guide-overlay");
+        // Rebuilding the overlay restarts the beacon's own animation, and the
+        // five-second refresh rebuilt it whether anything had changed or not —
+        // so the ring was cut off mid-breath twice a cycle. Same guide, same
+        // step states, same markers: leave them alone and let the pulse run.
+        const signature = `${activeGuide ? activeGuide.id : ""}|${stepStates.join(",")}`;
+        if (existing && existing.dataset.signature === signature) return;
+        existing?.remove();
         if (!activeGuide) return;
         const overlay = document.createElementNS(SVG_NS, "g");
         overlay.id = "operation-guide-overlay";
+        overlay.dataset.signature = signature;
         overlay.setAttribute("aria-hidden", "true");
-        activeGuide.steps.forEach((step, index) => {
-            stepTargets(step).forEach((stepTarget) => {
+        guideSteps().forEach((step, index) => {
+            markerTargets(step).forEach((stepTarget) => {
                 const target = svg.querySelector(`#${CSS.escape(stepTarget.id)}`);
                 if (!target) return;
                 const point = rootPointForElement(svg, target, stepTarget.markerOffset);
@@ -254,17 +302,18 @@
         title.textContent = activeGuide.label;
         summary.textContent = activeGuide.summary;
         clear.hidden = false;
-        const satisfied = activeGuide.steps.map(guideStepSatisfied);
+        const steps = guideSteps();
+        const satisfied = steps.map(guideStepSatisfied);
         const currentIndex = satisfied.findIndex((value) => !value);
         const stepStates = satisfied.map((done, index) => done ? "complete" : index === currentIndex ? "current" : "pending");
-        list.replaceChildren(...activeGuide.steps.map((step, index) => {
+        list.replaceChildren(...steps.map((step, index) => {
             const item = document.createElement("li");
             item.className = stepStates[index];
             item.tabIndex = 0;
             const label = document.createElement("span");
             label.textContent = step.action;
             const state = document.createElement("small");
-            const names = stepTargets(step).map((target) => displayName(target.id)).join(", ");
+            const names = markerTargets(step).map((target) => displayName(target.id)).join(", ");
             const word = stepStates[index] === "complete" ? "Done in diagram" : stepStates[index] === "current" ? "Next" : "Later";
             state.textContent = names ? `${word} · ${names}` : word;
             item.append(label, state);
@@ -375,7 +424,14 @@
             const element = document.getElementById(id);
             if (!element) return;
             if (item.fill) {
+                // One colour, body and edge alike. queezz, 2026-09-08: "I think
+                // I'd like it without black shape borders. All one color. Why
+                // not? Color speaks vacuum. Black border speaks... shapes?" So a
+                // vessel, a tee and a cross drop the outline he drew and stand
+                // in the state colour alone. Valves, pumps and gauges keep
+                // theirs: they are equipment, not volumes.
                 element.style.fill = item.fill;
+                if (item.stroke) element.style.stroke = item.stroke;
                 return;
             }
             const authored = widthOf(element);
@@ -391,9 +447,25 @@
             const {id, status} = prediction.linked_valve;
             const element = document.getElementById(id);
             const config = elementsConfig.find((item) => item.id === id);
-            if (element && config) element.style.fill = config.colors[status];
+            if (element && config) {
+                // Present or absent, not merely a different shade of the same
+                // blob. queezz, 2026-09-08: "Membrane. Can't click it. Which may
+                // be fine. But pipe open doesn't change its state." Under
+                // *Membrane installed* the symbol is a solid plug across the
+                // line; under *Pipe open* and *Boron deposition* there is
+                // nothing mounted there, so it is drawn as an empty dashed
+                // outline and the line reads straight through it.
+                const installed = status === "inactive";
+                element.style.fill = installed ? config.colors[status] : "none";
+                element.style.strokeDasharray = installed ? "none" : "5 4";
+                element.style.opacity = installed ? "1" : "0.45";
+            }
         }
         renderConnections(prediction.connections || {});
+        // A guide step may be satisfied by the prediction rather than by a valve
+        // position, so the steps are read again now that this prediction has
+        // landed — `applyState` renders them before it asks for one.
+        renderGuide();
     }
 
     /* The band is a reading aid, not a claim, so it has a switch and the switch
@@ -594,6 +666,13 @@
                 }
                 context = result;
                 renderLineMode(context);
+                // The drawing changes with the configuration, now rather than
+                // whenever the five-second refresh next comes round. queezz,
+                // 2026-09-08: "pipe open doesn't change its state" — measured
+                // on 0.13.0, the membrane symbol was still drawn open six
+                // seconds after the press, and longer in a background tab where
+                // the browser throttles the timer.
+                await fetchAndUpdateStates();
             });
         });
     }
@@ -627,6 +706,7 @@
             fetch("/operation-guides"), fetch("/get_current_user"), fetch("/operation-context")
         ]);
         guideConfig = await guidesResponse.json();
+        guideFacts = guideConfig.facts || {};
         const user = await userResponse.json();
         operatorIdentified = user.is_identified;
         const context = await contextResponse.json();
