@@ -73,9 +73,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.19.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.19.0"}
-    assert b"v0.19.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.19.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.19.1"}
+    assert b"v0.19.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -1860,15 +1860,39 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
     assert min(apart, 360 - apart) >= 90, round(apart, 1)
 
     # And the legend shows enough of each colour to judge it there: a full
-    # swatch rather than a thin bar, and the seven in a row at the top of More.
+    # swatch rather than a thin bar. **One legend, not two** since 0.19.0
+    # (owner, letter 20260908-c03c1788-9def42, on the first build of the rail
+    # card: "Why do we need two legends?"). The chips ARE the swatches, two to
+    # a row so seven fit the rail; the second board of bigger ones inside More
+    # is gone, and so are the thirteen sentences that followed it.
     script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
         encoding="utf-8"
     )
     assert "swatch.style.backgroundColor = colour;" in script
-    assert 'row.className = "vacuum-swatch-row";' in script
-    assert '"vacuum-swatch-big"' in script
-    assert ".vacuum-swatch-row {" in css
-    assert ".vacuum-swatch-big {" in css
+    assert "vacuum-swatch-row" not in script and "vacuum-swatch-row" not in css
+    assert "vacuum-swatch-big" not in script and "vacuum-swatch-big" not in css
+    assert "grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));" in css
+    # One short line per chip behind More, and three for the drawing's rules.
+    for state in json.loads(
+        (PROJECT_ROOT / "src" / "pihti" / "static" / "plumbing.json").read_text(
+            encoding="utf-8"
+        )
+    )["states"]:
+        assert len(state["meaning"].split()) <= 6, state["id"]
+    # Three short lines for the drawing's own rules, where thirteen sentences
+    # and a second swatch board used to stand.
+    rules = script.split("detail.replaceChildren(...lines);")[0].rsplit("].forEach", 1)[0]
+    rules = rules.rsplit("[", 1)[1]
+    assert len([line for line in rules.splitlines() if line.strip().startswith('"')]) == 3
+    # And the thick-pipes switch stands under the chips, above More -- never
+    # buried at the bottom of the prose inside it.
+    assert 'document.getElementById("vacuum-band")' in script
+    assert '" Draw thick pipes"' in script
+    for path in ("index.html", "history.html"):
+        page = (PROJECT_ROOT / "src" / "pihti" / "templates" / path).read_text(
+            encoding="utf-8"
+        )
+        assert page.index('id="vacuum-band"') < page.index('id="vacuum-more"'), path
     # The old thin-bar rule is gone rather than left behind to confuse the next
     # reader: nothing writes a `<i>` inside a swatch any more. The readout under
     # the drawing still did until 0.17.0, and its chips drew empty for it.

@@ -438,56 +438,45 @@
             item.append(swatch, label);
             return item;
         }));
+        // The thick-pipes switch stands directly under the chips and above
+        // More, always visible while the card is open. queezz, 2026-09-09
+        // (letter 20260908-c03c1788-9def42), finding it at the bottom of a
+        // wall of prose inside More: "the thick pipes is too far hidden."
+        const switchHolder = document.getElementById("vacuum-band");
+        if (switchHolder && !switchHolder.children.length) {
+            const label = document.createElement("label");
+            const box = document.createElement("input");
+            box.type = "checkbox";
+            box.id = "pipe-band";
+            label.append(box, document.createTextNode(" Draw thick pipes"));
+            switchHolder.appendChild(label);
+        }
         if (detail) {
-            // The seven in a row at the top of More, big enough to compare one
-            // against another rather than each against the drawing.
-            const row = document.createElement("div");
-            row.className = "vacuum-swatch-row";
-            chips.forEach(([text, colour, hatched]) => {
-                const cell = document.createElement("figure");
-                const block = document.createElement("span");
-                block.className = hatched
-                    ? "vacuum-swatch-big vacuum-swatch--sealed"
-                    : "vacuum-swatch-big";
-                block.style.backgroundColor = colour;
-                const caption = document.createElement("figcaption");
-                caption.textContent = text;
-                cell.append(block, caption);
-                row.appendChild(cell);
-            });
+            // **One legend, not two.** The chips above are the swatches; a
+            // second board of bigger ones inside More was the same information
+            // twice on one card, and the thirteen sentences under it were the
+            // textbook Fleet `WEBUI.md` bounds. queezz: "Why do we need two
+            // legends?... Do we need that much text in a rail card??" So More
+            // holds one short line per chip, from the map's own `meaning`, and
+            // three short lines for the rules the drawing itself follows.
             const meanings = states.map((state) => [state.label, state.meaning]);
             if (held && sample) meanings.push([held.label, held.meaning]);
-            const lines = [row, ...meanings.map(([text, meaning]) => {
+            const lines = meanings.map(([text, meaning]) => {
                 const line = document.createElement("p");
                 line.className = "muted";
                 line.textContent = `${text}: ${meaning}.`;
                 return line;
-            })];
-            // Four sentences, each said once for the whole surface: what a
-            // filled body means, what a two-tone one means, what a valve's own
-            // two inks mean, and what a pump's colour says. Nothing else on the
-            // page explains them again.
+            });
             [
-                "The two vessels, the manifold tees and the cross are filled with the same colour.",
+                "Open valve: the colour running through it. Closed: white, black rim.",
                 "A two-tone body means two things reach it.",
-                "An open valve wears the colour running through it, edge and all; a closed one is white with a black outline, and the colour stops on both sides of it.",
-                "A running pump wears what it is doing, over the black rim it was drawn with; a stopped one is left as drawn, in grey, and its rim and inner lines recede to dark grey.",
-                "A hatched colour means the space is shut and still holding that; the reading above says what, and for how long."
+                "A running pump wears its work; a stopped one keeps its grey."
             ].forEach((sentence) => {
                 const line = document.createElement("p");
                 line.className = "muted";
                 line.textContent = sentence;
                 lines.push(line);
             });
-            const band = document.createElement("p");
-            band.className = "band-switch";
-            const label = document.createElement("label");
-            const box = document.createElement("input");
-            box.type = "checkbox";
-            box.id = "pipe-band";
-            label.append(box, document.createTextNode(" Draw coloured pipes wider"));
-            band.appendChild(label);
-            lines.push(band);
             detail.replaceChildren(...lines);
         }
         if (more && !more.dataset.wired) {

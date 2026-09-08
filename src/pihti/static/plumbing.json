@@ -26,19 +26,19 @@
             "id": "gas",
             "label": "Gas",
             "color": "#a92a9c",
-            "meaning": "a bottle or N2 is open, and its symbol is drawn in the vessel"
+            "meaning": "a bottle is open"
         },
         {
             "id": "upstream-high-vacuum",
             "label": "High vacuum, plasma side",
             "color": "#1f5fd0",
-            "meaning": "a turbo reaches it, and so does the plasma vessel"
+            "meaning": "a turbo, on the plasma side"
         },
         {
             "id": "downstream-high-vacuum",
             "label": "High vacuum, QMS side",
             "color": "#0e8a46",
-            "meaning": "a turbo reaches it, and so does the QMS vessel"
+            "meaning": "a turbo, on the QMS side"
         },
         {
             "id": "rough-vacuum",
@@ -50,14 +50,14 @@
             "id": "isolated",
             "label": "Isolated, unknown",
             "color": "#7f7b75",
-            "meaning": "nothing open to it, and no record of what it last held"
+            "meaning": "nothing open, nothing remembered"
         }
     ],
     "sealed_state": {
         "note": "Sealed off is not a colour of its own; it is one of the six above, remembered, with a date on it. queezz, 2026-09-08 (letter 20260908-2c3d9837-37ab4a): 'Sealed off with good vacuum 3 days ago says something... If we have air/N2 or isolation especially in the main two vessels, we need to keep a date so we can say: ah, that upstream was under N2 for two weeks!' So an isolated volume that has a memory wears the colour of what it was LAST under, hatched, and the readout says what and for how long; `isolated` grey is left for a volume with no memory at all. The hatch was chosen over the lighter treatment the same letter offered because a lighter treatment cannot hold the palette's own 3:1 floor against the stone field: lightening the six by even 20 per cent toward white drops the QMS green to 2.42 and rough vacuum to 2.38, measured. A hatch keeps every coloured pixel at full strength and marks the volume by texture instead, and it is one mechanism for both a filled body and a drawn line.",
         "id": "sealed",
         "label": "Sealed off, holding",
-        "meaning": "closed and holding whatever it was last under; the readout says what, and since when",
+        "meaning": "closed and holding; the reading above says what",
         "sample": "upstream-high-vacuum"
     },
     "memory_note": "What the prediction remembers per volume so it can say 'sealed, was high vacuum, 1 day': the last state it was in while something reached it, the moment it became isolated, and the gas symbols it held if that state was gas. It lives under `_volumes` in `elements_state.json`, beside the valve positions, so it survives a restart; it is rebuilt by replaying `logs.csv` when the state file has none, so a fresh machine still knows; and it is a plain argument to `predict()`, so the practice mode can run the same predictor over its own copy without touching the recorded one.",

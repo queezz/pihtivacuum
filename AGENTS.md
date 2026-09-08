@@ -181,6 +181,18 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
 - Any UI change runs Fleet's Perimeter Walk on a scratch `lab` service before it ships.
 - **No surface shows a person a component key.** A reader sees the equipment's name; `GVU`, `gaspanel-valve-n` and the rest stay in the files, the log and the SVG. The names are the `label` beside each `id` in `static/elementsConfig.json`, read through `window.pihtiElementName` (0.10.0), and History marks a component the current diagram no longer carries rather than passing its recorded key off as a name. Fleet `WEBUI.md`: what a viewer sees is for the viewer.
 - **The top bar wraps; it never overflows.** Below about 470 px the five tabs and the operator selector cannot share one row, so the selector drops to a row of its own at the same right-hand corner and the tabs wrap before they can be pushed off screen (0.10.0, after the Mac audit found the selector clipped at 390 px). One DOM in a different placement — never a second phone-only control. The bar is taller when it wraps, which only rails below the 1199 px breakpoint would care about, and those are fixed drawers rather than sticky rails.
+- **One legend, and the thick-pipes switch is not hidden inside More** (owner
+  correction 2026-09-09, letter `20260908-c03c1788-9def42`, applied in 0.19.1).
+  queezz on the first build of the state card: *"Why do we need two legends?
+  pic 2, the thick pipes is too far hidden. Do we need that much text in a rail
+  card??"* The chips in the card **are** the swatches — two to a row so seven
+  fit a 16 rem rail — and the second board of bigger ones inside More is gone
+  with the thirteen sentences that followed it. More holds one short line per
+  chip, read from the map's own `meaning`, plus three lines for the drawing's
+  own rules; anything longer belongs on a help page, never in a rail card
+  (Fleet `WEBUI.md`, Teaching: the surface states, the rail teaches once at a
+  glance, the rest sits behind one press). The **Draw thick pipes** switch
+  stands directly under the chips and above More, on both pages that draw.
 - **On the Vacuum page the predicted state is a right-rail card; on History the
   key stays under the drawing** (owner order 2026-09-08, letters
   `20260908-aa2558c2-f3d03e` and `20260908-50f93f77-8e8a28`, built in 0.18.0).

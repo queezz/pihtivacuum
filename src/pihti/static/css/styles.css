@@ -913,24 +913,32 @@ button.tiny {
 }
 
 .diagram-legend .rail-lead { margin-bottom: 10px; }
+
+/* **One legend, not two** (owner, 2026-09-09, letter 20260908-c03c1788-9def42,
+   on the first build of the rail card: "Why do we need two legends? ... Do we
+   need that much text in a rail card??"). These chips ARE the swatches: grown
+   to a size a colour can be judged at, the word beside each, two to a row so
+   seven fit a 16rem rail without a wall. The second board of bigger swatches
+   inside More is gone, and so are the thirteen sentences that followed it. */
 .vacuum-legend {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   gap: 6px;
 }
 
 .vacuum-legend li {
   display: flex;
-  gap: 6px;
+  gap: 7px;
   align-items: center;
-  padding: 2px 7px;
+  padding: 4px 7px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--elevated);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.25;
   color: var(--fg);
 }
 
@@ -966,39 +974,6 @@ button.tiny {
   );
 }
 
-/* And the seven in a row at the top of More, on the same ground and big enough
-   to compare one against another rather than each against the drawing. */
-.vacuum-swatch-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 0 0 12px;
-  padding: 10px;
-  border-radius: 8px;
-  background: var(--diagram-ground);
-}
-
-.vacuum-swatch-row figure {
-  margin: 0;
-  display: grid;
-  gap: 4px;
-  justify-items: center;
-  width: 78px;
-}
-
-.vacuum-swatch-big {
-  display: block;
-  width: 100%;
-  height: 34px;
-  border-radius: 4px;
-}
-
-.vacuum-swatch-row figcaption {
-  font-size: 0.7rem;
-  line-height: 1.25;
-  text-align: center;
-  color: #2b2822;
-}
 
 /* The two vessels, as groups rather than as running sentences. queezz asked
    the question on 2026-09-08 — "I'd like to see if upstream and downstream are
@@ -1055,7 +1030,10 @@ button.tiny {
 
 .vacuum-connections b { font-weight: 600; }
 
-#vacuum-legend-detail p.band-switch { margin: 9px 0 0; color: var(--fg); }
+/* The thick-pipes switch sits under the chips and above More, never inside
+   it (owner, 2026-09-09: "the thick pipes is too far hidden"). */
+#vacuum-band { margin: 10px 0 0; color: var(--fg); font-size: 0.82rem; }
+#vacuum-band:empty { display: none; }
 .band-switch label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 
 /* The warning names every volume it found; on a short rail it scrolls inside

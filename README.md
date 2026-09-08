@@ -2,7 +2,7 @@
 
 PIHTI is a LAN-native, operator-annotated vacuum-system diagram with state history and control-unit plots. The diagram is an operating aid, not a control panel, pressure measurement, safety interlock, or source of hardware truth.
 
-Current release: **0.19.0**. The same version appears in the navigation bar and at `/version`.
+Current release: **0.19.1**. The same version appears in the navigation bar and at `/version`.
 
 ## What the landing page does
 
