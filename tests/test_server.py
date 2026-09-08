@@ -73,9 +73,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.17.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.17.1"}
-    assert b"v0.17.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.18.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.18.0"}
+    assert b"v0.18.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -2041,14 +2041,21 @@ def test_each_vessel_says_in_words_what_it_is_joined_to(client):
     ]
 
     # The page renders it, and says once that the whole card is a prediction.
+    # The answer is groups rather than a running sentence since 0.18.0 (owner,
+    # letter 20260908-aa2558c2-f3d03e: "With proper groups, not a long-line
+    # which is a list"), and the row labels are his own order.
     page = client.get("/").data.decode("utf-8")
     assert 'id="vacuum-connections"' in page
     assert page.count("not measured") == 1
     script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
         encoding="utf-8"
     )
-    for phrase in ("Open to the ", "Vent air through the ", "Pumped by the ", "Nothing open to it."):
+    for phrase in ('"Open to"', '"Gas"', '"Vent"', '"Pumped by"', '"Sealed since"',
+                   "Nothing open to it."):
         assert phrase in script, phrase
+    # And nothing writes the old running sentence any more.
+    for gone in ("Open to the ", "Vent air through the ", "Pumped by the "):
+        assert gone not in script, gone
 
 
 def test_a_replayed_moment_uses_the_line_configuration_of_that_moment(tmp_path):
@@ -2090,14 +2097,19 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     stamp = client.get("/history/events").json[-1]["ts"]
     replayed = client.get("/predicted-vacuum", query_string={"at": stamp})
     assert replayed.json["volumes"]["plasma-foreline"] == "air"
-    # The key sits under the drawing on both pages that draw it, and each page
-    # states the prediction once — a second telling is the textbook defect.
+    # Every page that draws the diagram carries the key, and states the
+    # prediction once — a second telling is the textbook defect. Where the key
+    # sits differs by page since 0.18.0: on the Vacuum page it is the right
+    # rail's own state card (owner order, letter 20260908-aa2558c2-f3d03e), and
+    # on History it stays under the drawing, because that page's right rail
+    # already carries its own cargo.
     for path in ("/", "/history"):
         page = client.get(path).data.decode("utf-8")
         assert page.count("Predicted from the valve positions") == 1, path
         assert 'id="vacuum-legend"' in page, path
-        assert 'class="diagram-legend"' in page, path
         assert "measure pressure" not in page, path
+    assert 'class="diagram-legend"' in client.get("/history").data.decode("utf-8")
+    assert 'class="diagram-legend"' not in client.get("/").data.decode("utf-8")
 
 
 def test_an_old_permalink_still_selects_the_renamed_element(tmp_path):
@@ -3068,3 +3080,142 @@ def test_venting_a_backing_line_under_a_stopped_turbo_now_warns(client):
         "membrane",
     )
     assert quiet == []
+
+
+# --- The predicted state moves into the right rail (0.18.0) ------------------
+#
+# queezz, 2026-09-08, on the Predicted state card under the drawing (letter
+# ``20260908-aa2558c2-f3d03e``): "I think the bottom card deserves a proper
+# place in the rail, no? And not hiding in small sizes, shying away. Proper.
+# With proper groups, not a long-line which is a list." Amended the same
+# afternoon (``20260908-50f93f77-8e8a28``): "We should keep the predicted state
+# somewhere, and maybe not hide, but collapse.. Both may benefit from collapse
+# then." And the guide card's own overflow (``20260908-8853f919-4c54b6``): "the
+# right procedure card gets a nasty scroll bar.. Would be nice if we can avoid
+# that."
+
+
+def diagram_script():
+    return (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+
+
+def diagram_styles():
+    return (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_predicted_state_is_a_right_rail_card_on_the_vacuum_page(client):
+    """It stands in the rail with the guide, at every width, in one DOM.
+
+    The rail exists at desktop widths and becomes a drawer below the
+    breakpoint; the card is inside it either way, so no breakpoint can drop it.
+    """
+    page = client.get("/").data.decode("utf-8")
+    rail = page.split('id="guide-steps"', 1)[1].split("</aside>", 1)[0]
+    for marker in (
+        'id="state-card"',
+        'id="state-card-toggle"',
+        'id="state-card-body"',
+        'id="vacuum-compact"',
+        'id="vacuum-connections"',
+        'id="vacuum-legend"',
+        'id="vacuum-more"',
+        'id="guide-card"',
+        'id="guide-card-toggle"',
+        'id="guide-step-list"',
+    ):
+        assert marker in rail, marker
+    # And nothing of it is left under the drawing on this page.
+    main = page.split('class="page-main"', 1)[1].split("</main>", 1)[0]
+    assert "vacuum-connections" not in main
+    assert "diagram-legend" not in main
+    # The drawer button that summons the rail says what is in it now.
+    assert "State &amp; guide" in page
+
+
+def test_both_right_rail_cards_collapse_to_a_headline_and_never_vanish(client):
+    """A collapsed card still says its own headline; neither is ever hidden.
+
+    The state card collapsed is one line per vessel, chip and state word; the
+    guide card collapsed is the guide's name and the current step with its
+    number. The default follows the situation — guide running, guide open and
+    state compact; no guide, state open — and the reader's own press is
+    remembered per browser and wins over it.
+    """
+    page = client.get("/").data.decode("utf-8")
+    assert page.count('class="card-toggle"') == 2
+    assert page.count('aria-expanded="true"') >= 2
+    script = diagram_script()
+    assert 'state: "pihti.rail.stateCard"' in script
+    assert 'guide: "pihti.rail.guideCard"' in script
+    assert 'function renderStateCompact' in script
+    assert 'function renderGuideCompact' in script
+    assert '`Step ${currentIndex + 1} of ${steps.length}' in script
+    # The default: with a guide running the state is compact, with none it is
+    # open, and the guide card is open either way.
+    assert '[["state", !running], ["guide", true]]' in script
+    # A stored choice always wins over the default.
+    assert 'stored === null ? fallback : stored === "open"' in script
+    # Collapsing hides the body and shows the headline, never the other way.
+    assert "body.hidden = !open;" in script
+    assert "if (compact) compact.hidden = open;" in script
+
+
+def test_the_guide_card_folds_before_it_scrolls_and_the_page_never_does(client):
+    """Grow, then fold, then a thin quiet bar — and the rail owns the overflow.
+
+    Three stages in that order, all measured in the rendered DOM rather than
+    counted in rows, plus the floor that stops a crushed card: below it the
+    rail takes the overflow instead, which is Fleet ``WEBUI.md``'s 2026-09-08
+    amendment ("a card the reader opens takes its natural height... when the
+    rail's content is taller than the rail, the *rail* scrolls inside its own
+    box"). The page itself never scrolls for the rail.
+    """
+    script = diagram_script()
+    assert "function fitRail()" in script
+    # 2. Everything but the current step and the one after it may fold.
+    assert 'rows.findIndex((item) => item.classList.contains("current"))' in script
+    assert "new Set(current < 0 ? [] : [current, current + 1])" in script
+    assert 'item.classList.add("folded")' in script
+    # 3. The thin quiet bar, and the floor that stops a crushed card.
+    assert "const STEP_LIST_FLOOR" in script
+    assert "if (capped < STEP_LIST_FLOOR) return;" in script
+    assert 'list.classList.add("guide-steps--scrolls")' in script
+    # Measured after the layout settles, never in the middle of it.
+    assert "function scheduleFit()" in script
+    assert "window.setTimeout(" in script
+    # Exactly one direct call, the scheduler's own: every other caller goes
+    # through `scheduleFit`, so nothing measures a layout that is still moving.
+    assert script.count("fitRail();") == 1
+    assert script.count("scheduleFit();") >= 5
+
+    css = diagram_styles()
+    # The rail scrolls inside its own box, thin and quiet.
+    rail_rule = css.split(".rail {", 1)[1].split("}", 1)[0]
+    assert "overflow-y: auto" in rail_rule
+    assert "scrollbar-width: thin" in rail_rule
+    assert ".guide-steps li.folded" in css
+    assert ".guide-steps--scrolls" in css
+    assert ".rail-card--collapsible { flex: 0 0 auto; }" in css
+    # A card header is a real target under a thumb in the drawer.
+    assert ".card-toggle { padding: 11px 6px; margin: -11px -6px; }" in css
+
+
+def test_the_readout_answers_in_groups_with_his_own_row_labels(client):
+    """Chip and state first, then Open to / Gas / Vent / Pumped by / Sealed since.
+
+    Empty rows are not drawn: a vessel with nothing open to it says so in one
+    line rather than printing four empty labels.
+    """
+    script = diagram_script()
+    assert "function connectionRows(item)" in script
+    assert 'className = "vacuum-group__rows"' in script
+    for label in ('"Open to"', '"Gas"', '"Vent"', '"Pumped by"', '"Sealed since"'):
+        assert label in script, label
+    assert 'nothing.textContent = "Nothing open to it.";' in script
+    css = diagram_styles()
+    assert ".vacuum-group__head" in css
+    assert ".vacuum-group__rows" in css

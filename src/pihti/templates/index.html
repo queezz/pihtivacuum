@@ -29,31 +29,53 @@
     <main class="page-main">
         <div class="rail-toggles" aria-label="Side panels">
             <button type="button" data-drawer="guide-controls" aria-controls="guide-controls" aria-expanded="false">Controls</button>
-            <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">Current guide</button>
+            <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">State &amp; guide</button>
         </div>
         <div id="diagram-container" aria-label="PIHTI vacuum system diagram"></div>
-        <section class="diagram-legend" aria-label="What the drawing predicts">
-            <h2 class="rail-label">Predicted state</h2>
-            <p class="rail-lead">Predicted from the valve positions, not measured.</p>
-            <ul id="vacuum-connections" class="vacuum-connections"></ul>
-            <ul id="vacuum-legend" class="vacuum-legend"></ul>
-            <button type="button" class="tiny" id="vacuum-more" aria-expanded="false" aria-controls="vacuum-legend-detail">More</button>
-            <div id="vacuum-legend-detail" hidden></div>
-        </section>
         <div id="tooltip"></div>
     </main>
 
-    <aside class="rail rail-right" id="guide-steps" aria-label="Current operation guide">
+    {# Both right-rail cards collapse to a headline and never vanish (owner and
+       Commander, 2026-09-08, letters 20260908-aa2558c2-f3d03e and
+       20260908-50f93f77-8e8a28): "I think the bottom card deserves a proper
+       place in the rail, no? And not hiding in small sizes, shying away." The
+       predicted state is context, which is what the right rail is for, and it
+       is here at every width — a card, not a breakpoint casualty. #}
+    <aside class="rail rail-right" id="guide-steps" aria-label="Predicted state and current guide">
         <button class="drawer-close" type="button">Close</button>
-        <section class="rail-card rail-card--growing rail-card--fit">
-            <h2 class="rail-label">Current guide</h2>
-            <h3 id="guide-title">No guide selected</h3>
-            <p id="guide-summary" class="muted">Choose an operation on the left to place numbered steps on the diagram.</p>
-            <div id="guide-alert" class="notice brick guide-alert" role="alert" hidden></div>
-            <div class="scrolls">
-                <ol id="guide-step-list" class="guide-steps"></ol>
+        <section class="rail-card rail-card--collapsible" id="state-card">
+            <h2 class="rail-label">
+                <button type="button" class="card-toggle" id="state-card-toggle"
+                        aria-expanded="true" aria-controls="state-card-body">
+                    <span>Predicted state</span>
+                    <span class="card-toggle__mark" aria-hidden="true"></span>
+                </button>
+            </h2>
+            <ul id="vacuum-compact" class="vacuum-compact" hidden></ul>
+            <div id="state-card-body">
+                <p class="rail-lead">Predicted from the valve positions, not measured.</p>
+                <ul id="vacuum-connections" class="vacuum-connections"></ul>
+                <ul id="vacuum-legend" class="vacuum-legend"></ul>
+                <button type="button" class="tiny" id="vacuum-more" aria-expanded="false" aria-controls="vacuum-legend-detail">More</button>
+                <div id="vacuum-legend-detail" hidden></div>
             </div>
-            <p class="muted" style="margin-top: 12px;">Operator guidance only. It does not operate hardware or replace an interlock.</p>
+        </section>
+        <section class="rail-card rail-card--collapsible" id="guide-card">
+            <h2 class="rail-label">
+                <button type="button" class="card-toggle" id="guide-card-toggle"
+                        aria-expanded="true" aria-controls="guide-card-body">
+                    <span>Current guide</span>
+                    <span class="card-toggle__mark" aria-hidden="true"></span>
+                </button>
+            </h2>
+            <p id="guide-compact" class="card-compact" hidden></p>
+            <div id="guide-card-body">
+                <h3 id="guide-title">No guide selected</h3>
+                <p id="guide-summary" class="muted">Choose an operation on the left to place numbered steps on the diagram.</p>
+                <div id="guide-alert" class="notice brick guide-alert" role="alert" hidden></div>
+                <ol id="guide-step-list" class="guide-steps"></ol>
+                <p class="muted" style="margin-top: 12px;">Operator guidance only. It does not operate hardware or replace an interlock.</p>
+            </div>
         </section>
     </aside>
 </div>

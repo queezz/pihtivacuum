@@ -325,6 +325,9 @@
             alert.hidden = true;
             clear.hidden = true;
             renderGuideMarkers([]);
+            renderGuideCompact([], -1);
+            applyCardDefaults();
+            scheduleFit();
             return;
         }
         title.textContent = activeGuide.label;
@@ -358,6 +361,9 @@
         alert.hidden = !warning;
         alert.textContent = warning ? warning.text : "";
         renderGuideMarkers(stepStates);
+        renderGuideCompact(steps, currentIndex);
+        applyCardDefaults();
+        scheduleFit();
     }
 
     /* The legend teaches the five predicted states once, for the whole page:
@@ -816,34 +822,52 @@
         return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
     }
 
-    /* What the prediction finds each vessel joined to, in words. queezz asked
-     * the question in this order — "if upstream and downstream are connected to
-     * a) each other b) gas c) vent air" — so the sentence answers it in that
-     * order, then names the pumps. It is the same prediction the colours come
-     * from, and the card says once that all of it is predicted, not measured. */
-    function connectionSentence(item) {
-        const clauses = [];
+    /* What the prediction finds each vessel joined to, as labelled rows rather
+     * than as one running sentence. queezz asked the question in this order —
+     * "if upstream and downstream are connected to a) each other b) gas c) vent
+     * air" — and then, reading the answer written out as a long line per vessel
+     * (letter 20260908-aa2558c2-f3d03e): "With proper groups, not a long-line
+     * which is a list."
+     *
+     * So: Open to, Gas, Vent, Pumped by, Sealed since — his own order, with the
+     * pumps last as before, and a row with nothing in it is not drawn at all.
+     * It is the same prediction the colours come from, and the card says once,
+     * at its top, that all of it is predicted rather than measured. */
+    function connectionRows(item) {
+        const rows = [];
         if ((item.joined || []).length) {
-            clauses.push(`Open to the ${joinWords(item.joined.map(
+            rows.push(["Open to", joinWords(item.joined.map(
                 (name) => inSentence(plumbing?.volumes?.[name]?.label || name)
-            ))}.`);
+            ))]);
         }
         if ((item.gas || []).length) {
-            const gases = joinWords(item.gas.map((source) => source.gas));
-            clauses.push(`${gases.charAt(0).toUpperCase()}${gases.slice(1)} ${item.gas.length > 1 ? "are" : "is"} open into it.`);
+            rows.push(["Gas", joinWords(item.gas.map((source) => source.gas))]);
         }
         if ((item.air || []).length) {
-            clauses.push(`Vent air through the ${joinWords(item.air.map(
+            rows.push(["Vent", joinWords(item.air.map(
                 (valve) => inSentence(displayName(valve.id))
-            ))}.`);
+            ))]);
         }
         if ((item.pumps || []).length) {
-            clauses.push(`Pumped by the ${joinWords(item.pumps.map(
+            rows.push(["Pumped by", joinWords(item.pumps.map(
                 (pump) => inSentence(displayName(pump.id))
-            ))}.`);
+            ))]);
         }
-        if (!clauses.length) clauses.push("Nothing open to it.");
-        return clauses.join(" ");
+        return rows;
+    }
+
+    function rowList(rows) {
+        const list = document.createElement("dl");
+        list.className = "vacuum-group__rows";
+        rows.forEach(([label, value]) => {
+            const term = document.createElement("dt");
+            term.textContent = label;
+            const detail = document.createElement("dd");
+            if (value instanceof Node) detail.append(value);
+            else detail.textContent = value;
+            list.append(term, detail);
+        });
+        return list;
     }
 
     /* What a sealed vessel is still holding, said the way queezz said it:
@@ -890,56 +914,286 @@
         return `${hint.bake ? "Consider baking. " : ""}${read}; ${hint.advice || ""}.`;
     }
 
-    function renderConnections(connections) {
-        const list = document.getElementById("vacuum-connections");
-        if (!list) return;
+    /* The state name as it fits a 16rem rail: trimmed at its comma, because
+     * "high vacuum, plasma side" spends the whole line saying what the colour
+     * beside it already says. The legend under the groups carries the full
+     * names, once. */
+    function stateWord(id) {
+        const states = Object.fromEntries((plumbing?.states || []).map((state) => [state.id, state]));
+        return (states[id]?.label || id).split(",")[0].toLowerCase();
+    }
+
+    function stateColour(id) {
+        const states = Object.fromEntries((plumbing?.states || []).map((state) => [state.id, state]));
+        return states[id]?.color || "#000000";
+    }
+
+    function stateSwatch(item) {
+        const held = item.sealed;
+        const swatch = document.createElement("span");
+        swatch.className = held ? "vacuum-swatch vacuum-swatch--sealed" : "vacuum-swatch";
+        // The colour goes on the swatch itself, as it does in the legend. It
+        // used to go on an `<i>` inside it, left from the thin-bar chip the
+        // legend replaced in 0.16.0 — and that `<i>` has had no rule of its own
+        // since, so every chip in this readout was drawing empty.
+        swatch.style.backgroundColor = stateColour(held ? held.was : item.state);
+        return swatch;
+    }
+
+    function emptyReadout() {
         // History carries no prediction until a moment is chosen, and an empty
         // list under a heading reads as "nothing is connected" rather than as
         // "nothing has been asked yet". Say which it is.
+        const empty = document.createElement("li");
+        empty.className = "muted";
+        empty.textContent = window.historyMode
+            ? "Choose a moment in the timeline to read what each vessel was joined to."
+            : "Not read yet.";
+        return empty;
+    }
+
+    function renderConnections(connections) {
+        const list = document.getElementById("vacuum-connections");
+        if (!list) return;
         if (!Object.keys(connections).length) {
-            const empty = document.createElement("li");
-            empty.className = "muted";
-            empty.textContent = window.historyMode
-                ? "Choose a moment in the timeline to read what each vessel was joined to."
-                : "Not read yet.";
-            list.replaceChildren(empty);
+            list.replaceChildren(emptyReadout());
+            renderStateCompact(connections);
+            scheduleFit();
             return;
         }
-        const states = Object.fromEntries((plumbing?.states || []).map((state) => [state.id, state]));
         list.replaceChildren(...Object.values(connections).map((item) => {
             const held = item.sealed;
-            const row = document.createElement("li");
-            const swatch = document.createElement("span");
-            swatch.className = held ? "vacuum-swatch vacuum-swatch--sealed" : "vacuum-swatch";
-            // The colour goes on the swatch itself, as it does in the legend.
-            // It used to go on an `<i>` inside it, left from the thin-bar chip
-            // the legend replaced in 0.16.0 — and that `<i>` has had no rule of
-            // its own since, so every chip in this readout was drawing empty.
-            swatch.style.backgroundColor = held
-                ? states[held.was]?.color || "#000000"
-                : states[item.state]?.color || "#000000";
-            const text = document.createElement("span");
+            const group = document.createElement("li");
+            const head = document.createElement("div");
+            head.className = "vacuum-group__head";
             const name = document.createElement("b");
+            name.textContent = item.label;
+            const word = document.createElement("span");
+            word.className = "vacuum-group__state";
             if (held) {
-                // A shut vessel says what it is holding and since when, not
-                // "isolated, unknown" — that grey is for a volume with no memory
-                // at all. Its own colour, hatched, is beside it.
-                name.append(
-                    `${item.label} — sealed, `,
-                    ...sealedPhrase(held),
-                    `, ${held.duration}.`
-                );
-                text.append(name);
-                if (held.hint) {
-                    text.append(document.createTextNode(` ${sealedHint(held.hint)}`));
-                }
+                // A shut vessel says what it is holding, not "isolated,
+                // unknown" — that grey is for a volume with no memory at all.
+                // Its own colour, hatched, is on the swatch beside it.
+                word.append("sealed, ", ...sealedPhrase(held));
             } else {
-                name.textContent = `${item.label} — ${(states[item.state]?.label || item.state).toLowerCase()}.`;
-                text.append(name, document.createTextNode(` ${connectionSentence(item)}`));
+                word.textContent = stateWord(item.state);
             }
-            row.append(swatch, text);
+            head.append(stateSwatch(item), name, word);
+            group.append(head);
+            const rows = connectionRows(item);
+            if (held) rows.push(["Sealed since", held.duration]);
+            if (rows.length) {
+                group.append(rowList(rows));
+            } else {
+                const nothing = document.createElement("p");
+                nothing.className = "vacuum-group__empty";
+                nothing.textContent = "Nothing open to it.";
+                group.append(nothing);
+            }
+            if (held?.hint) {
+                const hint = document.createElement("p");
+                hint.className = "vacuum-group__hint";
+                hint.textContent = sealedHint(held.hint);
+                group.append(hint);
+            }
+            return group;
+        }));
+        renderStateCompact(connections);
+        scheduleFit();
+    }
+
+    /* -- the two right-rail cards, and how they give ground ---------------- */
+
+    /* Collapsed, the state card is one line per vessel: the colour chip and the
+     * state word, nothing else. queezz and the Commander, 2026-09-08 (letter
+     * 20260908-50f93f77-8e8a28): "We should keep the predicted state somewhere,
+     * and maybe not hide, but collapse." A collapsed card still says what it is
+     * for; it never becomes an empty heading. */
+    function renderStateCompact(connections) {
+        const list = document.getElementById("vacuum-compact");
+        if (!list) return;
+        const items = Object.values(connections || {});
+        if (!items.length) {
+            list.replaceChildren(emptyReadout());
+            return;
+        }
+        list.replaceChildren(...items.map((item) => {
+            const row = document.createElement("li");
+            const name = document.createElement("b");
+            name.textContent = item.label;
+            const word = document.createElement("span");
+            word.className = "vacuum-group__state";
+            word.textContent = item.sealed ? "sealed" : stateWord(item.state);
+            row.append(stateSwatch(item), name, word);
             return row;
         }));
+    }
+
+    /* Collapsed, the guide card is its name and the current step with its
+     * number — the one thing an operator mid-procedure needs to see while the
+     * state card is open. */
+    function renderGuideCompact(steps, currentIndex) {
+        const line = document.getElementById("guide-compact");
+        if (!line) return;
+        line.replaceChildren();
+        if (!activeGuide) {
+            line.textContent = "No guide selected.";
+            return;
+        }
+        const name = document.createElement("b");
+        name.textContent = activeGuide.label;
+        line.append(name);
+        const step = document.createElement("span");
+        step.className = "card-compact__step";
+        step.textContent = currentIndex < 0
+            ? "Every step is done in the diagram."
+            : `Step ${currentIndex + 1} of ${steps.length}: ${steps[currentIndex].action}`;
+        line.append(step);
+    }
+
+    /* Which cards are open. The reader's own press is remembered per browser and
+     * always wins; until one is made, the default follows the situation — with a
+     * guide running the guide is open and the state is compact, with no guide
+     * the state is open (letter 20260908-50f93f77-8e8a28). */
+    const CARD_KEYS = {state: "pihti.rail.stateCard", guide: "pihti.rail.guideCard"};
+    const cardChoice = {state: null, guide: null};
+
+    function readCardChoice(card) {
+        try { return window.localStorage.getItem(CARD_KEYS[card]); } catch (error) { return null; }
+    }
+
+    function writeCardChoice(card, open) {
+        try { window.localStorage.setItem(CARD_KEYS[card], open ? "open" : "collapsed"); }
+        catch (error) { /* a browser that refuses storage still opens and closes */ }
+    }
+
+    function setCardOpen(card, open) {
+        const toggle = document.getElementById(`${card}-card-toggle`);
+        const body = document.getElementById(`${card}-card-body`);
+        if (!toggle || !body) return;
+        toggle.setAttribute("aria-expanded", String(open));
+        body.hidden = !open;
+        const compact = document.getElementById(card === "state" ? "vacuum-compact" : "guide-compact");
+        if (compact) compact.hidden = open;
+    }
+
+    function applyCardDefaults() {
+        const running = Boolean(activeGuide);
+        [["state", !running], ["guide", true]].forEach(([card, fallback]) => {
+            const stored = cardChoice[card];
+            setCardOpen(card, stored === null ? fallback : stored === "open");
+        });
+    }
+
+    function setupRailCards() {
+        Object.keys(CARD_KEYS).forEach((card) => {
+            cardChoice[card] = readCardChoice(card);
+            const toggle = document.getElementById(`${card}-card-toggle`);
+            if (!toggle || toggle.dataset.wired) return;
+            toggle.dataset.wired = "1";
+            toggle.addEventListener("click", () => {
+                const open = toggle.getAttribute("aria-expanded") !== "true";
+                cardChoice[card] = open ? "open" : "collapsed";
+                writeCardChoice(card, open);
+                setCardOpen(card, open);
+                scheduleFit();
+            });
+        });
+        applyCardDefaults();
+    }
+
+    /* Three stages before a scroll bar, in the order queezz asked for them
+     * (letter 20260908-8853f919-4c54b6, on the six-step Vent Plasma card at
+     * about 2000x1540: "the right procedure card gets a nasty scroll bar..
+     * Would be nice if we can avoid that"):
+     *
+     *   1. the card grows to the rail's own height;
+     *   2. still longer, the steps already done fold to one line each and the
+     *      current step and the next stay in full;
+     *   3. only then a bar inside the list, thin and quiet.
+     *
+     * Everything is measured in the rendered DOM rather than counted in rows: a
+     * row count picked from one author's screen caps a list that had room and
+     * leaves one that has none uncapped (Fleet WEBUI-COOKBOOK.md). The page
+     * itself never scrolls for the rail — the rail scrolls inside its own box,
+     * which is the escape valve when both cards are open and long. */
+    const STEP_LIST_FLOOR = 90;
+    let fitPending = false;
+
+    /* Measure after the browser has settled, never in the middle of the change
+     * that provoked it. Measured 2026-09-09: called straight out of a `resize`
+     * or a re-render, the fit read a card height from a layout that was still
+     * moving, stopped folding one step in, and left the rail overflowing — the
+     * same reading a moment later folded four and fitted exactly. One short
+     * timer, one pending flag, and every caller goes through here — a timer
+     * rather than an animation frame, because a browser stops handing out
+     * frames to a tab nobody is looking at, and a rail that only fits itself
+     * while it is on screen is a rail that is wrong the moment you come back
+     * to it. */
+    const FIT_DELAY = 50;
+
+    function scheduleFit() {
+        if (fitPending) return;
+        fitPending = true;
+        window.setTimeout(() => {
+            fitPending = false;
+            fitRail();
+        }, FIT_DELAY);
+    }
+
+    function fitRail() {
+        const rail = document.getElementById("guide-steps");
+        const card = document.getElementById("guide-card");
+        const list = document.getElementById("guide-step-list");
+        if (!rail || !card || !list || !list.children.length) return;
+        list.classList.remove("guide-steps--scrolls");
+        list.style.maxHeight = "";
+        Array.from(list.children).forEach((item) => item.classList.remove("folded"));
+        // A drawer is a full-height panel of its own and the rail's height rule
+        // does not apply there; below the breakpoint the drawer simply scrolls.
+        if (!rail.clientHeight || window.matchMedia("(max-width: 1199px)").matches) return;
+        // A `display: none` child is not a flex item and takes no gap with it,
+        // so both the heights and the gaps are counted from what is really laid
+        // out — the drawer's own Close button is hidden at these widths.
+        const laidOut = Array.from(rail.children).filter((child) => child.getClientRects().length);
+        const others = laidOut
+            .filter((child) => child !== card)
+            .reduce((total, child) => total + child.getBoundingClientRect().height, 0);
+        const gaps = 14 * Math.max(0, laidOut.length - 1);
+        const room = rail.clientHeight - others - gaps;
+        if (card.getBoundingClientRect().height <= room) return;
+        // 2. Fold everything but the current step and the one after it: the
+        // steps already done first, oldest first, then the later ones from the
+        // end backwards. "The current step plus the next stay in full" is his
+        // own wording, and those two are the only ones an operator is about to
+        // act on.
+        const rows = Array.from(list.children);
+        const current = rows.findIndex((item) => item.classList.contains("current"));
+        const keep = new Set(current < 0 ? [] : [current, current + 1]);
+        const foldable = rows
+            .map((item, index) => index)
+            .filter((index) => !keep.has(index))
+            .sort((left, right) => {
+                const done = (index) => rows[index].classList.contains("complete");
+                if (done(left) !== done(right)) return done(left) ? -1 : 1;
+                return done(left) ? left - right : right - left;
+            });
+        foldable.forEach((index) => {
+            if (card.getBoundingClientRect().height <= room) return;
+            const item = rows[index];
+            // A folded step is one line, so its own wording moves to its title
+            // — nothing a reader could need is thrown away.
+            if (!item.title) item.title = item.firstChild?.textContent || "";
+            item.classList.add("folded");
+        });
+        if (card.getBoundingClientRect().height <= room) return;
+        // 3. A thin quiet bar inside the list, and never a crushed card: below
+        // the floor the rail takes the overflow instead.
+        const overflow = card.getBoundingClientRect().height - room;
+        const capped = list.getBoundingClientRect().height - overflow;
+        if (capped < STEP_LIST_FLOOR) return;
+        list.style.maxHeight = `${Math.floor(capped)}px`;
+        list.classList.add("guide-steps--scrolls");
     }
 
     async function refreshPrediction(moment) {
@@ -1146,6 +1400,11 @@
         plumbing = await fetch("/plumbing").then((response) => response.ok ? response.json() : null).catch(() => null);
         renderVacuumLegend();
         setupBandToggle();
+        setupRailCards();
+        // A rail that is measured once at load is measured for one window size.
+        // The reader's window is the one that matters, so the fit is re-run
+        // whenever it changes shape.
+        window.addEventListener("resize", scheduleFit);
         if (window.historyMode) {
             container.style.pointerEvents = "none";
             renderConnections({});

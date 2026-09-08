@@ -153,7 +153,40 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
 - Any UI change runs Fleet's Perimeter Walk on a scratch `lab` service before it ships.
 - **No surface shows a person a component key.** A reader sees the equipment's name; `GVU`, `gaspanel-valve-n` and the rest stay in the files, the log and the SVG. The names are the `label` beside each `id` in `static/elementsConfig.json`, read through `window.pihtiElementName` (0.10.0), and History marks a component the current diagram no longer carries rather than passing its recorded key off as a name. Fleet `WEBUI.md`: what a viewer sees is for the viewer.
 - **The top bar wraps; it never overflows.** Below about 470 px the five tabs and the operator selector cannot share one row, so the selector drops to a row of its own at the same right-hand corner and the tabs wrap before they can be pushed off screen (0.10.0, after the Mac audit found the selector clipped at 390 px). One DOM in a different placement — never a second phone-only control. The bar is taller when it wraps, which only rails below the 1199 px breakpoint would care about, and those are fixed drawers rather than sticky rails.
-- **The key to the drawing lives under the drawing.** It is read, not pressed, so `WEBUI.md`'s rail law puts it in the main column; and measured at a 700px window the right rail is already full — the guide card alone wants its whole 604px with a summary, an alert and five steps. Two attempts at a third rail card were measured out again, one of them painting 113px of the guide's own words over the card below (0.11.0).
+- **On the Vacuum page the predicted state is a right-rail card; on History the
+  key stays under the drawing** (owner order 2026-09-08, letters
+  `20260908-aa2558c2-f3d03e` and `20260908-50f93f77-8e8a28`, built in 0.18.0).
+  queezz: *"I think the bottom card deserves a proper place in the rail, no? And
+  not hiding in small sizes, shying away. Proper. With proper groups, not a
+  long-line which is a list."* The right rail is where context lives, so the
+  state card, the legend swatches and More all moved there, present at every
+  width the rail exists and in the drawer where it does not — never dropped by a
+  breakpoint. What made room for it is the collapse rule below, not a taller
+  rail: the two earlier attempts at a third card were measured out because both
+  cards insisted on their full height at once. **History keeps the key under the
+  drawing**, because that page's right rail already carries its own cargo (the
+  selected moment and the export), and a rail answers for its own tab.
+- **Both right-rail cards collapse to a headline and neither ever vanishes.**
+  Collapsed, the state card is one line per vessel — colour chip and state word;
+  the guide card is the guide's name and the current step with its number. The
+  default follows the situation: with a guide running the guide is open and the
+  state compact, with no guide the state is open. The reader's own press is
+  remembered per browser and always wins over that default. A press on the
+  card's header toggles it, and the header is a thumb-sized target in the drawer.
+- **The guide card grows, then folds, then scrolls — in that order** (owner,
+  2026-09-08, letter `20260908-8853f919-4c54b6`: *"the right procedure card gets
+  a nasty scroll bar.. Would be nice if we can avoid that"*). It takes its
+  natural height first; when the list is still longer than the rail's room,
+  every step but the current one and the one after it folds to a single line
+  (its full wording moving to that row's own title); only then does the list
+  take a thin, quiet bar of its own. Below a floor the card is never crushed —
+  the **rail** takes the overflow and scrolls inside its own box, which is Fleet
+  `WEBUI.md`'s 2026-09-08 amendment. The page never scrolls for the rail.
+  Everything is measured in the rendered DOM, and measured **after** the layout
+  settles: called straight out of a resize the fit read a height from a layout
+  that was still moving, folded one step and stopped, so every caller goes
+  through one short timer and one pending flag. A timer rather than an animation
+  frame, because a browser stops handing frames to a tab nobody is looking at.
 - **Change a static file and you must bump the version**, or a browser that saw the previous release keeps the old copy for a year. Static files are cached by release, everything else is `no-store` (0.9.0). A template writes a static URL with `asset('css/styles.css')`, never `url_for('static', ...)`, and JavaScript that fetches a static file stamps it with `document.body.dataset.assetVersion`. An unstamped or stale-stamped static URL is deliberately uncacheable, so a stale asset cannot outlive its release.
 - The last control-unit plot is served as its own document (`/plot/last.html`) and framed, never injected into the page: Plotly's bundle is measured in megabytes and injecting it froze the tab. `X-Frame-Options` is `SAMEORIGIN` for that frame alone. The served document is prefixed with the frame's own reset, so a plot saved by an older release still fills the frame without white margins.
 - The recording archive travels one month at a time (`/plot/recordings?month=`), never as one payload in the page. A month that has passed does not change, so the answer carries an ETag and is revalidated rather than re-sent.
