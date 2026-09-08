@@ -369,17 +369,29 @@
         const more = document.getElementById("vacuum-more");
         if (!list || !plumbing) return;
         const states = plumbing.states || [];
+        // Sealed off is not a colour of its own; it is any of the six above,
+        // remembered and hatched. So it joins the legend as the seventh chip,
+        // shown on one of them, and its meaning says what the hatch means rather
+        // than naming a colour nothing can ever be (owner correction 2026-09-08,
+        // letters 20260908-fe94c769-493d71 and 20260908-2c3d9837-37ab4a).
+        const held = plumbing.sealed_state;
+        const sample = held
+            && (states.find((state) => state.id === held.sample) || states[0] || {}).color;
         // A full swatch, not a thin bar. queezz, 2026-09-08: "Make the legend
         // chips larger, a full swatch rather than a thin bar, so the colour can
         // be read there at all" — a five-pixel line of colour is not enough of
         // it to judge, and judging it in the legend is the legend's whole job.
-        list.replaceChildren(...states.map((state) => {
+        const chips = states.map((state) => [state.label, state.color, false]);
+        if (held && sample) chips.push([held.label, sample, true]);
+        list.replaceChildren(...chips.map(([text, colour, hatched]) => {
             const item = document.createElement("li");
             const swatch = document.createElement("span");
-            swatch.className = "vacuum-swatch";
-            swatch.style.background = state.color;
+            swatch.className = hatched ? "vacuum-swatch vacuum-swatch--sealed" : "vacuum-swatch";
+            // `backgroundColor`, never the `background` shorthand: the shorthand
+            // resets `background-image`, which is where the sealed hatch lives.
+            swatch.style.backgroundColor = colour;
             const label = document.createElement("span");
-            label.textContent = state.label;
+            label.textContent = text;
             item.append(swatch, label);
             return item;
         }));
@@ -388,20 +400,24 @@
             // against another rather than each against the drawing.
             const row = document.createElement("div");
             row.className = "vacuum-swatch-row";
-            states.forEach((state) => {
+            chips.forEach(([text, colour, hatched]) => {
                 const cell = document.createElement("figure");
                 const block = document.createElement("span");
-                block.className = "vacuum-swatch-big";
-                block.style.background = state.color;
+                block.className = hatched
+                    ? "vacuum-swatch-big vacuum-swatch--sealed"
+                    : "vacuum-swatch-big";
+                block.style.backgroundColor = colour;
                 const caption = document.createElement("figcaption");
-                caption.textContent = state.label;
+                caption.textContent = text;
                 cell.append(block, caption);
                 row.appendChild(cell);
             });
-            const lines = [row, ...states.map((state) => {
+            const meanings = states.map((state) => [state.label, state.meaning]);
+            if (held && sample) meanings.push([held.label, held.meaning]);
+            const lines = [row, ...meanings.map(([text, meaning]) => {
                 const line = document.createElement("p");
                 line.className = "muted";
-                line.textContent = `${state.label}: ${state.meaning}.`;
+                line.textContent = `${text}: ${meaning}.`;
                 return line;
             })];
             // Four sentences, each said once for the whole surface: what a
@@ -412,7 +428,8 @@
                 "The two vessels, the manifold tees and the cross are filled with the same colour.",
                 "A two-tone body means two things reach it.",
                 "An open valve wears the colour running through it, edge and all; a closed one is white with a black outline, and the colour stops on both sides of it.",
-                "A running pump wears what it is doing; a stopped one is left as drawn, in grey."
+                "A running pump wears what it is doing, over the black rim it was drawn with; a stopped one is left as drawn, in grey, and its rim and inner lines recede to dark grey.",
+                "A hatched colour means the space is shut and still holding that; the reading above says what, and for how long."
             ].forEach((sentence) => {
                 const line = document.createElement("p");
                 line.className = "muted";
@@ -494,12 +511,7 @@
      * is used on the shapes and never on a bent pipe. */
     function mixGradient(svg, dominant, contributing) {
         const name = `pihti-mix-${dominant}-${contributing}`.replace(/#/g, "");
-        let defs = svg.querySelector("#pihti-mix-defs");
-        if (!defs) {
-            defs = document.createElementNS(SVG_NS, "defs");
-            defs.id = "pihti-mix-defs";
-            svg.insertBefore(defs, svg.firstChild);
-        }
+        const defs = paintDefs(svg);
         if (!defs.querySelector(`#${CSS.escape(name)}`)) {
             const gradient = document.createElementNS(SVG_NS, "linearGradient");
             gradient.id = name;
@@ -516,6 +528,100 @@
             defs.appendChild(gradient);
         }
         return `url(#${name})`;
+    }
+
+    /* The one defs block this page writes into, so a gradient and a hatch do
+     * not each invent their own. */
+    function paintDefs(svg) {
+        let defs = svg.querySelector("#pihti-mix-defs");
+        if (!defs) {
+            defs = document.createElementNS(SVG_NS, "defs");
+            defs.id = "pihti-mix-defs";
+            svg.insertBefore(defs, svg.firstChild);
+        }
+        return defs;
+    }
+
+    /* The hatch a sealed volume wears over the colour of whatever it is still
+     * holding. queezz, 2026-09-08 (letter 20260908-2c3d9837-37ab4a): "Sealed off
+     * with good vacuum 3 days ago says something." The colour says what is in
+     * there; the texture says nothing is reaching it. Stripes of the drawing's
+     * own ground are cut through the state colour at 45 degrees, so every
+     * coloured pixel keeps its full strength — a lighter tint would have dropped
+     * two of the six below the palette's own 3:1 floor against that ground.
+     *
+     * The same pattern serves a filled body and a drawn line, and it is built
+     * here exactly as `sealed_pattern_markup` builds it for `/state.svg`, from
+     * the same three numbers in the map, so the screen and a saved render cannot
+     * disagree. */
+    function sealedPattern(svg, colour) {
+        const name = `pihti-sealed-${colour}`.replace(/#/g, "");
+        const defs = paintDefs(svg);
+        if (!defs.querySelector(`#${CSS.escape(name)}`)) {
+            const drawing = plumbing?.drawing || {};
+            const ground = drawing.ground || "#e3dfd6";
+            const period = Number(drawing.sealed_period) || 12;
+            const stripe = Number(drawing.sealed_stripe) || 5;
+            const pattern = document.createElementNS(SVG_NS, "pattern");
+            pattern.id = name;
+            pattern.setAttribute("width", String(period));
+            pattern.setAttribute("height", String(period));
+            pattern.setAttribute("patternUnits", "userSpaceOnUse");
+            pattern.setAttribute("patternTransform", "rotate(45)");
+            [[period, colour], [stripe, ground]].forEach(([width, paint]) => {
+                const bar = document.createElementNS(SVG_NS, "rect");
+                bar.setAttribute("width", String(width));
+                bar.setAttribute("height", String(period));
+                bar.setAttribute("fill", paint);
+                pattern.appendChild(bar);
+            });
+            defs.appendChild(pattern);
+        }
+        return `url(#${name})`;
+    }
+
+    /* The paint an element wears: its own colour, or the sealed hatch of that
+     * colour when nothing is reaching the volume any more. */
+    function paintFor(svg, item, colour) {
+        if (!item.sealed_paint || !svg || !colour) return colour;
+        return sealedPattern(svg, colour);
+    }
+
+    /* A bottle symbol split into its letters and its trailing count: H2 -> H, 2.
+     * queezz, 2026-09-08 (letter 20260908-e6ada507-7aa064): "Can we do H2, O2
+     * with a subscript?" Ar and He carry no digit and come back whole. */
+    function splitFormula(symbol) {
+        const match = /^([A-Za-z]+)([0-9]*)$/.exec(symbol || "");
+        return match ? [match[1], match[2]] : [symbol || "", ""];
+    }
+
+    /* The formula written into an SVG text node with a true subscript — a tspan
+     * dropped by a fraction of the mark's own size and drawn smaller, the way
+     * queezz's bottle symbols draw it on his own SVG, never a Unicode subscript
+     * glyph a font may not carry. The same fractions the saved render uses. */
+    function writeFormula(text, symbol, radius) {
+        const [letters, digits] = splitFormula(symbol);
+        text.textContent = letters;
+        if (!digits) return;
+        const sub = document.createElementNS(SVG_NS, "tspan");
+        sub.setAttribute("dy", (radius * 0.22).toFixed(2));
+        sub.setAttribute("font-size", (radius * 0.62).toFixed(2));
+        sub.textContent = digits;
+        text.appendChild(sub);
+    }
+
+    /* And the same formula in ordinary HTML, for the legend and the readout,
+     * where a <sub> is the right element and the browser sizes it. */
+    function formulaHtml(symbol) {
+        const [letters, digits] = splitFormula(symbol);
+        const span = document.createElement("span");
+        span.append(letters);
+        if (digits) {
+            const sub = document.createElement("sub");
+            sub.textContent = digits;
+            span.appendChild(sub);
+        }
+        return span;
     }
 
     /* The bottle symbol, drawn large inside a vessel that is holding that gas.
@@ -538,7 +644,16 @@
             const width = right - left;
             const height = bottom - top;
             const count = item.symbols.length;
-            const radius = Math.max(9, Math.min(width / (2.2 * count), height / 2.6));
+            // The radius travels with the mark, worked out by the same rule that
+            // sizes it in a saved render, so the two can never differ. queezz,
+            // 2026-09-08 (letter 20260908-8eaaa7a9-334955): "The qms-vacuum gas
+            // circle is bigger for some reason" — it was drawn at one absolute
+            // size in both vessels, which is nearly the whole width of the
+            // narrower QMS box. It is a fraction of the smaller side of the body
+            // it sits in now, capped at the widest chamber's own mark.
+            const radius = Number(item.radius) > 0
+                ? Number(item.radius)
+                : Math.max(6, Math.min(width / (2.2 * count), height / 2.6));
             const step = radius * 2.2;
             const middleY = top + height / 2;
             const start = left + width / 2 - step * (count - 1) / 2;
@@ -555,7 +670,7 @@
                 text.setAttribute("text-anchor", "middle");
                 text.setAttribute("dominant-baseline", "central");
                 text.setAttribute("font-size", String(radius * 0.9));
-                text.textContent = symbol;
+                writeFormula(text, symbol, radius);
                 group.append(circle, text);
             });
         });
@@ -570,6 +685,18 @@
         Object.entries(prediction.elements || {}).forEach(([id, item]) => {
             const element = document.getElementById(id);
             if (!element) return;
+            if (item.part) {
+                // The rim and the inner symbol lines of a pump, which are drawn
+                // elements of their own with their own ids: a group's stroke
+                // cannot reach a child that carries its own inline one. queezz,
+                // 2026-09-08 (letter 20260908-e2498698-5c9c50): "we can also
+                // gray out pump edges and lines. Dark gray. So it speaks more
+                // loudly that that is closed." Only the stroke is touched — the
+                // fill and the dashes he drew are his, and clearing either would
+                // repaint his own drawing rather than say something about it.
+                element.style.stroke = item.stroke;
+                return;
+            }
             if (item.valve || item.pump) {
                 // A valve says its position with its body, at every size: an
                 // open one wears the colour flowing through it, a shut one the
@@ -587,9 +714,13 @@
                 // colour of ours at all — it is put back to the grey queezz drew
                 // it in, because that grey already means off (2026-09-08: "Gray
                 // for off was lost. Why? WHY???").
+                //
+                // An open valve inside a sealed space is part of that space and
+                // wears the same hatch: a solid one would read as a route
+                // something is coming through right now.
                 const authoredPaint = fillOf(element);
-                element.style.fill = item.fill || authoredPaint;
-                if (item.stroke) element.style.stroke = item.stroke;
+                element.style.fill = item.fill ? paintFor(svg, item, item.fill) : authoredPaint;
+                if (item.stroke) element.style.stroke = paintFor(svg, item, item.stroke);
                 element.style.strokeDasharray = item.dash || "none";
                 element.style.opacity = typeof item.opacity === "number" ? String(item.opacity) : "";
                 return;
@@ -615,15 +746,20 @@
                 // else: a two-stop fill from the dominant colour to the
                 // contributing one. queezz: "I think the shape gradient is a
                 // good signal. 'You are pumping from two sides, take note'."
-                element.style.fill = item.mix && svg
-                    ? mixGradient(svg, item.fill, item.mix)
-                    : item.fill;
-                if (item.stroke) element.style.stroke = item.stroke;
+                // And a sealed body wears its remembered colour hatched: nothing
+                // is reaching it, which is the whole point of it, so it never
+                // carries a second tone either.
+                element.style.fill = item.sealed
+                    ? paintFor(svg, item, item.fill)
+                    : item.mix && svg
+                        ? mixGradient(svg, item.fill, item.mix)
+                        : item.fill;
+                if (item.stroke) element.style.stroke = paintFor(svg, item, item.stroke);
                 element.style.strokeLinejoin = "round";
                 return;
             }
             const authored = widthOf(element);
-            element.style.stroke = item.stroke;
+            element.style.stroke = paintFor(svg, item, item.stroke);
             // Round caps and joins close the notches a butt end leaves where a
             // gauge stem meets its pipe, without touching the drawing itself
             // (queezz, 2026-09-08: "I see small defect when line is enlarged").
@@ -710,6 +846,48 @@
         return clauses.join(" ");
     }
 
+    /* What a sealed vessel is still holding, said the way queezz said it:
+     * "sealed, was high vacuum, 1 day", "sealed, under nitrogen, 2 weeks",
+     * "sealed, under air, 1 month" (letter 20260908-2c3d9837-37ab4a). The state
+     * name is trimmed at its comma, because "was high vacuum, plasma side, 1
+     * day" has one comma too many to read out loud — which side it was is said
+     * by the colour on the drawing beside it. */
+    function sealedPhrase(held) {
+        if (held.was === "air") return [document.createTextNode("under air")];
+        if (held.was === "gas") {
+            const names = (held.symbols || []).map(
+                (symbol) => (plumbing?.gas_sources || []).find(
+                    (source) => source.symbol === symbol
+                )?.gas
+            ).filter(Boolean);
+            if (names.length) return [document.createTextNode(`under ${joinWords(names)}`)];
+            // No name recorded for it: say the formula, with its subscript.
+            const symbols = (held.symbols || []).map(formulaHtml);
+            if (!symbols.length) return [document.createTextNode("under gas")];
+            const out = [document.createTextNode("under ")];
+            symbols.forEach((span, index) => {
+                if (index) out.push(document.createTextNode(index === symbols.length - 1 ? " and " : ", "));
+                out.push(span);
+            });
+            return out;
+        }
+        const states = Object.fromEntries((plumbing?.states || []).map((state) => [state.id, state]));
+        const label = (states[held.was]?.label || held.was).split(",")[0];
+        return [document.createTextNode(`was ${label.toLowerCase()}`)];
+    }
+
+    /* The operator's next move, from his own three sentences: bake a chamber
+     * that has stood under air or nitrogen too long; read the gauge before
+     * pumping one that has held vacuum, and choose between opening the turbo
+     * straight in and roughing through the bypass first. The gauge is named
+     * because the diagram predicts and the gauge measures. */
+    function sealedHint(hint) {
+        const parts = [hint.text];
+        const gauges = (hint.gauges || []).map((id) => inSentence(displayName(id)));
+        if (gauges.length) parts.push(`On this vessel: the ${joinWords(gauges)}.`);
+        return parts.filter(Boolean).join(" ");
+    }
+
     function renderConnections(connections) {
         const list = document.getElementById("vacuum-connections");
         if (!list) return;
@@ -727,16 +905,36 @@
         }
         const states = Object.fromEntries((plumbing?.states || []).map((state) => [state.id, state]));
         list.replaceChildren(...Object.values(connections).map((item) => {
+            const held = item.sealed;
             const row = document.createElement("li");
             const swatch = document.createElement("span");
-            swatch.className = "vacuum-swatch";
-            const line = document.createElement("i");
-            line.style.background = states[item.state]?.color || "#000000";
-            swatch.appendChild(line);
+            swatch.className = held ? "vacuum-swatch vacuum-swatch--sealed" : "vacuum-swatch";
+            // The colour goes on the swatch itself, as it does in the legend.
+            // It used to go on an `<i>` inside it, left from the thin-bar chip
+            // the legend replaced in 0.16.0 — and that `<i>` has had no rule of
+            // its own since, so every chip in this readout was drawing empty.
+            swatch.style.backgroundColor = held
+                ? states[held.was]?.color || "#000000"
+                : states[item.state]?.color || "#000000";
             const text = document.createElement("span");
             const name = document.createElement("b");
-            name.textContent = `${item.label} — ${(states[item.state]?.label || item.state).toLowerCase()}.`;
-            text.append(name, document.createTextNode(` ${connectionSentence(item)}`));
+            if (held) {
+                // A shut vessel says what it is holding and since when, not
+                // "isolated, unknown" — that grey is for a volume with no memory
+                // at all. Its own colour, hatched, is beside it.
+                name.append(
+                    `${item.label} — sealed, `,
+                    ...sealedPhrase(held),
+                    `, ${held.duration}.`
+                );
+                text.append(name);
+                if (held.hint) {
+                    text.append(document.createTextNode(` ${sealedHint(held.hint)}`));
+                }
+            } else {
+                name.textContent = `${item.label} — ${(states[item.state]?.label || item.state).toLowerCase()}.`;
+                text.append(name, document.createTextNode(` ${connectionSentence(item)}`));
+            }
             row.append(swatch, text);
             return row;
         }));

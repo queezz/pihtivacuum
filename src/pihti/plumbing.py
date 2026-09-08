@@ -11,13 +11,23 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 ISOLATED = "isolated"
-SEALED = "sealed"
 ROUGH = "rough-vacuum"
 AIR = "air"
 GAS = "gas"
+
+#: The one timestamp spelling this project writes everywhere — the same one
+#: ``logs.csv`` carries, so a remembered moment and a history row are the same
+#: kind of thing and can be compared without a second format to remember.
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+#: Where the per-volume memory lives inside ``elements_state.json``, beside the
+#: valve positions. It is not an element id and never will be: every id on the
+#: drawing comes from Inkscape, and none of them starts with an underscore.
+MEMORY_KEY = "_volumes"
 
 
 def load_plumbing(static_folder: str | Path) -> dict:
@@ -276,12 +286,22 @@ def _verdict(
     second ("we have shapes in all important places. plasma-vacuum, bypass
     connector, and qms-vacuum").
 
-    High vacuum takes its colour **from the vessel it is joined to**, which is
-    the whole repair of the glance he reported: with GVU shut and the turbo
-    spinning, the pipe from the closed gate up to the turbo used to wear the
-    same blue as the plasma vessel, so the closed gate read as open. That pipe
-    reaches no vessel at all, so it is ``sealed`` — pumped, and sealed off — and
-    it can never be mistaken for either vessel again.
+    High vacuum takes its colour **from the vessel it is joined to**, and where
+    no vessel is joined, from the vessel the running turbo *serves*.
+
+    **Corrected 2026-09-08** (owner, letter ``20260908-fe94c769-493d71``): the
+    stub between a closed gate and its own turbo used to be a seventh state,
+    ``sealed`` — pumped, sealed off — on the reasoning that it reached no vessel
+    and so could not honestly wear one's colour. queezz took that apart in one
+    sentence: *"between the turbo and its gate, the vacuum is High, not pumped
+    sealed off. Not sealed. Pumped sealed off means I pump, close the valve.
+    Vacuum holds, and degrades per the vessel's leak rate."* A volume with a
+    running pump on it is that pump's state **now**, so the stub is high vacuum
+    in the turbo's own side colour and a running rotary's line is rough. The
+    closed gate — white, with the only black rim on the drawing — is what says
+    the colour does not continue into the vessel; it never needed a colour of
+    its own to say it. *Sealed off* moved to where it belongs, on a volume that
+    is holding what it was last given: see :func:`sealed_readings`.
 
     **Corrected 2026-09-08** (owner, letter ``20260908-aed40a4e-c9a286``, on a
     frame with the plasma vessel vented while the roughing bypass still reached
@@ -313,9 +333,18 @@ def _verdict(
         key=lambda name: volumes[name].get("rank", 99),
     )
     turbo_state = None
-    if turbos:
-        turbo_state = (
-            (volumes[vessels[0]].get("high_vacuum") or ISOLATED) if vessels else SEALED
+    if turbos and vessels:
+        turbo_state = volumes[vessels[0]].get("high_vacuum") or ISOLATED
+    elif turbos:
+        # No vessel in this space: the turbo still says which side it is, from
+        # the vessel it serves — a fact about the rig, not about today's valves.
+        served = sorted(
+            (volumes.get(pump.get("serves")) or {} for pump in turbos),
+            key=lambda side: side.get("rank", 99),
+        )
+        turbo_state = next(
+            (side.get("high_vacuum") for side in served if side.get("high_vacuum")),
+            ISOLATED,
         )
 
     if open_air:
@@ -346,6 +375,213 @@ def _verdict(
     return dominant, mix
 
 
+def _component_gas_symbols(plumbing: dict, state: dict, component: set[str]) -> list[str]:
+    """The bottle symbols open into one continuous space, in map order."""
+    return [
+        source["symbol"]
+        for source in plumbing.get("gas_sources") or []
+        if source.get("symbol")
+        and source["volume"] in component
+        and _is(state, source["id"], "active")
+    ]
+
+
+# -- the memory: what a volume was last under, and since when ---------------
+#
+# queezz, 2026-09-08 (letters `20260908-fe94c769-493d71` and
+# `20260908-2c3d9837-37ab4a`): "Pumped sealed off means I pump, close the valve.
+# Vacuum holds, and degrades per the vessel's leak rate... If we have air/N2 or
+# isolation especially in the main two vessels, we need to keep a date so we can
+# say: 'ah, that upstream was under N2 for two weeks!'"
+#
+# So the prediction needs one thing it never needed before: a memory. It is kept
+# deliberately outside the predictor — passed in as an argument and handed back
+# updated — so `predict` stays what it has always been, state in and prediction
+# out, and the practice mode can run the same walk over its own copy of both.
+
+
+def _parse_moment(value) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.strptime(value.strip().replace("T", " "), TIME_FORMAT)
+    except ValueError:
+        return None
+
+
+def read_memory(state: dict) -> dict:
+    """The per-volume memory carried inside a stored state, or an empty one."""
+    memory = (state or {}).get(MEMORY_KEY)
+    return {
+        name: dict(entry)
+        for name, entry in (memory or {}).items()
+        if isinstance(entry, dict) and entry.get("state")
+    }
+
+
+def update_memory(plumbing: dict, memory: dict | None, prediction: dict, now) -> dict:
+    """The memory after this reading. Pure: a new dict, the old one untouched.
+
+    Two rules and nothing else. While something reaches a volume, the memory is
+    simply *what it holds now*, with no isolation moment. The instant nothing
+    reaches it any more, that moment is stamped on the memory it already had —
+    and never re-stamped, because "since when" means since it was closed, not
+    since the last time anybody looked.
+
+    A volume that is open to the room (``always: "air"``) has no memory: it is
+    not holding anything, it *is* the room.
+    """
+    volumes: dict = plumbing.get("volumes") or {}
+    moment = now if isinstance(now, datetime) else _parse_moment(now)
+    stamp = moment.strftime(TIME_FORMAT) if moment else None
+    out = {
+        name: dict(entry)
+        for name, entry in (memory or {}).items()
+        if name in volumes and not volumes[name].get("always")
+    }
+    for name, volume in volumes.items():
+        if volume.get("always"):
+            continue
+        verdict = (prediction.get("volumes") or {}).get(name, ISOLATED)
+        if verdict != ISOLATED:
+            entry = {"state": verdict, "since": None}
+            symbols = (prediction.get("gases") or {}).get(name) or []
+            if symbols:
+                entry["symbols"] = list(symbols)
+            out[name] = entry
+        else:
+            entry = out.get(name)
+            if entry and entry.get("state") and not entry.get("since") and stamp:
+                entry["since"] = stamp
+    return out
+
+
+def duration_words(seconds: float) -> str:
+    """A span in the units a person says out loud, never in decimals.
+
+    The units are queezz's own three sentences: "that upstream was under N2 for
+    two weeks", "the downstream was under air for a month", "the plasma-vacuum
+    was under HV for a day". So the ladder is hours, then days, then weeks, then
+    months, and it steps up to months at thirty days rather than later — a span
+    he would call a month should not come back as four weeks.
+    """
+    if seconds < 3600:
+        return "less than an hour"
+    hours = seconds / 3600
+    if hours < 24:
+        count = int(hours)
+        return f"{count} hour" if count == 1 else f"{count} hours"
+    days = hours / 24
+    if days < 14:
+        count = int(days)
+        return f"{count} day" if count == 1 else f"{count} days"
+    if days < 30:
+        count = int(days / 7)
+        return f"{count} week" if count == 1 else f"{count} weeks"
+    count = int(days / 30.44) or 1
+    return f"{count} month" if count == 1 else f"{count} months"
+
+
+def hint_thresholds(plumbing: dict) -> dict:
+    """How long is long, in days, from the map rather than from this file."""
+    written = plumbing.get("hint_thresholds") or {}
+    return {
+        "bake_air_days": float(written.get("bake_air_days", 2)),
+        "bake_gas_days": float(written.get("bake_gas_days", 7)),
+        "fresh_vacuum_days": float(written.get("fresh_vacuum_days", 3)),
+    }
+
+
+def _vessel_hint(plumbing: dict, name: str, was: str, days: float, duration: str) -> dict:
+    """What to do about a vessel that has been shut for a while, in his words.
+
+    Drawn from the three sentences queezz wrote (letter
+    ``20260908-2c3d9837-37ab4a``): "Oh no, the downstream was under air for a
+    month! Need to bake!" and "the plasma-vacuum was under HV for a day, check
+    pirani and maybe we can open TMP directly into it. Or start a bypass just to
+    be safe." The gauge is named from the map — the diagram predicts, the gauge
+    measures — and the two ways the pump-down guides offer are answered
+    separately, because the guide's question is *which way*, not *how bad*.
+    """
+    limits = hint_thresholds(plumbing)
+    gauges = [
+        gauge["id"] for gauge in plumbing.get("gauges") or [] if gauge.get("volume") == name
+    ]
+    turbo = next(
+        (pump for pump in plumbing.get("pumps") or [] if pump.get("serves") == name), None
+    )
+    if was == AIR:
+        stale = days >= limits["bake_air_days"]
+    elif was == GAS:
+        stale = days >= limits["bake_gas_days"]
+    else:
+        stale = days > limits["fresh_vacuum_days"]
+    if was in (AIR, GAS):
+        text = "Consider baking." if stale else ""
+        text = (text + " Read the gauge before pumping, and rough through the bypass rather"
+                " than opening a turbo straight onto it.").strip()
+    elif stale:
+        text = (
+            "Read the gauge first, then rough through the bypass to be safe rather than"
+            " opening the turbo straight in."
+        )
+    else:
+        text = (
+            "Read the gauge; opening the turbo directly may be fine, or rough through the"
+            " bypass to be safe."
+        )
+    return {
+        "text": text,
+        "bake": bool(stale and was in (AIR, GAS)),
+        "gauges": gauges,
+        "turbo": turbo["id"] if turbo else None,
+        "duration": duration,
+    }
+
+
+def sealed_readings(
+    plumbing: dict, memory: dict | None, by_volume: dict, state: dict, now=None
+) -> dict:
+    """What each isolated volume is holding, and for how long.
+
+    Only a volume that is isolated *and* remembers something gets a reading;
+    everything else keeps the grey of ``isolated``, which is the absence of a
+    claim and stays that way (queezz: "isolated unknown remains only for a
+    volume with no memory"). ``way`` is the pump-down guides' own question —
+    a vessel whose turbo is still spinning behind its shut gate has to be
+    roughed through the bypass, and one whose turbo is stopped can be opened
+    to the gate and pumped through it.
+    """
+    volumes: dict = plumbing.get("volumes") or {}
+    moment = now if isinstance(now, datetime) else (_parse_moment(now) or datetime.now())
+    readings: dict[str, dict] = {}
+    for name, verdict in by_volume.items():
+        if verdict != ISOLATED or name not in volumes:
+            continue
+        entry = (memory or {}).get(name) or {}
+        was, since = entry.get("state"), _parse_moment(entry.get("since"))
+        if not was or since is None:
+            continue
+        seconds = max(0.0, (moment - since).total_seconds())
+        days = seconds / 86400
+        reading = {
+            "was": was,
+            "since": since.strftime(TIME_FORMAT),
+            "seconds": int(seconds),
+            "duration": duration_words(seconds),
+            "symbols": list(entry.get("symbols") or []),
+        }
+        if volumes[name].get("vessel"):
+            hint = _vessel_hint(plumbing, name, was, days, reading["duration"])
+            turbo_running = bool(hint["turbo"]) and _is(state, hint["turbo"], "active")
+            hint["way"] = "bypass" if turbo_running else "gate"
+            reading["hint"] = hint
+        readings[name] = reading
+    return readings
+
+
 _FAMILY = {"upstream-high-vacuum": "high-vacuum", "downstream-high-vacuum": "high-vacuum"}
 
 
@@ -370,7 +606,13 @@ def _agreed_side(plumbing: dict, sides: list[str]) -> str:
     return sorted(sides, key=lambda side: order.index(side) if side in order else 99)[0]
 
 
-def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
+def predict(
+    plumbing: dict,
+    state: dict,
+    line_mode: str | None = None,
+    memory: dict | None = None,
+    now=None,
+) -> dict:
     """Name the predicted content of every volume, and of every drawn element.
 
     Air beats gas beats high vacuum beats rough vacuum: a volume open to
@@ -392,8 +634,16 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     drawn valve the Line configuration links to itself (the ``Membrane``
     element) cannot disagree with the configuration that governs it, whatever
     ``elements_state.json`` or a historical log says.
+
+    ``memory`` is what each volume was last under and since when, and it is an
+    argument rather than something read from a file here on purpose: this
+    function is still state in, prediction out, so the practice mode can run it
+    over a local copy of both. ``now`` is the clock, for the same reason — a
+    test advances it rather than waiting a fortnight.
     """
     state = apply_line_mode_to_state(plumbing, state, line_mode)
+    if memory is None:
+        memory = read_memory(state)
     volumes: dict = plumbing.get("volumes") or {}
     names = list(volumes)
     divided = _divided_volume(plumbing, line_mode)
@@ -422,12 +672,16 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         edges.append(tuple(joins))
     by_volume: dict[str, str] = {}
     mix_of: dict[str, str] = {}
+    gases_of: dict[str, list[str]] = {}
     for component in _components(list(dict.fromkeys(names)), edges):
         verdict, mix = _verdict(plumbing, state, component, volumes)
+        symbols = _component_gas_symbols(plumbing, state, component)
         for name in component:
             by_volume[name] = verdict
             if mix:
                 mix_of[name] = mix
+            if symbols:
+                gases_of[name] = symbols
 
     if divided:
         # The drawn pipe is one line with a barrier partway along it. It may
@@ -435,14 +689,19 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         sides = [by_volume.pop(stub) for stub in stubs]
         for stub in stubs:
             mix_of.pop(stub, None)
+            gases_of.pop(stub, None)
         by_volume[divided] = _agreed_side(plumbing, sides)
 
     colors = {item["id"]: item["color"] for item in plumbing.get("states") or []}
+    sealed = sealed_readings(plumbing, memory, by_volume, state, now)
     band = float((plumbing.get("drawing") or {}).get("band") or 1)
     elements: dict[str, dict] = {}
     for name, volume in volumes.items():
         verdict = by_volume.get(name, ISOLATED)
-        colour = colors.get(verdict, "#000000")
+        held = sealed.get(name)
+        # A sealed volume wears the colour of what it is still holding, hatched
+        # so it can never be read as a space something is reaching right now.
+        colour = colors.get(held["was"], "#000000") if held else colors.get(verdict, "#000000")
         # A vessel is a volume you can see into, and a T or a cross is a small
         # one, so they say their state by their body rather than by an outline.
         # queezz, 2026-09-08: "We can go very loud, why not? Color it the color
@@ -468,13 +727,20 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
                 }
                 # The two-tone body, and only the body. queezz on the signal:
                 # "I think the shape gradient is a good signal. 'You are pumping
-                # from two sides, take note'."
-                if mix and mix in colors:
+                # from two sides, take note'." A sealed volume never has one:
+                # nothing is reaching it, which is the whole point of it.
+                if held:
+                    body["sealed"] = True
+                    body["sealed_paint"] = _sealed_paint_id(colour)
+                    body["state"] = held["was"]
+                elif mix and mix in colors:
                     body["mix"] = colors[mix]
                     body["mix_state"] = mix
                 elements[element_id] = body
             else:
-                elements[element_id] = _line(name, verdict, colour, band)
+                elements[element_id] = _line(
+                    name, held["was"] if held else verdict, colour, band, sealed=bool(held)
+                )
     # A gauge's stem is the short line from its symbol to what it reads, and it
     # belongs to that volume as much as any pipe does (queezz, 2026-09-08:
     # "all gauges stems don't have colors... If we can work with that, fine").
@@ -484,7 +750,11 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         if not stem or volume_name not in volumes:
             continue
         verdict = by_volume.get(volume_name, ISOLATED)
-        elements[stem] = _line(volume_name, verdict, colors.get(verdict, "#000000"), band)
+        held = sealed.get(volume_name)
+        shown = held["was"] if held else verdict
+        elements[stem] = _line(
+            volume_name, shown, colors.get(shown, "#000000"), band, sealed=bool(held)
+        )
     # A valve says its position with its body, at every size. An open one wears
     # the colour flowing through it; a shut one wears the closed ink, so the
     # colour visibly stops short on both sides and a closed gate can never read
@@ -509,9 +779,10 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
             # either side names the same colour; the barrier cases keep the
             # side the map lists first.
             through = next((name for name in joins if name in by_volume), None)
-            verdict = by_volume.get(through, ISOLATED)
+            held = sealed.get(through)
+            verdict = held["was"] if held else by_volume.get(through, ISOLATED)
             colour = colors.get(verdict, "#000000")
-            elements[valve["id"]] = {
+            item = {
                 "valve": True,
                 "open": True,
                 "volume": through,
@@ -519,6 +790,13 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
                 "fill": colour,
                 "stroke": colour,
             }
+            if held:
+                # An open valve inside a sealed space is part of that space, so
+                # it wears the same hatch: a solid one would read as a route
+                # something is coming through right now.
+                item["sealed"] = True
+                item["sealed_paint"] = _sealed_paint_id(colour)
+            elements[valve["id"]] = item
         else:
             elements[valve["id"]] = {
                 "valve": True,
@@ -546,11 +824,23 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     # Every one of these already had a confirmed on/off an operator presses and
     # history records, and the prediction has always read it: a stopped turbo
     # has never made high vacuum here.
+    #
+    # **And a stopped pump's edges recede with it (2026-09-08, letter
+    # 20260908-e2498698-5c9c50).** queezz, on a running rotary beside a stopped
+    # turbo: "In diagram, we can also gray out pump edges and lines. Dark gray.
+    # So it speaks more loudly that that is closed." So a stopped pump keeps his
+    # grey body and its rim and inner symbol lines go dark grey; a running one
+    # keeps the black rim and lines he drew, over its state colour. The inner
+    # lines are drawn elements of their own with their own ids — `parts` in the
+    # map, checked against the drawing by a test — because a group's stroke
+    # cannot reach a child that carries its own inline one.
+    stopped_edge = drawing.get("pump_stopped_edge") or "#5f5f5f"
     for pump in plumbing.get("pumps") or []:
-        if _is(state, pump["id"], "active"):
+        running = _is(state, pump["id"], "active")
+        if running:
             if pump.get("kind") == "turbo":
                 side = volumes.get(pump.get("serves")) or {}
-                role = side.get("high_vacuum") or SEALED
+                role = side.get("high_vacuum") or ISOLATED
             else:
                 role = ROUGH
             elements[pump["id"]] = {
@@ -561,7 +851,15 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
                 "stroke": "#000000",
             }
         else:
-            elements[pump["id"]] = {"pump": True, "running": False, "state": "stopped"}
+            elements[pump["id"]] = {
+                "pump": True,
+                "running": False,
+                "state": "stopped",
+                "stroke": stopped_edge,
+            }
+        edge = "#000000" if running else stopped_edge
+        for part in pump.get("parts") or []:
+            elements[part] = {"pump": True, "part": pump["id"], "stroke": edge}
     # The drawn valve the Line configuration governs, painted here rather than
     # in the page's JavaScript so `/state.svg` and the screen cannot disagree.
     # Under *Membrane installed* it is a solid plug across the line; under every
@@ -600,40 +898,107 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     connections = _connections(
         plumbing, state, list(dict.fromkeys(names)), edges, by_volume
     )
+    for name, item in connections.items():
+        if name in sealed:
+            item["sealed"] = sealed[name]
     return {
         "volumes": by_volume,
         "mixes": mix_of,
+        "gases": gases_of,
+        "sealed": sealed,
         "elements": elements,
         "air": air,
         "connections": connections,
-        "gas_symbols": _gas_symbols(volumes, connections),
+        "gas_symbols": _gas_symbols(volumes, connections, sealed),
         "line_mode": line_mode or "unknown",
         "linked_valve": linked_valve_status(plumbing, line_mode),
     }
 
 
-def _gas_symbols(volumes: dict, connections: dict) -> list[dict]:
-    """Which bottle symbol to draw large inside which vessel, and how many.
+def _sealed_paint_id(colour: str) -> str:
+    """The name of the hatch pattern for one remembered colour."""
+    return "pihti-sealed-" + colour.replace("#", "")
+
+
+MARK_FRACTION = 0.45
+MARK_FLOOR = 6.0
+
+
+def _mark_cap(volumes: dict) -> float:
+    """The largest a gas mark may ever be: the plasma vessel's own.
+
+    queezz, 2026-09-08 (letter ``20260908-8eaaa7a9-334955``): "The qms-vacuum
+    gas circle is bigger for some reason... the mark's diameter is a fraction of
+    the SMALLER dimension of the vessel body it sits in (about 0.45 of the
+    smaller side, capped at the plasma mark's size)." It used to be one absolute
+    size for both, which is nearly the whole width of the narrower QMS box. The
+    cap is derived rather than typed: it is the smallest of the vessels' own
+    marks, which on this rig is the plasma vessel's, so a vessel can never wear
+    a bigger mark than the widest chamber does.
+    """
+    sizes = [
+        MARK_FRACTION * min(box[2] - box[0], box[3] - box[1]) / 2
+        for volume in volumes.values()
+        for box in [volume.get("symbol_box")]
+        if volume.get("vessel") and box and len(box) == 4
+    ]
+    return min(sizes) if sizes else MARK_FLOOR
+
+
+def mark_radius(box: list, count: int, cap: float) -> float:
+    """How big one gas mark is inside one vessel body, with several in a row."""
+    left, top, right, bottom = (float(value) for value in box)
+    width, height = right - left, bottom - top
+    radius = min(MARK_FRACTION * min(width, height) / 2, cap)
+    if count > 1:
+        radius = min(radius, width / (2.2 * count))
+    return max(MARK_FLOOR, radius)
+
+
+def _gas_symbols(
+    volumes: dict, connections: dict, sealed: dict | None = None
+) -> list[dict]:
+    """Which bottle symbol to draw inside which vessel, how many, and how big.
 
     queezz, 2026-09-08: "for the gas fill, we can put a gas in a circle (same as
     the bottle sign) inside the plasma vessel. Ar, O2, H2. So it's visible big
-    at a glance." Only a vessel whose predicted state is *gas* carries one, one
-    circle per gas open into it, and the symbol is the one written beside that
-    bottle in the map rather than derived from its name.
+    at a glance." A vessel whose predicted state is *gas* carries one circle per
+    gas open into it, and the symbol is the one written beside that bottle in
+    the map rather than derived from its name.
+
+    **A vessel that is sealed under a gas keeps its marks** (2026-09-08): the
+    bottle is shut, but the vessel is still full of nitrogen, and that is
+    exactly the thing his sentence wanted to see at a glance — "ah, that
+    upstream was under N2 for two weeks!"
+
+    The radius travels with the mark so the page and ``/state.svg`` cannot size
+    them differently.
     """
+    cap = _mark_cap(volumes)
     drawn = []
     for name, item in connections.items():
-        if item.get("state") != "gas":
-            continue
         volume = volumes.get(name) or {}
         element = volume.get("vessel")
         box = volume.get("symbol_box")
-        symbols = [
-            source["symbol"] for source in item.get("gas") or [] if source.get("symbol")
-        ]
+        held = (sealed or {}).get(name) or {}
+        if item.get("state") == "gas":
+            symbols = [
+                source["symbol"] for source in item.get("gas") or [] if source.get("symbol")
+            ]
+        elif held.get("was") == GAS:
+            symbols = [symbol for symbol in held.get("symbols") or [] if symbol]
+        else:
+            continue
         if element and box and symbols:
             drawn.append(
-                {"volume": name, "element": element, "box": box, "symbols": symbols}
+                {
+                    "volume": name,
+                    "element": element,
+                    "box": box,
+                    "symbols": symbols,
+                    "radius": round(mark_radius(box, len(symbols), cap), 2),
+                    "sealed": bool(held),
+                }
             )
     return drawn
 
@@ -733,7 +1098,9 @@ def press_warnings(
     ]
 
 
-def _line(volume: str, verdict: str, colour: str, band: float) -> dict:
+def _line(
+    volume: str, verdict: str, colour: str, band: float, sealed: bool = False
+) -> dict:
     """A drawn line in its volume's colour, and how much wider to draw it.
 
     The band is a solid widening of the pipe's own stroke, never a translucent
@@ -744,6 +1111,9 @@ def _line(volume: str, verdict: str, colour: str, band: float) -> dict:
     item = {"volume": volume, "state": verdict, "stroke": colour}
     if verdict != ISOLATED and band > 1:
         item["band"] = band
+    if sealed:
+        item["sealed"] = True
+        item["sealed_paint"] = _sealed_paint_id(colour)
     return item
 
 
@@ -888,7 +1258,7 @@ def _element_tag(svg_text: str, element_id: str) -> str | None:
 
 
 def overlay_markup(
-    plumbing: dict, state: dict, line_mode: str | None, svg_text: str
+    plumbing: dict, state: dict, line_mode: str | None, svg_text: str, now=None
 ) -> str:
     """The gradients and gas symbols a saved render needs, as SVG markup.
 
@@ -898,26 +1268,30 @@ def overlay_markup(
     from the same prediction the page paints from, so ``/state.svg`` and the
     screen it was saved from still cannot disagree.
     """
-    prediction = predict(plumbing, state, line_mode)
+    prediction = predict(plumbing, state, line_mode, now=now)
     parts = []
+    definitions = []
     gradients = {
         _mix_gradient_id(item["fill"], item["mix"]): (item["fill"], item["mix"])
         for item in prediction["elements"].values()
         if item.get("mix") and _safe_color(item.get("fill")) and _safe_color(item["mix"])
     }
-    if gradients:
-        stops = "".join(
-            f'<linearGradient id="{name}" x1="0" y1="0" x2="1" y2="0">'
-            f'<stop offset="0" stop-color="{dominant}"/>'
-            f'<stop offset="1" stop-color="{contributing}"/></linearGradient>'
-            for name, (dominant, contributing) in sorted(gradients.items())
-        )
-        parts.append(f"<defs>{stops}</defs>")
+    definitions.extend(
+        f'<linearGradient id="{name}" x1="0" y1="0" x2="1" y2="0">'
+        f'<stop offset="0" stop-color="{dominant}"/>'
+        f'<stop offset="1" stop-color="{contributing}"/></linearGradient>'
+        for name, (dominant, contributing) in sorted(gradients.items())
+    )
+    definitions.extend(sealed_pattern_markup(plumbing, prediction))
+    if definitions:
+        parts.append("<defs>" + "".join(definitions) + "</defs>")
     symbols = []
     for item in prediction.get("gas_symbols") or []:
         if not box_inside(svg_text, item["element"], item["box"]):
             continue
-        symbols.append(_gas_symbol_markup(item["box"], item["symbols"]))
+        symbols.append(
+            _gas_symbol_markup(item["box"], item["symbols"], float(item["radius"]))
+        )
     if symbols:
         parts.append(
             '<g id="pihti-gas-symbols" aria-hidden="true">' + "".join(symbols) + "</g>"
@@ -925,12 +1299,59 @@ def overlay_markup(
     return "".join(parts)
 
 
-def _gas_symbol_markup(box: list, symbols: list[str]) -> str:
+def split_formula(symbol: str) -> tuple[str, str]:
+    """A bottle symbol as its letters and its trailing count: ``H2`` -> H, 2.
+
+    queezz, 2026-09-08 (letter ``20260908-e6ada507-7aa064``): "Can we do H2, O2
+    with a subscript?" — drawn "the way the bottle symbols on his SVG draw them
+    (an SVG tspan with baseline-shift sub or a dy offset and a smaller
+    font-size, not a Unicode subscript glyph that a font may lack)". ``Ar`` and
+    ``He`` have no digit and come back unchanged.
+    """
+    match = re.fullmatch(r"([A-Za-z]+)([0-9]*)", symbol or "")
+    if not match:
+        return symbol or "", ""
+    return match.group(1), match.group(2)
+
+
+def sealed_pattern_markup(plumbing: dict, prediction: dict) -> list[str]:
+    """One hatch pattern per remembered colour a sealed volume is wearing.
+
+    The hatch is the sealed marking, chosen over the lighter treatment the
+    owner's letter also offered because lightening cannot hold the palette's own
+    3:1 floor against the stone field. Stripes of the field's own colour are cut
+    through the state colour at 45 degrees, so every coloured pixel stays at
+    full strength and the texture, not the tint, is what says *sealed*. One
+    pattern serves a filled body and a drawn line alike.
+    """
+    drawing = plumbing.get("drawing") or {}
+    ground = drawing.get("ground") or "#e3dfd6"
+    period = float(drawing.get("sealed_period") or 12)
+    stripe = float(drawing.get("sealed_stripe") or 5)
+    if not _safe_color(ground):
+        return []
+    colours = sorted(
+        {
+            item.get("fill") or item.get("stroke")
+            for item in (prediction.get("elements") or {}).values()
+            if item.get("sealed_paint")
+            and _safe_color(item.get("fill") or item.get("stroke"))
+        }
+    )
+    return [
+        f'<pattern id="{_sealed_paint_id(colour)}" width="{period:g}" height="{period:g}" '
+        f'patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+        f'<rect width="{period:g}" height="{period:g}" fill="{colour}"/>'
+        f'<rect width="{stripe:g}" height="{period:g}" fill="{ground}"/></pattern>'
+        for colour in colours
+    ]
+
+
+def _gas_symbol_markup(box: list, symbols: list[str], radius: float) -> str:
     """One white circle per gas, drawn across the middle of the vessel."""
     left, top, right, bottom = (float(value) for value in box)
     width, height = right - left, bottom - top
     middle_y = top + height / 2
-    radius = max(9.0, min(width / (2.2 * len(symbols)), height / 2.6))
     step = radius * 2.2
     start = left + width / 2 - step * (len(symbols) - 1) / 2
     out = []
@@ -938,13 +1359,20 @@ def _gas_symbol_markup(box: list, symbols: list[str]) -> str:
         if not symbol.isalnum():
             continue
         centre = start + step * index
+        letters, digits = split_formula(symbol)
+        body = letters
+        if digits:
+            body += (
+                f'<tspan dy="{radius * 0.22:.2f}" font-size="{radius * 0.62:.2f}">'
+                f"{digits}</tspan>"
+            )
         out.append(
             f'<circle cx="{centre:.2f}" cy="{middle_y:.2f}" r="{radius:.2f}" '
             f'fill="#ffffff" stroke="#111111" stroke-width="2"/>'
             f'<text x="{centre:.2f}" y="{middle_y:.2f}" text-anchor="middle" '
             f'dominant-baseline="central" fill="#111111" '
             f'font-family="sans-serif" font-weight="bold" '
-            f'font-size="{radius * 0.9:.2f}">{symbol}</text>'
+            f'font-size="{radius * 0.9:.2f}">{body}</text>'
         )
     return "".join(out)
 
@@ -955,6 +1383,7 @@ def style_rules(
     line_mode: str | None = None,
     widths: dict[str, float] | None = None,
     wide: bool = False,
+    now=None,
 ) -> str:
     """The prediction as CSS, for the server-rendered ``/state.svg``.
 
@@ -974,20 +1403,32 @@ def style_rules(
     reaches half a stroke past it and closes the seam without touching the
     drawing (queezz, 2026-09-08: "I see small defect when line is enlarged").
     """
-    prediction = predict(plumbing, state, line_mode)
+    prediction = predict(plumbing, state, line_mode, now=now)
     rules = []
     for element_id, item in sorted(prediction["elements"].items()):
         if not _safe_id(element_id):
             continue
         declarations = []
-        if _safe_color(item.get("stroke")):
+        # A sealed volume is painted with its hatch rather than with a flat
+        # colour, on the body and on the line alike — the pattern is written
+        # into the render's own defs by `sealed_pattern_markup`.
+        sealed_paint = (
+            f"url(#{item['sealed_paint']})"
+            if item.get("sealed_paint") and _safe_id(item["sealed_paint"])
+            else None
+        )
+        if sealed_paint:
+            declarations.append(f"stroke:{sealed_paint} !important")
+        elif _safe_color(item.get("stroke")):
             declarations.append(f"stroke:{item['stroke']} !important")
         authored = (widths or {}).get(element_id)
         if wide and item.get("band") and authored:
             declarations.append(
                 f"stroke-width:{round(authored * item['band'], 3)} !important"
             )
-        if item.get("mix") and _safe_color(item.get("fill")) and _safe_color(item["mix"]):
+        if sealed_paint and item.get("fill"):
+            declarations.append(f"fill:{sealed_paint} !important")
+        elif item.get("mix") and _safe_color(item.get("fill")) and _safe_color(item["mix"]):
             gradient = _mix_gradient_id(item["fill"], item["mix"])
             declarations.append(f"fill:url(#{gradient}) !important")
         elif _safe_color(item.get("fill")):

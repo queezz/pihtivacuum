@@ -213,6 +213,29 @@ def index_at_timestamp(events: list[dict], moment: datetime) -> int | None:
     return idx
 
 
+def load_line_mode_history(context_log: Path) -> list[tuple[datetime, str]]:
+    """Every recorded Line configuration change, oldest first.
+
+    Read once and walked, rather than re-read per question: rebuilding the
+    volume memory asks this for every diagram change in the log, and reopening
+    a CSV a thousand times to answer the same thousand questions is how a
+    Raspberry Pi gets slow.
+    """
+    rows: list[tuple[datetime, str]] = []
+    if not context_log.is_file():
+        return rows
+    try:
+        with context_log.open(newline="", encoding="utf-8") as csvfile:
+            for row in csv.DictReader(csvfile):
+                stamp = parse_timestamp(row.get("timestamp"))
+                if stamp is not None and row.get("line_mode"):
+                    rows.append((stamp, row["line_mode"]))
+    except (OSError, csv.Error):
+        return []
+    rows.sort(key=lambda item: item[0])
+    return rows
+
+
 def line_mode_at(context_log: Path, moment: datetime) -> str:
     """The Line configuration recorded at or before ``moment``.
 
@@ -221,17 +244,45 @@ def line_mode_at(context_log: Path, moment: datetime) -> str:
     the first recorded change the honest answer is ``unknown``.
     """
     mode = "unknown"
-    if not context_log.is_file():
-        return mode
-    try:
-        with context_log.open(newline="", encoding="utf-8") as csvfile:
-            for row in csv.DictReader(csvfile):
-                stamp = parse_timestamp(row.get("timestamp"))
-                if stamp is not None and stamp <= moment and row.get("line_mode"):
-                    mode = row["line_mode"]
-    except (OSError, csv.Error):
-        return "unknown"
+    for stamp, value in load_line_mode_history(context_log):
+        if stamp <= moment:
+            mode = value
     return mode
+
+
+def memory_timeline(
+    plumbing: dict,
+    events: list[dict],
+    base_state: dict,
+    modes: list[tuple[datetime, str]],
+) -> list[dict]:
+    """What each volume was last under, replayed forward through history.
+
+    The memory lives in the state file, but a state file can be new, copied to
+    another machine, or simply older than the log beside it — so it is also
+    derivable, by walking the recorded presses from the beginning and asking the
+    same predictor at each one. Snapshot ``0`` is before the first press ever
+    recorded; snapshot ``i + 1`` is the memory just after event ``i``.
+
+    Each snapshot is a fresh dictionary (``update_memory`` never mutates), so
+    the list can be kept and indexed without copying it again.
+    """
+    memory: dict = {}
+    state = dict(base_state)
+    snapshots = [memory]
+    cursor = 0
+    mode = "unknown"
+    for event in events:
+        state[event["id"]] = "active" if event["state"] else "inactive"
+        while cursor < len(modes) and modes[cursor][0] <= event["ts"]:
+            mode = modes[cursor][1]
+            cursor += 1
+        prediction = plumbing_map.predict(
+            plumbing, state, mode, memory=memory, now=event["ts"]
+        )
+        memory = plumbing_map.update_memory(plumbing, memory, prediction, event["ts"])
+        snapshots.append(memory)
+    return snapshots
 
 
 def render_state_svg(
@@ -241,6 +292,7 @@ def render_state_svg(
     plumbing: dict | None = None,
     line_mode: str | None = None,
     wide: bool = False,
+    now=None,
 ) -> str:
     """Return the authored SVG with operator-entered fills applied as a style block.
 
@@ -262,7 +314,7 @@ def render_state_svg(
     predicted_fills: set[str] = set()
     if plumbing:
         state = plumbing_map.apply_line_mode_to_state(plumbing, state, line_mode)
-        prediction = plumbing_map.predict(plumbing, state, line_mode)
+        prediction = plumbing_map.predict(plumbing, state, line_mode, now=now)
         rules.append(
             plumbing_map.style_rules(
                 plumbing,
@@ -270,9 +322,12 @@ def render_state_svg(
                 line_mode,
                 plumbing_map.authored_stroke_widths(svg_text),
                 wide=wide,
+                now=now,
             )
         )
-        overlay = plumbing_map.overlay_markup(plumbing, state, line_mode, svg_text)
+        overlay = plumbing_map.overlay_markup(
+            plumbing, state, line_mode, svg_text, now=now
+        )
         predicted_fills = {
             element_id
             for element_id, item in prediction["elements"].items()
@@ -455,9 +510,18 @@ def create_app(test_config: dict | None = None) -> Flask:
         app.config.update(test_config)
 
     state_file = Path(app.config["STATE_FILE"])
+    _stored_state = _load_json(state_file, {})
+    if not isinstance(_stored_state, dict):
+        _stored_state = {}
+    # The valve positions and, beside them under one reserved key, what each
+    # volume was last under and since when. The two are read apart here so that
+    # `/state` keeps answering with valves alone — the memory is not an element
+    # and no page should have to skip it.
     elements_state: dict[str, str] = apply_id_aliases_to_state(
-        _load_json(state_file, {})
+        {key: value for key, value in _stored_state.items() if key != plumbing_map.MEMORY_KEY}
     )
+    volume_memory: dict = plumbing_map.read_memory(_stored_state)
+    memory_rebuilt = bool(volume_memory)
     logs = load_logs_from_csv(Path(app.config["LOG_FILE"]))[-MAX_LOGS:]
     element_config = _load_json(Path(app.config["ELEMENTS_CONFIG_FILE"]), [])
     plumbing = plumbing_map.load_plumbing(app.static_folder)
@@ -472,6 +536,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     linked_valve_id = _linked[0] if _linked else None
     last_plot_html: str | None = None
     last_plot_meta: dict | None = None
+    # The replayed memory, cached against the two logs it is read from.
+    memory_cache: tuple | None = None
 
     def touch_operator() -> None:
         session["last_activity"] = datetime.now().isoformat(timespec="seconds")
@@ -588,6 +654,72 @@ def create_app(test_config: dict | None = None) -> Flask:
     def current_state_flags() -> dict[str, bool]:
         return {key: value == "active" for key, value in elements_state.items()}
 
+    def replayed_memory() -> list[dict]:
+        """The memory after each recorded press, rebuilt only when history moves.
+
+        One walk over the log per change to it, cached against the same stamp
+        `load_history_events` uses plus the Line-configuration log's own, so a
+        page that asks about ten historical moments pays for one walk.
+        """
+        nonlocal memory_cache
+        log_file = Path(app.config["LOG_FILE"])
+        context_log = Path(app.config["OPERATION_CONTEXT_LOG_FILE"])
+
+        def stamp_of(path: Path):
+            try:
+                stat = path.stat()
+            except FileNotFoundError:
+                return None
+            return (stat.st_mtime_ns, stat.st_size)
+
+        stamp = (stamp_of(log_file), stamp_of(context_log))
+        if memory_cache is not None and memory_cache[0] == stamp:
+            return memory_cache[1]
+        events = load_history_events(log_file)
+        snapshots = memory_timeline(
+            plumbing,
+            events,
+            state_at_index(events, current_state_flags(), -1),
+            load_line_mode_history(context_log),
+        )
+        memory_cache = (stamp, snapshots)
+        return snapshots
+
+    def live_memory() -> dict:
+        """The memory as it stands now, rebuilt from history the first time.
+
+        A state file written before this release carries no memory, and so does
+        a fresh checkout on another machine. Rather than start blind — every
+        volume "isolated, unknown" until somebody presses something — the log
+        beside it is replayed once, and the answer is written to the state file
+        with the next real change rather than on a read.
+        """
+        nonlocal volume_memory, memory_rebuilt
+        if not memory_rebuilt:
+            snapshots = replayed_memory()
+            if snapshots:
+                volume_memory = snapshots[-1]
+            memory_rebuilt = True
+        return volume_memory
+
+    def save_state() -> None:
+        """Valves and memory, in the one file, written together."""
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        payload = {**elements_state, plumbing_map.MEMORY_KEY: live_memory()}
+        state_file.write_text(json.dumps(payload, indent=4) + "\n", encoding="utf-8")
+
+    def remember_now(mode: str | None = None) -> dict:
+        """Update the memory from the state as it now stands, and return it."""
+        nonlocal volume_memory
+        memory = live_memory()
+        prediction = plumbing_map.predict(
+            plumbing, elements_state, mode or current_line_mode(), memory=memory
+        )
+        volume_memory = plumbing_map.update_memory(
+            plumbing, memory, prediction, datetime.now()
+        )
+        return volume_memory
+
     def current_prediction(mode: str | None = None) -> dict:
         """The prediction for the state as it stands, this second.
 
@@ -598,7 +730,25 @@ def create_app(test_config: dict | None = None) -> Flask:
         second round trip — which is what queezz felt as "membrane installed to
         open pipe is VERY slow. And no reason for it to be slow."
         """
-        return plumbing_map.predict(plumbing, elements_state, mode or current_line_mode())
+        return plumbing_map.predict(
+            plumbing,
+            elements_state,
+            mode or current_line_mode(),
+            memory=live_memory(),
+        )
+
+    def prediction_at(moment: datetime, idx: int, state: dict) -> dict:
+        """The prediction for a replayed moment, memory and all.
+
+        The memory is the replayed one, not today's: a moment is read as it was,
+        including how long a vessel had been shut *by then*.
+        """
+        snapshots = replayed_memory()
+        memory = snapshots[idx + 1] if 0 <= idx + 1 < len(snapshots) else {}
+        mode = plumbing_map.resolve_line_mode(
+            plumbing, line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment)
+        )
+        return plumbing_map.predict(plumbing, state, mode, memory=memory, now=moment)
 
     def current_line_mode() -> str:
         """What an operator last said is mounted in the line between the vessels.
@@ -643,8 +793,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         This is the same operator-entered annotation the page shows, not a
         pressure measurement.
         """
-        state: dict = elements_state
+        state: dict = {**elements_state, plumbing_map.MEMORY_KEY: live_memory()}
         mode = current_line_mode()
+        when = None
         if raw_moment := request.args.get("at"):
             moment = parse_timestamp(raw_moment)
             if moment is None:
@@ -653,7 +804,13 @@ def create_app(test_config: dict | None = None) -> Flask:
             idx = index_at_timestamp(events, moment)
             if idx is None:
                 return jsonify({"error": "No diagram change at or before that moment"}), 404
-            state = state_at_index(events, current_state_flags(), idx)
+            snapshots = replayed_memory()
+            memory = snapshots[idx + 1] if 0 <= idx + 1 < len(snapshots) else {}
+            state = {
+                **state_at_index(events, current_state_flags(), idx),
+                plumbing_map.MEMORY_KEY: memory,
+            }
+            when = moment
             mode = plumbing_map.resolve_line_mode(
                 plumbing,
                 line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment),
@@ -663,7 +820,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         # default on both sides since 0.15.0, so the two agree without asking.
         wide = request.args.get("wide") in {"1", "true", "on"}
         return Response(
-            render_state_svg(svg_text, element_config, state, plumbing, mode, wide=wide),
+            render_state_svg(
+                svg_text, element_config, state, plumbing, mode, wide=wide, now=when
+            ),
             mimetype="image/svg+xml",
         )
 
@@ -692,8 +851,10 @@ def create_app(test_config: dict | None = None) -> Flask:
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         elements_state[element_id] = status
-        state_file.parent.mkdir(parents=True, exist_ok=True)
-        state_file.write_text(json.dumps(elements_state, indent=4) + "\n", encoding="utf-8")
+        # What each volume was last under is updated from the state this press
+        # just made, and saved in the one file beside the valve positions.
+        remember_now()
+        save_state()
         log_entry = {
             "timestamp": timestamp,
             "id": element_id,
@@ -753,8 +914,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         what the Line configuration said was mounted between the two vessels
         then.
         """
-        state: dict = elements_state
-        mode = current_line_mode()
         if raw_moment := request.args.get("at"):
             moment = parse_timestamp(raw_moment)
             if moment is None:
@@ -764,11 +923,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             if idx is None:
                 return jsonify({"error": "No diagram change at or before that moment"}), 404
             state = state_at_index(events, current_state_flags(), idx)
-            mode = plumbing_map.resolve_line_mode(
-                plumbing,
-                line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment),
-            )
-        return jsonify(plumbing_map.predict(plumbing, state, mode))
+            return jsonify(prediction_at(moment, idx, state))
+        return jsonify(current_prediction())
 
     @app.route("/press-warnings")
     def press_warnings():
@@ -862,6 +1018,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             writer.writerow(
                 {"timestamp": timestamp, "line_mode": mode, "user": session["username"]}
             )
+        # A configuration change joins or separates the two vessels, so it can
+        # seal a volume exactly as a valve can: the memory moves with it.
+        remember_now(mode)
+        save_state()
         # The prediction for the configuration just recorded rides back with it,
         # so the drawing redraws from this answer rather than from two more
         # round trips (0.15.0; queezz on 0.13.0: "membrane installed to open pipe

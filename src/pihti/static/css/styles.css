@@ -790,6 +790,20 @@ button.tiny {
   transform: translateY(1px);
 }
 
+/* Sealed off is not a colour of its own: it is any of the six, hatched, and the
+   hatch is the same mechanism the drawing itself uses (owner correction
+   2026-09-08, letters 20260908-fe94c769-493d71 and 20260908-2c3d9837-37ab4a).
+   The stripes are cut in the drawing's own ground at 45 degrees, in the same
+   5-to-12 proportion the SVG pattern uses, so a chip here and a shape on the
+   drawing read as the same marking. */
+.vacuum-swatch--sealed {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--diagram-ground) 0 3px,
+    transparent 3px 8px
+  );
+}
+
 /* And the seven in a row at the top of More, on the same ground and big enough
    to compare one against another rather than each against the drawing. */
 .vacuum-swatch-row {

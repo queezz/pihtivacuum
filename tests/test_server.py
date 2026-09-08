@@ -4,7 +4,7 @@ import json
 import math
 import tomllib
 import xml.etree.ElementTree as ET
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -72,9 +72,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.16.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.16.1"}
-    assert b"v0.16.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.17.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.17.0"}
+    assert b"v0.17.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -281,11 +281,15 @@ def test_history_moment_and_rendered_state_svg(client):
     assert current.mimetype == "image/svg+xml"
     body = current.data.decode("utf-8")
     # A running turbo wears the high-vacuum colour of the side it serves (0.16.0)
-    # and a stopped one is left as drawn (0.16.1): TMPU is running here, so it
-    # wears the plasma side's blue, and TMPD, which is not, is not painted at all.
+    # over the black rim queezz drew: TMPU is running here, so it is the plasma
+    # side's blue.
     assert "#TMPU{stroke:#000000 !important;fill:#1f5fd0 !important}" in body
-    # And a stopped pump is left exactly as queezz drew it: nothing writes it.
-    assert "#TMPD{" not in body
+    # A stopped pump keeps his own grey body -- nothing writes it a fill -- and
+    # its rim and inner lines recede to dark grey (0.17.0, letter
+    # 20260908-e2498698-5c9c50: "we can also gray out pump edges and lines").
+    assert "#TMPD{stroke:#5f5f5f !important}" in body
+    assert "#path1563-6{stroke:#5f5f5f !important}" in body
+    assert "#path1563{stroke:#000000 !important}" in body
     assert "yellow" not in body
     # A valve wears the prediction's own colour, never the operator green
     # (0.15.0), and its edge goes with its fill (0.16.0): GVU is open onto a
@@ -1185,7 +1189,13 @@ def test_a_pump_wears_what_it_is_doing(client):
     turned the off signal into the on one. queezz, at once (letter
     ``20260908-93fb84a6-5a69cf``): "No, no! Blue and yellow, yellow reads like
     on. Gray for off was lost. Why? WHY???" So neither the prediction nor the
-    operator palette paints a stopped pump, and his grey stands.
+    operator palette gives a stopped pump a fill, and his grey stands.
+
+    **And the whole pump recedes (0.17.0, letter ``20260908-e2498698-5c9c50``).**
+    queezz: "In diagram, we can also gray out pump edges and lines. Dark gray.
+    So it speaks more loudly that that is closed." A stopped pump's rim and its
+    inner symbol lines go dark grey; a running one keeps the black rim and lines
+    he drew, over its state colour.
     """
     plumbing = client.get("/plumbing").json
     colours = {state["id"]: state["color"] for state in plumbing["states"]}
@@ -1210,10 +1220,17 @@ def test_a_pump_wears_what_it_is_doing(client):
     assert running["elements"]["TMPD"]["fill"] == colours["downstream-high-vacuum"]
     assert running["elements"]["RoughU"]["fill"] == colours["rough-vacuum"]
     assert running["elements"]["Rough-Bypass"]["fill"] == colours["rough-vacuum"]
-    # RoughD was not pressed, so nothing paints it and it keeps his grey.
+    # RoughD was not pressed, so nothing gives it a fill and it keeps his grey.
+    # Its rim and inner lines recede to the map's own dark grey.
+    recessed = plumbing["drawing"]["pump_stopped_edge"]
     assert running["elements"]["RoughD"]["running"] is False
     assert "fill" not in running["elements"]["RoughD"]
-    assert "stroke" not in running["elements"]["RoughD"]
+    assert running["elements"]["RoughD"]["stroke"] == recessed
+    for part in next(p for p in plumbing["pumps"] if p["id"] == "RoughD")["parts"]:
+        assert running["elements"][part]["stroke"] == recessed, part
+    # And a running pump's parts keep the black he drew them with.
+    for part in next(p for p in plumbing["pumps"] if p["id"] == "TMPU")["parts"]:
+        assert running["elements"][part]["stroke"] == "#000000", part
 
     # Every pump answers, keeps the black outline it was drawn with, and is an
     # ordinary confirmed toggle an operator presses and history records.
@@ -1226,16 +1243,22 @@ def test_a_pump_wears_what_it_is_doing(client):
             assert item["fill"] in set(colours.values()), pump["id"]
         else:
             assert "fill" not in item, pump["id"]
+            assert item["stroke"] == recessed, pump["id"]
 
-    # A turbo that is not running makes no high vacuum, and its own line is not
-    # even sealed -- nothing is pumping it.
+    # A turbo that is not running makes no high vacuum, and nothing has shut on
+    # its own line either, so that line is not sealed: it is simply isolated.
     stopped = plumbing_map.predict(plumbing, {"GVU": "active"}, "membrane")
     assert stopped["volumes"]["plasma-vessel"] == "isolated"
     assert "fill" not in stopped["elements"]["TMPU"]
-    assert "#TMPU" not in plumbing_map.style_rules(plumbing, {"GVU": "active"}, "membrane")
-    # And a turbo behind a shut gate still says which side it belongs to.
+    # The saved render writes a stopped pump its recessed rim and nothing else:
+    # no fill at all, so the grey queezz drew still stands underneath it.
+    saved = plumbing_map.style_rules(plumbing, {"GVU": "active"}, "membrane")
+    assert f"#TMPU{{stroke:{recessed} !important}}" in saved
+    # And a turbo behind a shut gate still says which side it belongs to -- and
+    # so does the stub between them, which is high vacuum, not a state of its
+    # own (owner correction 2026-09-08, letter 20260908-fe94c769-493d71).
     behind_the_gate = plumbing_map.predict(plumbing, {"TMPU": "active"}, "membrane")
-    assert behind_the_gate["volumes"]["plasma-turbo-line"] == "sealed"
+    assert behind_the_gate["volumes"]["plasma-turbo-line"] == "upstream-high-vacuum"
     assert behind_the_gate["elements"]["TMPU"]["fill"] == colours["upstream-high-vacuum"]
 
 
@@ -1769,13 +1792,15 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
         )
 
     states = {state["id"]: state["color"] for state in plumbing["states"]}
+    # Six since 0.17.0: the teal seventh, "pumped, sealed off", was retired by
+    # the owner's own correction -- sealed off is a remembered state now, and it
+    # wears the hatched colour of whatever the volume was last under.
     assert set(states) == {
         "air",
         "gas",
         "upstream-high-vacuum",
         "downstream-high-vacuum",
         "rough-vacuum",
-        "sealed",
         "isolated",
     }
     assert len(set(states.values())) == len(states)
@@ -1784,8 +1809,8 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
     for name, colour in states.items():
         assert contrast(colour, ground) >= 3.0, (name, contrast(colour, ground))
         assert contrast(colour, operator_green) >= 3.0, (name, contrast(colour, operator_green))
-    # Isolated is the quietest of the seven on purpose: it is the absence of a
-    # claim, not an eighth thing competing for the eye.
+    # Isolated is the quietest of them on purpose: it is the absence of a
+    # claim, not one more thing competing for the eye.
     quietest = min(states, key=lambda name: contrast(states[name], ground))
     assert quietest == "isolated"
 
@@ -1801,9 +1826,9 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
 
     # Every PAIR must be told apart, on a 4 px line and on a chip alike -- the
     # letter's own rule, checked pairwise rather than only against the field.
-    # 18 CIEDE2000 units is a comfortable margin; the closest pair here is the
-    # plasma blue against the sealed teal at about 21, where the palette this
-    # replaced had a pair at 11.6.
+    # 18 CIEDE2000 units is a comfortable margin; the closest pair of the seven
+    # was the plasma blue against the sealed teal at about 21, where the palette
+    # this replaced had a pair at 11.6, and the teal has since gone.
     names = sorted(states)
     pairs = [
         (ciede2000(states[first], states[second]), first, second)
@@ -1825,14 +1850,19 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
     script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
         encoding="utf-8"
     )
-    assert "swatch.style.background = state.color;" in script
+    assert "swatch.style.backgroundColor = colour;" in script
     assert 'row.className = "vacuum-swatch-row";' in script
-    assert 'block.className = "vacuum-swatch-big";' in script
+    assert '"vacuum-swatch-big"' in script
     assert ".vacuum-swatch-row {" in css
     assert ".vacuum-swatch-big {" in css
     # The old thin-bar rule is gone rather than left behind to confuse the next
-    # reader: nothing writes a `<i>` inside a swatch any more.
+    # reader: nothing writes a `<i>` inside a swatch any more. The readout under
+    # the drawing still did until 0.17.0, and its chips drew empty for it.
     assert ".vacuum-swatch i" not in css
+    assert 'document.createElement("i")' not in script
+    # The colour is written as `backgroundColor`, never the `background`
+    # shorthand, which would reset the background-image the sealed hatch is.
+    assert "style.background =" not in script
 
 
 def test_a_saved_render_really_carries_the_prediction(client):
@@ -2034,6 +2064,8 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     assert set(live.json) == {
         "volumes",
         "mixes",
+        "gases",
+        "sealed",
         "elements",
         "air",
         "connections",
@@ -2093,13 +2125,16 @@ def test_a_closed_gate_never_lets_its_turbo_colour_the_vessel(client):
     2026-09-08, on the deployed drawing: "GVU is closed, so TMP is not pumping
     plasma-vacuum. Yet at a glance it seems that it does." The pipe from the
     shut gate up to the spinning turbo was the same blue as the vessel, because
-    both were simply "high vacuum". A high-vacuum volume now takes its colour
-    from the vessel it is joined to, and a pump's private volume behind a closed
-    valve reaches no vessel at all, so it wears the seventh colour instead --
-    pumped, and sealed off -- which is neither vessel's.
+    both were simply "high vacuum".
+
+    0.16.0 answered that with a seventh colour for the stub, and **queezz took
+    that answer back the same evening** (letter ``20260908-fe94c769-493d71``):
+    "between the turbo and its gate, the vacuum is High, not pumped sealed off."
+    A volume with a running pump on it is that pump's state now, so the stub is
+    the turbo's own side colour again -- and what says the colour stops at the
+    gate is the gate itself, white with the only black rim on the drawing.
     """
     plumbing = client.get("/plumbing").json
-    colours = {state["id"]: state["color"] for state in plumbing["states"]}
 
     shut_gate = plumbing_map.predict(
         plumbing,
@@ -2112,17 +2147,20 @@ def test_a_closed_gate_never_lets_its_turbo_colour_the_vessel(client):
         },
         "membrane",
     )
-    assert shut_gate["volumes"]["plasma-turbo-line"] == "sealed"
+    # The stub is high vacuum in the turbo's own side colour; the vessel beside
+    # it is being roughed through the bypass, so the two still do not match.
+    assert shut_gate["volumes"]["plasma-turbo-line"] == "upstream-high-vacuum"
     assert shut_gate["volumes"]["plasma-vessel"] == "rough-vacuum"
     assert (
         shut_gate["elements"]["plasma-vacuum-gv-to-tmp-pipe"]["stroke"]
         != shut_gate["elements"]["plasma-vacuum"]["fill"]
     )
-    # And the sealed colour is nobody's vessel colour, in any state.
-    assert colours["sealed"] not in {
-        colours["upstream-high-vacuum"],
-        colours["downstream-high-vacuum"],
-    }
+    # The break is the gate: white, with the one black outline on the drawing.
+    gate = shut_gate["elements"]["GVU"]
+    assert gate["open"] is False
+    assert (gate["fill"], gate["stroke"]) == ("#ffffff", "#000000")
+    # And the retired teal is gone from the map rather than left lying about.
+    assert "sealed" not in {state["id"] for state in plumbing["states"]}
 
     # With the gate open the same pipe is the plasma vessel's own colour again,
     # and the backing line behind the turbo is forevacuum.
@@ -2384,7 +2422,10 @@ def test_a_change_costs_one_request_and_one_redraw(client):
 
     pressed = client.post("/update", json={"id": "TMPU", "status": "active"})
     assert pressed.status_code == 200
-    assert pressed.json["prediction"]["volumes"]["plasma-turbo-line"] == "sealed"
+    assert (
+        pressed.json["prediction"]["volumes"]["plasma-turbo-line"]
+        == "upstream-high-vacuum"
+    )
     unchanged = client.post("/update", json={"id": "TMPU", "status": "active"})
     assert unchanged.json["message"] == "State unchanged"
     assert "prediction" in unchanged.json
@@ -2395,3 +2436,367 @@ def test_a_change_costs_one_request_and_one_redraw(client):
     )
     assert "applyState(vacuumState, undefined, result.prediction)" in script
     assert "function applyState(state, moment, prediction)" in script
+
+
+# --- Sealed off is a remembered, dated state (0.17.0) ------------------------
+#
+# queezz, 2026-09-08, correcting the seventh colour of 0.16.0 (letters
+# ``20260908-fe94c769-493d71`` and ``20260908-2c3d9837-37ab4a``): "between the
+# turbo and its gate, the vacuum is High, not pumped sealed off. Not sealed.
+# Pumped sealed off means I pump, close the valve. Vacuum holds, and degrades
+# per the vessel's leak rate... If we have air/N2 or isolation especially in the
+# main two vessels, we need to keep a date so we can say: 'ah, that upstream was
+# under N2 for two weeks!'"
+
+
+def nitrogen_route():
+    """The valves queezz opens to let nitrogen into the plasma vessel.
+
+    His own route, corrected on the deployed guides (letter
+    ``20260908-7a3c9ac3-bbd7aa``): "Let Nitrogen in.. we are using the big
+    manual needle valve, not massflows for venting. So the argon line must
+    provide gas."
+    """
+    return {
+        "gaspanel-valve-n": "active",
+        "gaspanel-valve-ar": "active",
+        "gasline-ar": "active",
+        "gasline-main": "active",
+    }
+
+
+def sealed_state_of(plumbing, state, memory, now):
+    """One prediction with an explicit memory and an explicit clock."""
+    return plumbing_map.predict(plumbing, state, "membrane", memory=memory, now=now)
+
+
+def test_a_pumped_vessel_shut_off_is_sealed_and_its_stub_is_high_vacuum(client):
+    """Pump it, close the gate: the vessel holds what it had, the stub does not.
+
+    The letter's own first test. The vessel is isolated *and* remembers high
+    vacuum, so it is sealed and says since when; the stub between the shut gate
+    and the still-spinning turbo is simply high vacuum in that turbo's own side
+    colour, because a volume with a running pump on it is that pump's state now.
+    """
+    plumbing = client.get("/plumbing").json
+    colours = {state["id"]: state["color"] for state in plumbing["states"]}
+    pumping = {"TMPU": "active", "GVU": "active"}
+    started = datetime(2026, 9, 8, 12, 0, 0)
+
+    # Pumped: the gate is open, the vessel is plasma-side high vacuum, and
+    # nothing is remembered as sealed because nothing is shut.
+    open_gate = sealed_state_of(plumbing, pumping, {}, started)
+    assert open_gate["volumes"]["plasma-vessel"] == "upstream-high-vacuum"
+    assert open_gate["sealed"] == {}
+    memory = plumbing_map.update_memory(plumbing, {}, open_gate, started)
+    assert memory["plasma-vessel"] == {"state": "upstream-high-vacuum", "since": None}
+
+    # The gate closes. The memory takes its stamp from that moment, and never
+    # re-stamps: "since when" means since it was closed.
+    shut = {"TMPU": "active"}
+    closing = sealed_state_of(plumbing, shut, memory, started)
+    memory = plumbing_map.update_memory(plumbing, memory, closing, started)
+    assert memory["plasma-vessel"]["since"] == "2026-09-08 12:00:00"
+    later = plumbing_map.update_memory(
+        plumbing, memory, closing, started + timedelta(days=1)
+    )
+    assert later["plasma-vessel"]["since"] == "2026-09-08 12:00:00"
+
+    a_day_later = started + timedelta(days=1)
+    reading = sealed_state_of(plumbing, shut, memory, a_day_later)
+    held = reading["sealed"]["plasma-vessel"]
+    assert held["was"] == "upstream-high-vacuum"
+    assert held["duration"] == "1 day"
+    # The vessel wears what it is holding, hatched -- never the grey of a volume
+    # with no memory at all, and never a second tone, because nothing reaches it.
+    body = reading["elements"]["plasma-vacuum"]
+    assert body["fill"] == colours["upstream-high-vacuum"]
+    assert body["sealed"] is True and body["sealed_paint"].startswith("pihti-sealed-")
+    assert "mix" not in body
+    # And the stub between the shut gate and the spinning turbo is high vacuum
+    # in the turbo's own side colour -- not sealed, and not a state of its own.
+    assert reading["volumes"]["plasma-turbo-line"] == "upstream-high-vacuum"
+    assert "plasma-turbo-line" not in reading["sealed"]
+    assert reading["elements"]["TMPU"]["fill"] == colours["upstream-high-vacuum"]
+    # The break the eye reads is the gate: the one white shape with a black rim.
+    gate = reading["elements"]["GVU"]
+    assert (gate["open"], gate["fill"], gate["stroke"]) == (False, "#ffffff", "#000000")
+
+
+def test_a_vessel_vented_with_nitrogen_and_shut_is_sealed_under_nitrogen(client):
+    """His own sentence: "ah, that upstream was under N2 for two weeks!"
+
+    A closed vessel full of nitrogen is still full of nitrogen: the memory keeps
+    the gas and its bottle symbols, so the readout can say which gas and the
+    mark stays drawn inside the vessel after the bottle is shut.
+    """
+    plumbing = client.get("/plumbing").json
+    # Nitrogen reaches the plasma vessel through the gas panel and the argon
+    # line, the route queezz named for venting (letter 20260908-7a3c9ac3-bbd7aa).
+    venting = nitrogen_route()
+    started = datetime(2026, 8, 25, 9, 0, 0)
+    vented = sealed_state_of(plumbing, venting, {}, started)
+    assert vented["volumes"]["plasma-vessel"] == "gas"
+    assert vented["gases"]["plasma-vessel"] == ["N2"]
+    memory = plumbing_map.update_memory(plumbing, {}, vented, started)
+    assert memory["plasma-vessel"]["symbols"] == ["N2"]
+
+    shut = sealed_state_of(plumbing, {}, memory, started)
+    memory = plumbing_map.update_memory(plumbing, memory, shut, started)
+
+    two_weeks = started + timedelta(days=14)
+    reading = sealed_state_of(plumbing, {}, memory, two_weeks)
+    held = reading["sealed"]["plasma-vessel"]
+    assert held["was"] == "gas"
+    assert held["symbols"] == ["N2"]
+    assert held["duration"] == "2 weeks"
+    # The mark stays inside the vessel, so a glance still says what is in there.
+    marks = {item["volume"]: item for item in reading["gas_symbols"]}
+    assert marks["plasma-vessel"]["symbols"] == ["N2"]
+    assert marks["plasma-vessel"]["sealed"] is True
+
+
+def test_the_duration_and_the_advice_change_as_a_fake_clock_runs(client):
+    """The thresholds, said out loud rather than left in the code.
+
+    ``bake_air_days`` 2, ``bake_gas_days`` 7, ``fresh_vacuum_days`` 3, all in
+    the map. Air is the shortest because air brings water vapour in and dry
+    nitrogen does not; three days is how long a vacuum stays fresh enough that
+    opening the turbo straight in may be fine rather than roughing through the
+    bypass first. The advice is his own three sentences, and it names the gauge
+    on that volume, because the diagram predicts and the gauge measures.
+    """
+    plumbing = client.get("/plumbing").json
+    limits = plumbing_map.hint_thresholds(plumbing)
+    assert limits == {
+        "bake_air_days": 2.0,
+        "bake_gas_days": 7.0,
+        "fresh_vacuum_days": 3.0,
+    }
+    started = datetime(2026, 9, 1, 8, 0, 0)
+
+    def hint_after(was, days, symbols=None):
+        memory = {
+            "qms-vessel": {
+                "state": was,
+                "since": started.strftime(plumbing_map.TIME_FORMAT),
+                "symbols": symbols or [],
+            }
+        }
+        reading = sealed_state_of(plumbing, {}, memory, started + timedelta(days=days))
+        return reading["sealed"]["qms-vessel"]
+
+    # Under vacuum: fresh for three days, then rough through the bypass to be
+    # safe rather than opening the turbo straight in.
+    fresh = hint_after("downstream-high-vacuum", 1)
+    assert fresh["duration"] == "1 day"
+    assert "may be fine" in fresh["hint"]["text"]
+    assert fresh["hint"]["bake"] is False
+    stale_vacuum = hint_after("downstream-high-vacuum", 5)
+    assert stale_vacuum["duration"] == "5 days"
+    assert "rough through the bypass" in stale_vacuum["hint"]["text"]
+    assert stale_vacuum["hint"]["bake"] is False
+
+    # Under air: baking is advised from the second day.
+    assert hint_after("air", 1)["hint"]["bake"] is False
+    month_of_air = hint_after("air", 31)
+    assert month_of_air["duration"] == "1 month"
+    assert month_of_air["hint"]["bake"] is True
+    assert "Consider baking." in month_of_air["hint"]["text"]
+
+    # Under nitrogen: dry gas buys a week before the same advice.
+    assert hint_after("gas", 3, ["N2"])["hint"]["bake"] is False
+    assert hint_after("gas", 10, ["N2"])["hint"]["bake"] is True
+
+    # The gauge on that volume is named as the thing to read, by id -- the page
+    # says it by the name a person uses at the rig.
+    named = hint_after("downstream-high-vacuum", 1)["hint"]["gauges"]
+    assert set(named) == {"downstream-ionization-gauge", "downstream-baratron"}
+
+    # And the pump-down guides' own question -- which of their two ways -- is
+    # answered from the same memory: a turbo still spinning behind its shut gate
+    # has to be roughed through the bypass; a stopped one can pump through the
+    # gate it sits behind.
+    memory = {
+        "plasma-vessel": {
+            "state": "upstream-high-vacuum",
+            "since": started.strftime(plumbing_map.TIME_FORMAT),
+        }
+    }
+    spinning = sealed_state_of(plumbing, {"TMPU": "active"}, memory, started)
+    assert spinning["sealed"]["plasma-vessel"]["hint"]["way"] == "bypass"
+    quiet = sealed_state_of(plumbing, {}, memory, started)
+    assert quiet["sealed"]["plasma-vessel"]["hint"]["way"] == "gate"
+
+    # Plain units all the way up, never a decimal.
+    assert plumbing_map.duration_words(600) == "less than an hour"
+    assert plumbing_map.duration_words(3600) == "1 hour"
+    assert plumbing_map.duration_words(3600 * 6) == "6 hours"
+    assert plumbing_map.duration_words(86400 * 3) == "3 days"
+    assert plumbing_map.duration_words(86400 * 21) == "3 weeks"
+    assert plumbing_map.duration_words(86400 * 70) == "2 months"
+
+
+def test_a_fresh_state_is_isolated_unknown_and_a_replayed_one_is_not(tmp_path):
+    """A fresh record says it does not know; a log two weeks old says two weeks.
+
+    Rule three of the letter: "Isolated, unknown is only for a volume with no
+    remembered state." And the memory is derivable as well as stored, because a
+    state file can be new, copied to another machine, or simply older than the
+    log beside it -- so the log is replayed once on the first read and the
+    answer is written back with the next real change rather than on a read.
+    """
+    (tmp_path / "operators.json").write_text(
+        json.dumps({"operators": ["operator"]}), encoding="utf-8"
+    )
+    # A fresh record: an empty state file, and no history at all.
+    fresh = make_app(tmp_path).test_client()
+    blank = fresh.get("/predicted-vacuum").json
+    assert blank["volumes"]["plasma-vessel"] == "isolated"
+    assert blank["sealed"] == {}
+    plumbing = fresh.get("/plumbing").json
+    states = {state["id"]: state for state in plumbing["states"]}
+    assert states["isolated"]["label"] == "Isolated, unknown"
+
+    # Now a history that pumped the plasma vessel and shut the gate a fortnight
+    # ago, with nothing since, and a state file that never heard of a memory.
+    long_ago = datetime.now() - timedelta(days=14, hours=2)
+    rows = [
+        (long_ago - timedelta(minutes=10), "TMPU", "active"),
+        (long_ago - timedelta(minutes=5), "GVU", "active"),
+        (long_ago, "GVU", "inactive"),
+    ]
+    (tmp_path / "logs.csv").write_text(
+        "timestamp,id,status,user\n"
+        + "".join(
+            "{},{},{},operator\n".format(
+                when.strftime("%Y-%m-%d %H:%M:%S"), name, status
+            )
+            for when, name, status in rows
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "elements_state.json").write_text(
+        json.dumps({"TMPU": "active", "GVU": "inactive"}), encoding="utf-8"
+    )
+    replayed = make_app(tmp_path).test_client()
+    reading = replayed.get("/predicted-vacuum").json
+    held = reading["sealed"]["plasma-vessel"]
+    assert held["was"] == "upstream-high-vacuum"
+    assert held["duration"] == "2 weeks"
+    # The turbo is still spinning behind the shut gate, so its own stub is high
+    # vacuum rather than sealed, and the guide's question answers "bypass".
+    assert reading["volumes"]["plasma-turbo-line"] == "upstream-high-vacuum"
+    assert held["hint"]["way"] == "bypass"
+
+
+def test_the_memory_lives_in_the_state_file_beside_the_valves(client, tmp_path):
+    """Written with the valve positions, in one file, under one reserved key.
+
+    It is not an element and never will be -- every id on the drawing comes from
+    Inkscape and none of them starts with an underscore -- and ``/elements-state``
+    still answers with valve positions alone, so no page has to know to skip it.
+    """
+    identify(client)
+    client.post("/update", json={"id": "TMPU", "status": "active"})
+    client.post("/update", json={"id": "GVU", "status": "active"})
+    client.post("/update", json={"id": "GVU", "status": "inactive"})
+
+    stored = json.loads((tmp_path / "elements_state.json").read_text(encoding="utf-8"))
+    assert plumbing_map.MEMORY_KEY == "_volumes"
+    memory = stored[plumbing_map.MEMORY_KEY]
+    assert memory["plasma-vessel"]["state"] == "upstream-high-vacuum"
+    assert memory["plasma-vessel"]["since"]
+    # The valves are still valves, and the memory is not one of them.
+    assert stored["GVU"] == "inactive" and stored["TMPU"] == "active"
+    assert plumbing_map.MEMORY_KEY not in client.get("/elements-state").json
+
+    # And the prediction the press answered with already knew it was sealed.
+    reading = client.get("/predicted-vacuum").json
+    held = reading["sealed"]["plasma-vessel"]
+    assert held["was"] == "upstream-high-vacuum"
+    assert held["duration"] == "less than an hour"
+    # The readout under the drawing carries it, so the page says what and since
+    # when without asking a second question.
+    assert reading["connections"]["plasma-vessel"]["sealed"]["was"] == held["was"]
+
+
+def test_a_gas_mark_is_sized_to_the_vessel_it_sits_in(client):
+    """queezz: "The qms-vacuum gas circle is bigger for some reason."
+
+    It was drawn at one absolute size in both vessels, which is nearly the whole
+    width of the narrower QMS box. The rule he gave (letter
+    ``20260908-8eaaa7a9-334955``): the mark's diameter is about 0.45 of the
+    SMALLER side of the vessel body it sits in, capped at the plasma mark's own
+    size, centred, and smaller again with several gases in a row.
+    """
+    plumbing = client.get("/plumbing").json
+    volumes = plumbing["volumes"]
+    # Under *Pipe open*, with the two bypass gates open, one bottle of nitrogen
+    # reaches both vessels -- the frame his letter was written on.
+    joined = dict(nitrogen_route())
+    joined.update({"GVBU": "active", "GVBD": "active"})
+    reading = plumbing_map.predict(plumbing, joined, "open")
+    marks = {item["volume"]: item for item in reading["gas_symbols"]}
+    assert set(marks) == {"plasma-vessel", "qms-vessel"}
+
+    for name, mark in marks.items():
+        left, top, right, bottom = volumes[name]["symbol_box"]
+        shorter = min(right - left, bottom - top)
+        # 0.45 of the smaller side, as a diameter, so half of that as a radius.
+        assert mark["radius"] <= 0.45 * shorter / 2 + 0.01, name
+    # The QMS box is the narrower one and used to carry the bigger mark. Neither
+    # is bigger than the other now, and neither is bigger than the cap.
+    assert marks["qms-vessel"]["radius"] <= marks["plasma-vessel"]["radius"] + 0.01
+    cap = plumbing_map._mark_cap(volumes)
+    assert marks["plasma-vessel"]["radius"] <= cap + 0.01
+
+    # Several gases in a row are drawn smaller so they fit side by side.
+    crowded = plumbing_map.mark_radius(volumes["qms-vessel"]["symbol_box"], 3, cap)
+    assert crowded < marks["qms-vessel"]["radius"]
+
+    # And the page reads the radius off the prediction rather than working out
+    # its own, so a saved render and the screen cannot size a mark differently.
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    assert "Number(item.radius)" in script
+
+
+def test_h2_and_o2_are_written_with_a_true_subscript(client):
+    """queezz: "Can we do H2, O2 with a subscript?"
+
+    Drawn the way his own bottle symbols draw it -- a tspan dropped by a
+    fraction of the mark's size and set smaller -- never a Unicode subscript
+    glyph a font may not carry. ``Ar`` and ``He`` have no digit and are
+    untouched.
+    """
+    assert plumbing_map.split_formula("H2") == ("H", "2")
+    assert plumbing_map.split_formula("O2") == ("O", "2")
+    assert plumbing_map.split_formula("N2") == ("N", "2")
+    assert plumbing_map.split_formula("Ar") == ("Ar", "")
+    assert plumbing_map.split_formula("He") == ("He", "")
+
+    plumbing = client.get("/plumbing").json
+    svg_text = (PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").read_text(
+        encoding="utf-8"
+    )
+    markup = plumbing_map.overlay_markup(plumbing, nitrogen_route(), "membrane", svg_text)
+    # The letters stand at the mark's own size; the digit is a tspan of its own,
+    # dropped and smaller. No Unicode subscript character anywhere.
+    assert "<tspan dy=" in markup
+    assert ">N<tspan" in markup and ">2</tspan>" in markup
+    for glyph in "₀₁₂₃₄₅₆₇₈₉":
+        assert glyph not in markup
+
+    # And the page draws it the same way, at the small QMS size as at the large
+    # plasma one, from the same two fractions.
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    assert "function writeFormula(text, symbol, radius)" in script
+    assert "(radius * 0.22).toFixed(2)" in script
+    assert "(radius * 0.62).toFixed(2)" in script
+    # The legend and the readout say it in HTML, where <sub> is the right thing.
+    assert "function formulaHtml(symbol)" in script
+    assert 'document.createElement("sub")' in script
