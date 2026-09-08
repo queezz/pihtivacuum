@@ -1,6 +1,25 @@
 {
     "note": "Which drawn pipe belongs to which vacuum volume, and which valve joins which two volumes. Read from the names queezz gave the pipes in diagram.svg, never from where the lines happen to sit on the page. The vacuum state derived from this is a prediction from the valve positions an operator has entered, not a pressure measurement.",
     "prototype": true,
+    "dark_theme": {
+        "drawing": {
+            "ground": "#293440", "sealed_pale": 0.5,
+            "valve_closed": "#dfe7ef", "valve_closed_edge": "#aebfce",
+            "empty_marker_opacity": 0.9
+        },
+        "states": {
+            "upstream-high-vacuum": "#42c5ff",
+            "downstream-high-vacuum": "#56e394",
+            "rough-vacuum": "#c69242",
+            "air": "#ff4d60",
+            "gas": "#df70d6",
+            "isolated": "#777f89"
+        },
+        "surfaces": {
+            "rect11": {"fill": "#32352c", "stroke": "#666b5d"},
+            "gaspanel-valve-n": {"stroke": "#aebfce"}
+        }
+    },
     "drawing": {
         "note": "The field the drawing is painted on, how much wider the reading aid draws a coloured pipe, and the inks that are not vacuum states. `pump_stopped_edge` is the dark grey a stopped pump's rim and inner lines wear so the whole pump recedes (queezz, 2026-09-08, letter 20260908-e2498698-5c9c50: 'we can also gray out pump edges and lines. Dark gray. So it speaks more loudly that that is closed'); a running pump keeps the black he drew. `sealed_stripe` and `sealed_period` are the hatch a sealed volume's own vessel body wears over its remembered colour, and `sealed_pale` is how far the same volume's pipes, tees, crosses, gauge stems and open valves are moved toward the ground instead -- because a hatch painted onto a 4 px stroke is a dashed line, and queezz read dashed pipes as broken ones three letters running on 2026-09-09 (`20260908-b1c0ba9c-342679`, `20260908-a8f73fdc-616055`, `20260908-db3ff048-8394c2`): 'I don't like the broken lines. They are pipes. That reads like a breakage', and 'the dashed valve, it's like guess what shape this is and what this blob does'. So the hatch is on the two chamber bodies alone, every pipe is solid in every state, and a valve is never hatched at all. The paler tone sits below the palette's own 3:1 floor against the field on purpose: a sealed pipe is not a live claim. See `sealed_state` below. The field is a quiet warm stone so the state colours are the loudest thing on the page (owner permission 2026-09-08). `band` is the widening the More switch offers; `band_default` is false since 0.15.0, because queezz's own strokes are the width he wants (letter 20260908-c8ef7df5-5f5e40) and a widening he did not ask for is the app talking over his drawing. `valve_closed` and `valve_closed_edge` are the two inks a shut valve wears: white with a black outline, the one dark-rimmed shape on the drawing, so it stands out as the break (queezz, 2026-09-08, letter 20260908-3308e02d-3021dd: 'When closed, black border white fill is good. Stands out'). An open valve wears the colour flowing through it as fill *and* outline — 'I think I like the valves edge to be same color as the fill' — so it reads as part of the pipe at every valve size, gas panel included. `flange` is the blank-flange tone: a light steel that is neither the open green nor the closed grey nor any state colour, worn by the probe segment when a blank is installed in place of the probe. A stopped pump has no ink here at all, on purpose: it keeps the grey queezz drew it in, because that grey already means off. 0.16.0 made a stopped pump yellow, on a relayed line that said 'stays as drawn (yellow)' — the drawing's own fill is grey, and the yellow was the app's own *on* colour. His answer, immediately (letter 20260908-93fb84a6-5a69cf): 'No, no! Blue and yellow, yellow reads like on. Gray for off was lost. Why? WHY???' So yellow appears nowhere on a pump any more, the operator palette no longer paints one either, and the prediction writes a fill only for a pump that is running.",
         "ground": "#e3dfd6",

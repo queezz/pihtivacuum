@@ -21,6 +21,9 @@
      * made from it. The colours live in the map, so the legend and the pipes
      * cannot disagree. */
     let plumbing = null;
+    let lightPlumbing = null;
+    let darkOn = false;
+    const surfacePaints = new Map();
     let predictionPending = false;
     /* The last prediction the server sent, so the band switch can repaint from
      * it without asking again. */
@@ -438,10 +441,8 @@
             item.append(swatch, label);
             return item;
         }));
-        // The thick-pipes switch stands directly under the chips and above
-        // More, always visible while the card is open. queezz, 2026-09-09
-        // (letter 20260908-c03c1788-9def42), finding it at the bottom of a
-        // wall of prose inside More: "the thick pipes is too far hidden."
+        // Appearance switches lead More, before its meanings. Owner review of
+        // dark mode: exposed checkboxes are too easy to change accidentally.
         const switchHolder = document.getElementById("vacuum-band");
         if (switchHolder && !switchHolder.children.length) {
             const label = document.createElement("label");
@@ -468,7 +469,8 @@
                 return line;
             });
             [
-                "Open valve: the colour running through it. Closed: white, black rim.",
+                darkOn ? "Open valve: the colour running through it. Closed: pale, light rim."
+                    : "Open valve: the colour running through it. Closed: white, black rim.",
                 "A two-tone body means two things reach it.",
                 "A running pump wears its work; a stopped one keeps its grey."
             ].forEach((sentence) => {
@@ -477,7 +479,7 @@
                 line.textContent = sentence;
                 lines.push(line);
             });
-            detail.replaceChildren(...lines);
+            document.getElementById("vacuum-meanings")?.replaceChildren(...lines);
         }
         if (more && !more.dataset.wired) {
             more.dataset.wired = "1";
@@ -486,6 +488,7 @@
                 more.setAttribute("aria-expanded", String(!open));
                 more.textContent = open ? "More" : "Less";
                 if (detail) detail.hidden = open;
+                scheduleFit();
             });
         }
     }
@@ -714,7 +717,17 @@
     function paintPrediction(prediction) {
         lastPrediction = prediction;
         const svg = document.querySelector("#diagram-container svg");
-        Object.entries(prediction.elements || {}).forEach(([id, item]) => {
+        const colours = darkOn ? lightPlumbing?.dark_palette?.colours || {} : {};
+        Object.entries(prediction.elements || {}).forEach(([id, original]) => {
+            const item = {...original};
+            const inks = item.valve && darkOn
+                ? {...colours, ...lightPlumbing.dark_palette.valve_inks} : colours;
+            ["fill", "stroke", "mix"].forEach((key) => {
+                if (inks[item[key]]) item[key] = inks[item[key]];
+            });
+            if (darkOn && item.linked && !item.plug) {
+                item.opacity = plumbing.drawing.empty_marker_opacity;
+            }
             const element = document.getElementById(id);
             if (!element) return;
             if (item.part) {
@@ -830,10 +843,61 @@
         toggle.addEventListener("change", () => {
             bandOn = toggle.checked;
             if (lastPrediction) paintPrediction(lastPrediction);
+            updateImageLink();
             try {
                 window.localStorage.setItem("pihti.pipeBand", bandOn ? "on" : "off");
             } catch (error) { /* a browser that refuses storage still draws */ }
         });
+    }
+
+    function updateImageLink() {
+        const link = document.getElementById("moment-image-link");
+        if (!link || !link.getAttribute("href")?.startsWith("/state.svg")) return;
+        const url = new URL(link.href);
+        url.searchParams.set("theme", darkOn ? "dark" : "light");
+        url.searchParams.set("wide", bandOn ? "1" : "0");
+        link.href = url.pathname + url.search;
+    }
+
+    function applyDiagramTheme() {
+        const dark = lightPlumbing?.dark_palette;
+        plumbing = darkOn && dark
+            ? {...lightPlumbing, drawing: dark.drawing, states: dark.states}
+            : lightPlumbing;
+        if (!plumbing) return;
+        document.documentElement.style.setProperty("--diagram-ground", plumbing.drawing.ground);
+        // Explicit surface inks; the nitrogen source valve keeps its own
+        // operational fill and receives only the dark theme's light edge.
+        Object.entries(dark?.surfaces || {}).forEach(([id, paints]) => {
+            const element = document.getElementById(id);
+            if (!element) return;
+            if (!surfacePaints.has(id)) {
+                surfacePaints.set(id, Object.fromEntries(Object.keys(paints).map(key => [key, element.style[key]])));
+            }
+            Object.entries(paints).forEach(([key, ink]) => {
+                element.style[key] = darkOn ? ink : surfacePaints.get(id)[key];
+            });
+        });
+        renderVacuumLegend();
+        if (lastPrediction) paintPrediction(lastPrediction);
+        updateImageLink();
+        scheduleFit();
+    }
+
+    function setupThemeToggle() {
+        lightPlumbing = plumbing;
+        const toggle = document.getElementById("diagram-dark");
+        if (!toggle) return;
+        try { darkOn = window.localStorage.getItem("pihti.diagramTheme") === "dark"; }
+        catch (error) { darkOn = false; }
+        toggle.checked = darkOn;
+        toggle.addEventListener("change", () => {
+            darkOn = toggle.checked;
+            try { window.localStorage.setItem("pihti.diagramTheme", darkOn ? "dark" : "light"); }
+            catch (error) { /* the switch also works without storage */ }
+            applyDiagramTheme();
+        });
+        applyDiagramTheme();
     }
 
     /* A label as it reads inside a sentence: "the plasma vessel", but "the QMS
@@ -1639,6 +1703,7 @@
         plumbing = await fetch("/plumbing").then((response) => response.ok ? response.json() : null).catch(() => null);
         renderVacuumLegend();
         setupBandToggle();
+        setupThemeToggle();
         setupRailCards();
         // A rail that is measured once at load is measured for one window size.
         // The reader's window is the one that matters, so the fit is re-run
@@ -1671,5 +1736,6 @@
 
     window.applyState = applyState;
     window.pihtiElementName = elementName;
+    window.pihtiUpdateImageLink = updateImageLink;
     loadDiagram().catch((error) => console.error("Diagram could not be loaded", error));
 }());

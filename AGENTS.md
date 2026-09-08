@@ -181,7 +181,7 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
 - Any UI change runs Fleet's Perimeter Walk on a scratch `lab` service before it ships.
 - **No surface shows a person a component key.** A reader sees the equipment's name; `GVU`, `gaspanel-valve-n` and the rest stay in the files, the log and the SVG. The names are the `label` beside each `id` in `static/elementsConfig.json`, read through `window.pihtiElementName` (0.10.0), and History marks a component the current diagram no longer carries rather than passing its recorded key off as a name. Fleet `WEBUI.md`: what a viewer sees is for the viewer.
 - **The top bar wraps; it never overflows.** Below about 470 px the five tabs and the operator selector cannot share one row, so the selector drops to a row of its own at the same right-hand corner and the tabs wrap before they can be pushed off screen (0.10.0, after the Mac audit found the selector clipped at 390 px). One DOM in a different placement — never a second phone-only control. The bar is taller when it wraps, which only rails below the 1199 px breakpoint would care about, and those are fixed drawers rather than sticky rails.
-- **One legend, and the thick-pipes switch is not hidden inside More** (owner
+- **One legend; appearance switches lead More after the dark-mode review** (owner
   correction 2026-09-09, letter `20260908-c03c1788-9def42`, applied in 0.19.1).
   queezz on the first build of the state card: *"Why do we need two legends?
   pic 2, the thick pipes is too far hidden. Do we need that much text in a rail
@@ -192,7 +192,12 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   own rules; anything longer belongs on a help page, never in a rail card
   (Fleet `WEBUI.md`, Teaching: the surface states, the rail teaches once at a
   glance, the rest sits behind one press). The **Draw thick pipes** switch
-  stands directly under the chips and above More, on both pages that draw.
+  stood directly under the chips and above More, on both pages that draw.
+  **Amended 2026-09-08, owner live review of dark mode (0.20.2):** the exposed
+  checkboxes are too easy to press by mistake. Dark diagram and Draw thick
+  pipes now lead the contents of More, before the meanings, on both pages.
+  The earlier placement kept the width switch findable; this order makes both
+  preferences deliberate while keeping them one press away.
 - **On the Vacuum page the predicted state is a right-rail card; on History the
   key stays under the drawing** (owner order 2026-09-08, letters
   `20260908-aa2558c2-f3d03e` and `20260908-50f93f77-8e8a28`, built in 0.18.0).
@@ -236,3 +241,14 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
 The lab Raspberry Pi (`pihti:5000`) serves this diagram from an editable install of `/home/pi/pihtivacuum` on Python 3.9, run by `deploy/pihti.service`; laptops and phones read it. It deploys by pulling `master` from GitHub, so a shipping session pushes after committing (owner decision 2026-09-04, see `.agents/README.md`) and then pulls and restarts on the Pi. Keep the package importable on Python 3.9.
 
 Read `.agents/README.md` for workflow, `.agents/directions.md` for open owner decisions, and `.agents/log/` for session evidence. Fleet-wide policy remains in Fleet's `RULES-BRIEF.md` and routed references.
+
+## Dark diagram (owner review, 2026-09-08; 0.20.2)
+
+The appearance switch changes no SVG geometry or connectivity. Dark uses a lifted
+slate ground, electric blue and bright green vacuum, quieter amber roughing and
+vivid vent red. Closed valves use pale fill and a light rim in dark mode; this
+is the theme-specific amendment to the black-rim rule above, after the owner
+found the black borders unsuitable. The empty membrane marker keeps its dashed
+outline but uses that visible light rim at 90% opacity. Light mode keeps the
+previous inks. Stopped pumps remain grey. Sealed tones fade toward the selected
+ground. Theme and thickness travel into historical SVG image links.

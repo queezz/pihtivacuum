@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +19,42 @@ ISOLATED = "isolated"
 ROUGH = "rough-vacuum"
 AIR = "air"
 GAS = "gas"
+
+
+def themed_map(plumbing: dict, theme: str = "light") -> dict:
+    """Change presentation only; the authored map and connectivity stay untouched."""
+    if theme != "dark":
+        return plumbing
+    result = deepcopy(plumbing)
+    dark = plumbing.get("dark_theme") or {}
+    result["drawing"].update(dark.get("drawing") or {})
+    for state in result["states"]:
+        state["color"] = (dark.get("states") or {}).get(state["id"], state["color"])
+    return result
+
+
+def theme_palette(plumbing: dict) -> dict:
+    """Ship the browser the same colour conversion used by saved SVGs.
+
+    Include the quiet sealed tones: those blend toward each theme's own ground.
+    No state, connection, timestamp or volume memory is changed by this mapping.
+    """
+    dark = themed_map(plumbing, "dark")
+    colours = {}
+    for light_state, dark_state in zip(plumbing["states"], dark["states"]):
+        light, ink = light_state["color"], dark_state["color"]
+        colours[light] = ink
+        colours[sealed_pale(plumbing, light)] = sealed_pale(dark, ink)
+    return {
+        "colours": colours,
+        "drawing": dark["drawing"],
+        "states": dark["states"],
+        "valve_inks": {
+            plumbing["drawing"][key]: dark["drawing"][key]
+            for key in ("valve_closed", "valve_closed_edge")
+        },
+        "surfaces": (plumbing.get("dark_theme") or {}).get("surfaces", {}),
+    }
 
 #: The one timestamp spelling this project writes everywhere — the same one
 #: ``logs.csv`` carries, so a remembered moment and a history row are the same
@@ -937,7 +974,7 @@ def predict(
             "fill": closed_ink if plug else "none",
             "stroke": closed_edge,
             "dash": "none" if plug else "5 4",
-            "opacity": 1.0 if plug else 0.45,
+            "opacity": 1.0 if plug else (plumbing.get("drawing") or {}).get("empty_marker_opacity", 0.45),
         }
     # A blank flange in place of the probe: the one drawn segment that is not a
     # vacuum claim at all. It wears the flange tone — neither a state colour nor

@@ -186,6 +186,7 @@
             : (event.state ? "active" : "inactive");
         document.getElementById("moment-user").textContent = event.user || "—";
         document.getElementById("moment-image-link").href = `/state.svg?at=${encodeURIComponent(event.ts)}`;
+        window.pihtiUpdateImageLink?.();
     }
 
     function applyPendingState() {

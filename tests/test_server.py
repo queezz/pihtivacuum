@@ -71,11 +71,63 @@ def identify(client):
     return client.post("/api/identify", json={"username": "operator"})
 
 
+@pytest.mark.parametrize("mode", ["membrane", "open", "blank", "boron"])
+def test_dark_palette_preserves_connectivity_and_matches_browser_paints(client, mode):
+    mapping = client.get("/plumbing").json
+    before = json.dumps(mapping, sort_keys=True)
+    dark = plumbing_map.themed_map(mapping, "dark")
+    palette = mapping["dark_palette"]["colours"]
+    now = datetime.fromisoformat("2026-09-08T12:00:00")
+    states = [
+        {},
+        {"TMPU": "active", "GVU": "active", "TMPD": "active", "GVD": "active"},
+        {"RoughU": "active", "GVU": "active"},
+        {"RoughD": "active", "GVD": "active", "downstream-pumpline-vent-valve": "active"},
+        {"TMPU": "active", "TMPD": "active", "GVBU": "active", "bypass-l1": "active",
+         "GVBD": "active", "GVU": "active", "GVD": "active"},
+    ]
+    running = plumbing_map.predict(mapping, states[1], mode, now=now)
+    memory = plumbing_map.update_memory(mapping, {}, running, now)
+    memory = plumbing_map.update_memory(mapping, memory, plumbing_map.predict(mapping, {}, mode), now)
+    states.append({plumbing_map.MEMORY_KEY: memory})
+    assert any(item.get("sealed_paint") for item in
+               plumbing_map.predict(mapping, states[-1], mode, now=now)["elements"].values())
+    for state in states:
+        light_result = plumbing_map.predict(mapping, state, mode, now=now)
+        dark_result = plumbing_map.predict(dark, state, mode, now=now)
+        assert light_result["connections"] == dark_result["connections"]
+        assert light_result["elements"].keys() == dark_result["elements"].keys()
+        marker = dark_result["elements"]["Membrane"]
+        assert marker["stroke"] == "#aebfce"
+        assert marker["opacity"] == (1.0 if marker["plug"] else 0.9)
+        for key, light in light_result["elements"].items():
+            shaded = dark_result["elements"][key]
+            inks = {**palette, **mapping["dark_palette"]["valve_inks"]} if light.get("valve") else palette
+            for paint in ("fill", "stroke", "mix"):
+                assert inks.get(light.get(paint), light.get(paint)) == shaded.get(paint)
+    assert json.dumps(mapping, sort_keys=True) == before
+
+
+def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
+    identify(client)
+    assert client.post("/update", json={"id": "TMPU", "status": "active"}).status_code == 200
+    paths = [Path(app.config[key]) for key in ("STATE_FILE", "LOG_FILE")]
+    before = [path.read_bytes() for path in paths]
+    dark = client.get("/state.svg?theme=dark").get_data(as_text=True)
+    assert "background:#293440" in dark
+    assert "#42c5ff" in dark
+    ET.fromstring(dark)
+    light = client.get("/state.svg?theme=light").data
+    assert light == client.get("/state.svg?theme=invalid").data
+    client.get("/plumbing")
+    assert [path.read_bytes() for path in paths] == before
+
+
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.19.2"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.19.2"}
-    assert b"v0.19.2" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.2"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.2"}
+    assert b"v0.20.2" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -580,7 +632,7 @@ def test_health_endpoint_keeps_the_ensemble_contract(client):
 
 def test_services_board_names_five_states_and_never_guesses(tmp_path):
     answers = {
-        "http://log.test:4310": ("ok", "0.20.1", "a session is open"),
+        "http://log.test:4310": ("ok", "0.20.2", "a session is open"),
         "http://rig.test:4187": ("unreachable", "", "no answer within two seconds"),
     }
     app = make_app(
@@ -593,7 +645,7 @@ def test_services_board_names_five_states_and_never_guesses(tmp_path):
     assert [row["alias"] for row in rows] == ["pihti-diagram", "pihti-log", "controlunit"]
     assert rows[0]["state"] == "ok" and rows[0]["url"] == ""
     assert rows[1] == {"alias": "pihti-log", "name": "PIHTI Log", "url": "http://log.test:4310",
-                       "state": "ok", "version": "0.20.1", "detail": "a session is open",
+                       "state": "ok", "version": "0.20.2", "detail": "a session is open",
                        "start_how": "Start it on the PC that keeps the journal.",
                        "start_command": "lab pihti-log"}
     assert rows[2]["state"] == "unreachable" and rows[2]["url"] == "http://rig.test:4187"
@@ -1956,18 +2008,19 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
         assert len(state["meaning"].split()) <= 6, state["id"]
     # Three short lines for the drawing's own rules, where thirteen sentences
     # and a second swatch board used to stand.
-    rules = script.split("detail.replaceChildren(...lines);")[0].rsplit("].forEach", 1)[0]
+    rules = script.split('document.getElementById("vacuum-meanings")?.replaceChildren(...lines);')[0].rsplit("].forEach", 1)[0]
     rules = rules.rsplit("[", 1)[1]
-    assert len([line for line in rules.splitlines() if line.strip().startswith('"')]) == 3
-    # And the thick-pipes switch stands under the chips, above More -- never
-    # buried at the bottom of the prose inside it.
+    assert len([line for line in rules.splitlines() if line.strip().startswith('"')]) == 2
+    # Owner dark-mode review: both switches lead More, before its meanings,
+    # where they cannot be toggled accidentally while reading the legend.
     assert 'document.getElementById("vacuum-band")' in script
     assert '" Draw thick pipes"' in script
     for path in ("index.html", "history.html"):
         page = (PROJECT_ROOT / "src" / "pihti" / "templates" / path).read_text(
             encoding="utf-8"
         )
-        assert page.index('id="vacuum-band"') < page.index('id="vacuum-more"'), path
+        assert page.index('id="vacuum-more"') < page.index('id="vacuum-band"'), path
+        assert page.index('id="vacuum-band"') < page.index('id="vacuum-meanings"'), path
     # The old thin-bar rule is gone rather than left behind to confuse the next
     # reader: nothing writes a `<i>` inside a swatch any more. The readout under
     # the drawing still did until 0.17.0, and its chips drew empty for it.

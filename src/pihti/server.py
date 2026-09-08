@@ -386,6 +386,7 @@ def render_state_svg(
     line_mode: str | None = None,
     wide: bool = False,
     now=None,
+    theme: str = "light",
 ) -> str:
     """Return the authored SVG with operator-entered fills applied as a style block.
 
@@ -406,6 +407,17 @@ def render_state_svg(
     overlay = ""
     predicted_fills: set[str] = set()
     if plumbing:
+        plumbing = plumbing_map.themed_map(plumbing, theme)
+        ground = plumbing["drawing"]["ground"]
+        rules.append(f"svg{{background:{ground}}}")
+        if theme == "dark":
+            for element_id, paints in plumbing.get("dark_theme", {}).get("surfaces", {}).items():
+                if plumbing_map._safe_id(element_id):
+                    ink = ";".join(
+                        f"{key}:{value} !important" for key, value in paints.items()
+                        if key in {"fill", "stroke"} and plumbing_map._safe_color(value)
+                    )
+                    rules.append(f"#{element_id}{{{ink}}}")
         state = plumbing_map.apply_line_mode_to_state(plumbing, state, line_mode)
         prediction = plumbing_map.predict(plumbing, state, line_mode, now=now)
         rules.append(
@@ -921,7 +933,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         wide = request.args.get("wide") in {"1", "true", "on"}
         return Response(
             render_state_svg(
-                svg_text, element_config, state, plumbing, mode, wide=wide, now=when
+                svg_text, element_config, state, plumbing, mode, wide=wide, now=when,
+                theme=request.args.get("theme", "light"),
             ),
             mimetype="image/svg+xml",
         )
@@ -1002,7 +1015,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.route("/plumbing")
     def serve_plumbing():
-        return send_from_directory(directory=app.static_folder, path="plumbing.json")
+        return jsonify({**plumbing, "dark_palette": plumbing_map.theme_palette(plumbing)})
 
     @app.route("/predicted-vacuum")
     def predicted_vacuum():

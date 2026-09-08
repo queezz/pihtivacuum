@@ -37,9 +37,12 @@
             <p class="rail-lead">Predicted from the valve positions at the selected moment, not measured.</p>
             <ul id="vacuum-connections" class="vacuum-connections"></ul>
             <ul id="vacuum-legend" class="vacuum-legend"></ul>
-            <p class="band-switch" id="vacuum-band"></p>
             <button type="button" class="tiny" id="vacuum-more" aria-expanded="false" aria-controls="vacuum-legend-detail">More</button>
-            <div id="vacuum-legend-detail" hidden></div>
+            <div id="vacuum-legend-detail" hidden>
+                <p class="band-switch"><label><input type="checkbox" id="diagram-dark"> Dark diagram</label></p>
+                <p class="band-switch" id="vacuum-band"></p>
+                <div id="vacuum-meanings"></div>
+            </div>
         </section>
         <div id="tooltip"></div>
     </main>
