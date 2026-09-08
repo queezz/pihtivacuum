@@ -293,6 +293,19 @@ Six letters collected — `20260908-fe94c769-493d71`, `20260908-2c3d9837-37ab4a`
 here), `20260908-e2498698-5c9c50`, `20260908-8eaaa7a9-334955` and
 `20260908-e6ada507-7aa064` — after their work was recorded here.
 
+Three more collected after the correction above — `20260908-b1c0ba9c-342679`,
+`20260908-a8f73fdc-616055` and `20260908-db3ff048-8394c2` — for **nine
+collected** in all.
+
+Seven stay posted. Five are the ship-after-next's by dispatch, and two arrived
+mid-session and are left beside them deliberately: `20260908-948b8dbc-b1eb0d`
+(a stopped turbo is a passage) is a change to the connectivity model rather than
+to the drawing, and `20260908-6f3f0308-5906a1` is his own idea marked "not for
+now". Both are recorded in `directions.md` in his own words, so nothing depends
+on the letter surviving; they stay posted for the same reason the other five do,
+which is that posted mail is what tells the next session at this address that it
+has work waiting.
+
 The five for the ship after this one stay posted, unread by this release's code
 but read by this session so the memory built here serves them: practice mode
 (`20260908-9d38bf34-8415c7`, `20260908-e460b66f-616b53`), the right-rail state
