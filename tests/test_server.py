@@ -73,9 +73,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.19.1"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.19.1"}
-    assert b"v0.19.1" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.19.2"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.19.2"}
+    assert b"v0.19.2" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -996,6 +996,74 @@ def test_the_readout_never_claims_the_qms_vessel_during_boron_deposition(client)
     assert open_mode["plasma-vessel"]["joined"] == ["qms-vessel"]
 
 
+def test_the_probe_pipe_belongs_to_the_bypass_side_under_boron_deposition(client):
+    """The probe pipe never reaches the plasma vessel through its own holder end.
+
+    queezz, 2026-09-09 (letter `20260908-5d638879-1b617e`), on 0.17.x with Boron
+    selected and both vessels drawn joined: "Boron deposition, the pipe to the
+    bypass cross (probe cross) is not connected then." The sample holder occupies
+    the same spot a membrane, a blank flange or a probe would -- so, like them, it
+    blocks the ``Membrane`` valve's own position, and `probe-line` can only ever
+    reach `bypass-manifold` through the real `bypass-l1` valve at the cross, never
+    through a `Membrane` the map used to force open for every mode but *Membrane
+    installed* and *Blank*.  The crossover's own dead end (`bypass-vcr-d`) is
+    unchanged: it is a separate physical pipe and this is not a second special
+    case bolted onto it, just `Membrane` joining the modes that already shut it.
+    """
+    plumbing = client.get("/plumbing").json
+
+    # Every bypass valve shut: the two vessels are separate, the crossover
+    # mirrors the plasma vessel it dead-ends against, and the probe pipe (both
+    # drawn segments of it) reads its own -- the bypass cross's -- state, which
+    # here is "isolated" because nothing reaches that side either.
+    plasma_pumped_only = {
+        "TMPU": "active",
+        "GVU": "active",
+        "RoughU": "active",
+        "bypass-vcr-u": "active",
+        "bypass-vcr-d": "active",
+    }
+    isolated_bypass = plumbing_map.predict(plumbing, plasma_pumped_only, "boron")
+    assert isolated_bypass["volumes"]["plasma-vessel"] == "upstream-high-vacuum"
+    assert isolated_bypass["volumes"]["qms-vessel"] == "isolated"
+    assert isolated_bypass["volumes"]["vessel-crossover"] == "upstream-high-vacuum"
+    assert isolated_bypass["volumes"]["probe-line"] == "isolated"
+    assert isolated_bypass["elements"]["probe-pipe"]["state"] == "isolated"
+    assert isolated_bypass["elements"]["probe-pipe-cross-to-GVBD"]["state"] == "isolated"
+    assert isolated_bypass["connections"]["plasma-vessel"]["joined"] == []
+
+    # Opening only the two bypass gate valves, with the cross's own bypass-l1
+    # still shut, proves the fix: before it, the map's own forced-open
+    # `Membrane` alone used to bridge bypass-manifold to probe-line and this
+    # combination joined the vessels. Now it does not -- the holder end really
+    # is a dead end, and a real valve has to carry the route.
+    gates_alone = {
+        "TMPU": "active",
+        "GVU": "active",
+        "RoughU": "active",
+        "TMPD": "active",
+        "GVD": "active",
+        "RoughD": "active",
+        "GVBU": "active",
+        "GVBD": "active",
+    }
+    still_separate = plumbing_map.predict(plumbing, gates_alone, "boron")
+    assert still_separate["connections"]["plasma-vessel"]["joined"] == []
+    assert still_separate["volumes"]["vessel-crossover"] == "isolated"
+
+    # With bypass-l1 open too -- a real route through the cross -- the two
+    # vessels join through the bypass, and the readout says so: the crossover
+    # stays isolated throughout, because the join never runs through it.
+    through_the_bypass = dict(gates_alone, **{"bypass-l1": "active"})
+    joined = plumbing_map.predict(plumbing, through_the_bypass, "boron")
+    assert joined["volumes"]["plasma-vessel"] == "upstream-high-vacuum"
+    assert joined["volumes"]["qms-vessel"] == "upstream-high-vacuum"
+    assert joined["volumes"]["probe-line"] == "upstream-high-vacuum"
+    assert joined["volumes"]["vessel-crossover"] == "isolated"
+    assert joined["connections"]["plasma-vessel"]["joined"] == ["qms-vessel"]
+    assert joined["connections"]["qms-vessel"]["joined"] == ["plasma-vessel"]
+
+
 def test_the_membrane_element_follows_the_line_configuration_not_a_press(client):
     """One source of truth: the drawn valve has no press that could disagree.
 
@@ -1005,6 +1073,13 @@ def test_the_membrane_element_follows_the_line_configuration_not_a_press(client)
     "Membrane installed and the membrane 'valve' should be linked." It is now
     display-only, closed under *Membrane installed* and open under every other
     configuration, whatever a stored `elements_state.json` says for it.
+
+    **Amended 2026-09-09** (owner correction, letter `20260908-5d638879-1b617e`):
+    Boron deposition joined *closed_modes* too. The sample holder occupies the
+    same physical spot the membrane, blank flange and probe all share, so it
+    blocks that spot exactly as they do -- the probe pipe reaches bypass-manifold
+    only through `bypass-l1` now, never through a Membrane the map used to force
+    open for it.
     """
     plumbing = client.get("/plumbing").json
     element_config = client.get("/elements-config").json
@@ -1012,12 +1087,12 @@ def test_the_membrane_element_follows_the_line_configuration_not_a_press(client)
     assert membrane_config["followsLineMode"] is True
 
     linked = plumbing["line_configuration"]["linked_valve"]
-    # Shut by two configurations, and only one of them draws a plug: a blank
-    # flange closes the crossover exactly as a membrane does, but there is no
-    # probe mounted at that position to draw.
+    # Shut by three configurations now, and only one of them draws a plug: a
+    # blank flange or a sample holder closes the crossover exactly as a
+    # membrane does, but there is no probe mounted at that position to draw.
     assert linked == {
         "id": "Membrane",
-        "closed_modes": ["membrane", "blank"],
+        "closed_modes": ["membrane", "blank", "boron"],
         "plug_mode": "membrane",
     }
 
@@ -1028,7 +1103,7 @@ def test_the_membrane_element_follows_the_line_configuration_not_a_press(client)
         ("membrane", False),
         ("blank", False),
         ("open", True),
-        ("boron", True),
+        ("boron", False),
         ("unknown", True),
         (None, True),
     ):
