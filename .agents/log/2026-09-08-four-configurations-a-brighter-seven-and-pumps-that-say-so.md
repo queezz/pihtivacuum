@@ -300,7 +300,7 @@ inks and the corrected second tone.
 
 ## Version
 
-0.16.0 — a minor bump: a fourth configuration, a different palette, a new rule
+0.16.0, then 0.16.1 for the pump correction below — a minor bump: a fourth configuration, a different palette, a new rule
 for what a valve's edge and a pump's body look like, and a gradient that appears
 where it never did. In `pyproject.toml`, `src/pihti/__init__.py`, `README.md`
 and the three assertions in `tests/test_server.py`. Static files changed
@@ -312,14 +312,14 @@ untouched: his 10:36 save is still byte-identical to what is committed.
 
 Told not to push and not to touch the Pi, which crosses this repository's own
 `.agents/README.md` (owner decision 2026-09-04). The commit sits on local
-`master`, now ten ahead of `origin`. To get it live, in an ordinary terminal:
+`master`, now eleven ahead of `origin`. To get it live, in an ordinary terminal:
 
 ```powershell
 git -C "$env:USERPROFILE\Dropbox\20-Code\2024-interactive-diagram" push
 ```
 
 then on the Pi: `git pull --ff-only` in `/home/pi/pihtivacuum`, `sudo systemctl
-restart pihti`, and confirm `/version` says 0.16.0.
+restart pihti`, and confirm `/version` says 0.16.1.
 
 ## Mail
 
@@ -338,6 +338,74 @@ The configuration question is closed by his own list, dated. The palette item is
 rewritten for the seven he has not seen yet. Two are new: whether a stopped pump
 should keep the yellow it now wears, and the second SVG for power and water,
 which is his own hands' work and waits for a file in `local/`.
+
+## Corrected an hour later: the pump yellow (0.16.1)
+
+He read the release in his browser while this handoff was being written, and the
+first thing back was the pump: *"No, no! Blue and yellow, yellow reads like on.
+Gray for off was lost. Why? WHY???"* (letter `20260908-93fb84a6-5a69cf`). He is
+right, and the mistake is traceable: the dispatching letter said a stopped pump
+"stays as drawn (yellow)", the drawing's own fill is **grey**, and yellow was
+the app's own *active* colour from `elementsConfig.json`. Reading the words
+rather than checking the drawing turned the off signal into the on one.
+
+Fixed in 0.16.1, and the fix is a deletion: a stopped pump now carries no ink
+from this app at all. The prediction emits no fill and no stroke for it, the
+pumps have no `colors` entry left in `elementsConfig.json`, `pump_idle` is gone
+from the map, and both `/state.svg` and the page skip it — so his own grey
+stands, untouched, which is what it always meant. A running pump is unchanged:
+its side's high vacuum for a turbo, rough vacuum for a rotary or a scroll, over
+the black rim he drew. The test asserts the word `yellow` appears nowhere in a
+saved render.
+
+**One trap on the way, worth writing down: clearing an inline fill deletes his
+own.** The first attempt at leaving a stopped pump alone set
+`element.style.fill = ""`, which looks like "put it back". It is not: his fill
+lives in that very `style` attribute, so clearing the property removes it and
+the shape falls through to the CSS default — every stopped pump came back
+**black**, measured in the browser. The page now captures each shape's authored
+fill once, before anything of ours has been written over it, exactly as it
+already does for stroke widths, and writes that value back. `/state.svg` never
+had the bug: it writes no rule for a stopped pump at all, so the authored style
+survives untouched.
+
+**And a second one, my own test loop rather than the app.** The version was
+already bumped when the black pumps were measured, so the browser held the
+previous `diagram.js` at the *same* `?v=0.16.1` URL and served it back after the
+fix. The release-keyed cache was doing exactly what it is for; a check that
+changes a static file twice under one version has to force the fetch
+(`fetch(url, {cache: "reload"})`) before reloading, or it is measuring the file
+it replaced.
+
+Verified after the fix, in the browser: TMPU running `rgb(31,95,208)`, RoughU
+running `rgb(168,106,0)`, and the four stopped pumps back on his own greys —
+`#888888`, `#868686`, `#828282`, `#989898`. Stopping TMPU returns it to
+`#979793`, its own authored fill, and restarting it turns it blue again. The
+saved render writes no rule for a stopped pump and the word `yellow` appears
+nowhere in it. Console clean.
+
+## Five letters left posted for the next ship
+
+Five more arrived in the same few minutes, and they are one coherent piece of
+work rather than corrections that can be picked off:
+
+- `20260908-fe94c769-493d71` — **sealed off means pumped, then closed and
+  holding.** The pipe between a running turbo and its closed gate is *high
+  vacuum* in that turbo's side colour, not sealed; *sealed off* becomes a
+  **remembered** state, kept per volume in the state file with the time it
+  became isolated, restored on load and replayable from history, and *isolated,
+  unknown* is left only for a volume that has no remembered state at all. It
+  also has to work inside the practice mode the next ship builds.
+- `20260908-425e4cdb-09c038` — the frame that found it; superseded by the above.
+- `20260908-e2498698-5c9c50` — a stopped pump's rim and inner lines go dark grey
+  as well, so the whole pump recedes.
+- `20260908-8eaaa7a9-334955` and `20260908-e6ada507-7aa064` — the gas mark
+  inside the QMS vessel is oversized, and H2 and O2 want a real subscript.
+
+Only the pump colour was acted on here, because it was an isolated correction to
+a line shipped an hour earlier. The rest was left posted deliberately: doing half
+of the sealed-off letter would ship a legend colour that nothing on the drawing
+can ever be in, and that is a worse release than an honest handoff.
 
 ## Usage receipt
 

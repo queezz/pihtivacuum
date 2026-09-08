@@ -76,11 +76,17 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   TMP on color to its HV color? Same for rough pumps. Rotaries and Scroll?"* A
   running turbo now wears the high-vacuum colour of the side it serves —
   `serves` in `plumbing.json`, a fact about the rig rather than about today's
-  valve positions — a running rotary or scroll wears rough vacuum, and a stopped
-  pump keeps the yellow, which is what makes a stopped turbo visible at a
-  glance. Gauges and the gas bottles still keep their own colours, and every
-  pump and valve keeps the confirmed on/off an operator presses and history
-  records.
+  valve positions — and a running rotary or scroll wears rough vacuum. Gauges
+  and the gas bottles still keep their own colours, and every pump and valve
+  keeps the confirmed on/off an operator presses and history records.
+  **Corrected within the hour, in 0.16.1** (letter `20260908-93fb84a6-5a69cf`):
+  **a stopped pump carries no ink of the app's at all** and keeps the grey
+  queezz drew it in. 0.16.0 made it yellow, on a relayed line reading "stays as
+  drawn (yellow)" — the drawing's own fill is grey and yellow was the app's own
+  *on* colour, so the release turned the off signal into the on one. His answer:
+  *"No, no! Blue and yellow, yellow reads like on. Gray for off was lost. Why?
+  WHY???"* Neither the prediction nor the operator palette paints a stopped
+  pump now, and the pumps carry no `colors` entry in `elementsConfig.json`.
 - **A high-vacuum volume takes its colour from the vessel it is joined to
   (2026-09-08).** Upstream and downstream are two colours, not one — queezz: *"I
   think I'd rather have two high vacuum colors. Upstream and downstream. To see

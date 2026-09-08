@@ -38,46 +38,26 @@
     {
         "id": "TMPU",
         "label": "Plasma turbo pump (TMPU)",
-        "colors": {
-            "active": "yellow",
-            "inactive": "gray"
-        },
         "confirmToggle": true
     },
     {
         "id": "TMPD",
         "label": "QMS turbo pump (TMPD)",
-        "colors": {
-            "active": "yellow",
-            "inactive": "gray"
-        },
         "confirmToggle": true
     },
     {
         "id": "RoughD",
         "label": "Roughing line, downstream (RoughD)",
-        "colors": {
-            "active": "yellow",
-            "inactive": "gray"
-        },
         "confirmToggle": true
     },
     {
         "id": "RoughU",
         "label": "Roughing line, upstream (RoughU)",
-        "colors": {
-            "active": "yellow",
-            "inactive": "gray"
-        },
         "confirmToggle": true
     },
     {
         "id": "Rough-Bypass",
         "label": "Roughing bypass",
-        "colors": {
-            "active": "yellow",
-            "inactive": "gray"
-        },
         "confirmToggle": true
     },
     {
@@ -246,10 +226,6 @@
     {
         "id": "gaspanel-pump",
         "label": "Gas panel pump",
-        "colors": {
-            "active": "#9bf08d",
-            "inactive": "gray"
-        },
         "confirmToggle": false
     },
     {

@@ -72,9 +72,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.16.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.16.0"}
-    assert b"v0.16.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.16.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.16.1"}
+    assert b"v0.16.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -280,11 +280,13 @@ def test_history_moment_and_rendered_state_svg(client):
     current = client.get("/state.svg")
     assert current.mimetype == "image/svg+xml"
     body = current.data.decode("utf-8")
-    # A running turbo wears the high-vacuum colour of the side it serves, and a
-    # stopped one keeps the yellow (0.16.0): TMPU is running here, so it wears
-    # the plasma side's blue and TMPD, which is not, stays yellow.
+    # A running turbo wears the high-vacuum colour of the side it serves (0.16.0)
+    # and a stopped one is left as drawn (0.16.1): TMPU is running here, so it
+    # wears the plasma side's blue, and TMPD, which is not, is not painted at all.
     assert "#TMPU{stroke:#000000 !important;fill:#1f5fd0 !important}" in body
-    assert "#TMPD{stroke:#000000 !important;fill:yellow !important}" in body
+    # And a stopped pump is left exactly as queezz drew it: nothing writes it.
+    assert "#TMPD{" not in body
+    assert "yellow" not in body
     # A valve wears the prediction's own colour, never the operator green
     # (0.15.0), and its edge goes with its fill (0.16.0): GVU is open onto a
     # turbo-pumped plasma vessel, so both its fill and its outline are that
@@ -1176,12 +1178,23 @@ def test_a_pump_wears_what_it_is_doing(client):
     confirmed on/off recorded in history like a valve, and the prediction has
     always read it -- a stopped turbo has never made high vacuum here, which
     this test also pins down.
+
+    **A stopped pump carries no ink of ours at all (0.16.1).** 0.16.0 made it
+    yellow, on a relayed line reading "stays as drawn (yellow)"; the drawing's
+    own fill is grey and the yellow was the app's *on* colour, so the release
+    turned the off signal into the on one. queezz, at once (letter
+    ``20260908-93fb84a6-5a69cf``): "No, no! Blue and yellow, yellow reads like
+    on. Gray for off was lost. Why? WHY???" So neither the prediction nor the
+    operator palette paints a stopped pump, and his grey stands.
     """
     plumbing = client.get("/plumbing").json
     colours = {state["id"]: state["color"] for state in plumbing["states"]}
-    idle = plumbing["drawing"]["pump_idle"]
     element_config = client.get("/elements-config").json
     pressable = {item["id"]: item for item in element_config}
+    # Yellow is gone from the pumps, in the map and in the operator palette.
+    assert "pump_idle" not in plumbing["drawing"]
+    for pump in plumbing["pumps"]:
+        assert "colors" not in pressable[pump["id"]], pump["id"]
 
     running = plumbing_map.predict(
         plumbing,
@@ -1197,24 +1210,29 @@ def test_a_pump_wears_what_it_is_doing(client):
     assert running["elements"]["TMPD"]["fill"] == colours["downstream-high-vacuum"]
     assert running["elements"]["RoughU"]["fill"] == colours["rough-vacuum"]
     assert running["elements"]["Rough-Bypass"]["fill"] == colours["rough-vacuum"]
-    # RoughD was not pressed, so it stays yellow beside the ones that were.
-    assert running["elements"]["RoughD"]["fill"] == idle
+    # RoughD was not pressed, so nothing paints it and it keeps his grey.
     assert running["elements"]["RoughD"]["running"] is False
+    assert "fill" not in running["elements"]["RoughD"]
+    assert "stroke" not in running["elements"]["RoughD"]
 
     # Every pump answers, keeps the black outline it was drawn with, and is an
     # ordinary confirmed toggle an operator presses and history records.
     for pump in plumbing["pumps"]:
         item = running["elements"][pump["id"]]
         assert item["pump"] is True, pump["id"]
-        assert item["stroke"] == "#000000", pump["id"]
-        assert item["fill"] == idle or item["fill"] in set(colours.values()), pump["id"]
         assert pump["id"] in pressable, pump["id"]
+        if item["running"]:
+            assert item["stroke"] == "#000000", pump["id"]
+            assert item["fill"] in set(colours.values()), pump["id"]
+        else:
+            assert "fill" not in item, pump["id"]
 
     # A turbo that is not running makes no high vacuum, and its own line is not
     # even sealed -- nothing is pumping it.
     stopped = plumbing_map.predict(plumbing, {"GVU": "active"}, "membrane")
     assert stopped["volumes"]["plasma-vessel"] == "isolated"
-    assert stopped["elements"]["TMPU"]["fill"] == idle
+    assert "fill" not in stopped["elements"]["TMPU"]
+    assert "#TMPU" not in plumbing_map.style_rules(plumbing, {"GVU": "active"}, "membrane")
     # And a turbo behind a shut gate still says which side it belongs to.
     behind_the_gate = plumbing_map.predict(plumbing, {"TMPU": "active"}, "membrane")
     assert behind_the_gate["volumes"]["plasma-turbo-line"] == "sealed"

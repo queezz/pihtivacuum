@@ -532,12 +532,20 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     # color? Same for rough pumps. Rotaries and Scroll?"). A running turbo takes
     # the high-vacuum colour of the side it serves — a fact about the rig, not
     # about today's valves, so a turbo behind a closed gate still says which
-    # chamber it belongs to — a running rotary or scroll takes rough vacuum, and
-    # a stopped one keeps the yellow, which is now what "not pumping" looks
-    # like. Every one of these already had a confirmed on/off recorded in
-    # history like a valve, and the prediction has always read it: a stopped
-    # turbo has never made high vacuum here.
-    idle_ink = drawing.get("pump_idle") or "yellow"
+    # chamber it belongs to — and a running rotary or scroll takes rough vacuum.
+    #
+    # **A stopped pump is left exactly as queezz drew it, in his own grey**, and
+    # this entry carries no ink at all so that nothing paints over it. 0.16.0
+    # made it yellow on a relayed line reading "stays as drawn (yellow)"; the
+    # drawing's own fill is grey, and yellow was the app's *on* colour, so the
+    # release turned the off signal into the on one. His answer, at once (letter
+    # 20260908-93fb84a6-5a69cf): "No, no! Blue and yellow, yellow reads like on.
+    # Gray for off was lost. Why? WHY???" Yellow is gone from every pump, here
+    # and in `elementsConfig.json`.
+    #
+    # Every one of these already had a confirmed on/off an operator presses and
+    # history records, and the prediction has always read it: a stopped turbo
+    # has never made high vacuum here.
     for pump in plumbing.get("pumps") or []:
         if _is(state, pump["id"], "active"):
             if pump.get("kind") == "turbo":
@@ -549,17 +557,11 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
                 "pump": True,
                 "running": True,
                 "state": role,
-                "fill": colors.get(role, idle_ink),
+                "fill": colors.get(role, "#000000"),
                 "stroke": "#000000",
             }
         else:
-            elements[pump["id"]] = {
-                "pump": True,
-                "running": False,
-                "state": "stopped",
-                "fill": idle_ink,
-                "stroke": "#000000",
-            }
+            elements[pump["id"]] = {"pump": True, "running": False, "state": "stopped"}
     # The drawn valve the Line configuration governs, painted here rather than
     # in the page's JavaScript so `/state.svg` and the screen cannot disagree.
     # Under *Membrane installed* it is a solid plug across the line; under every

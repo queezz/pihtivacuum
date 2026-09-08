@@ -412,7 +412,7 @@
                 "The two vessels, the manifold tees and the cross are filled with the same colour.",
                 "A two-tone body means two things reach it.",
                 "An open valve wears the colour running through it, edge and all; a closed one is white with a black outline, and the colour stops on both sides of it.",
-                "A running pump wears what it is doing; a stopped one stays yellow."
+                "A running pump wears what it is doing; a stopped one is left as drawn, in grey."
             ].forEach((sentence) => {
                 const line = document.createElement("p");
                 line.className = "muted";
@@ -446,6 +446,22 @@
      * hierarchy — thin gas tubing, thicker vacuum pipe — survives the widening,
      * and switching the band off restores exactly what he drew. */
     const authoredWidth = new Map();
+
+    /* And the fill he drew each shape with, read the same way and for the same
+     * reason. Clearing `element.style.fill` does **not** restore it: his fill
+     * lives in that very `style` attribute, so clearing the property deletes it
+     * and the shape falls through to the CSS default, black. Measured 2026-09-08
+     * on the first attempt at leaving a stopped pump alone — every stopped pump
+     * came back black. So the authored value is captured once, before anything
+     * of ours has been written over it, and written back explicitly. */
+    const authoredFill = new Map();
+
+    function fillOf(element) {
+        if (!authoredFill.has(element.id)) {
+            authoredFill.set(element.id, window.getComputedStyle(element).fill || "");
+        }
+        return authoredFill.get(element.id);
+    }
 
     function widthOf(element) {
         if (!authoredWidth.has(element.id)) {
@@ -567,8 +583,12 @@
                 //
                 // A pump wears what it is doing beside it: a running turbo the
                 // high-vacuum colour of the side it serves, a running rotary or
-                // scroll the rough-vacuum colour, a stopped one the yellow.
-                element.style.fill = item.fill;
+                // scroll the rough-vacuum colour. A **stopped** pump carries no
+                // colour of ours at all — it is put back to the grey queezz drew
+                // it in, because that grey already means off (2026-09-08: "Gray
+                // for off was lost. Why? WHY???").
+                const authoredPaint = fillOf(element);
+                element.style.fill = item.fill || authoredPaint;
                 if (item.stroke) element.style.stroke = item.stroke;
                 element.style.strokeDasharray = item.dash || "none";
                 element.style.opacity = typeof item.opacity === "number" ? String(item.opacity) : "";
@@ -752,6 +772,9 @@
             if (predicted[element.id]?.fill) return;
             const diagramElement = document.getElementById(element.id);
             if (!diagramElement) return;
+            // An element may declare no operator palette at all — the pumps do
+            // not, since 0.16.1 — and then nothing here paints it.
+            if (!element.colors) return;
             const status = normalizedStatus(state[element.id]);
             diagramElement.style.fill = element.colors[status];
         });
