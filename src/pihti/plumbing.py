@@ -703,9 +703,13 @@ def predict(
     for name, volume in volumes.items():
         verdict = by_volume.get(name, ISOLATED)
         held = sealed.get(name)
-        # A sealed volume wears the colour of what it is still holding, hatched
-        # so it can never be read as a space something is reaching right now.
+        # A sealed volume wears the colour of what it is still holding. The
+        # vessel body says *sealed* with a hatch; everything else in that volume
+        # says it by being paler, and stays solid — a hatch on a stroke is a
+        # dashed line, and queezz read dashed pipes as broken ones three letters
+        # running on 2026-09-09.
         colour = colors.get(held["was"], "#000000") if held else colors.get(verdict, "#000000")
+        pale = sealed_pale(plumbing, colour) if held else colour
         # A vessel is a volume you can see into, and a T or a cross is a small
         # one, so they say their state by their body rather than by an outline.
         # queezz, 2026-09-08: "We can go very loud, why not? Color it the color
@@ -718,16 +722,26 @@ def predict(
         # drew: they are equipment, not volumes. Every other element the map
         # names is a line, and a line was already in its volume's colour.
         bodies = set(volume.get("junctions") or ())
-        if volume.get("vessel"):
-            bodies.add(volume["vessel"])
+        # Only the drawn body of a *chamber* may carry the hatch. A tee or a
+        # cross is a small volume and takes the paler tone like its pipes: in
+        # his frame the cross, the tee above it and the gate valve between them
+        # were all under one hatch and the valve's shape was lost in the blob
+        # ("guess what shape this is and what this blob does", letter
+        # 20260908-db3ff048-8394c2). His own letter offers the escape —
+        # "drop it from tees too and hatch the two vessels alone" — and this is
+        # it.
+        chamber = volume.get("vessel")
+        if chamber:
+            bodies.add(chamber)
         mix = mix_of.get(name)
         for element_id in volume.get("elements") or []:
             if element_id in bodies:
+                hatched = bool(held) and element_id == chamber
                 body = {
                     "volume": name,
                     "state": verdict,
-                    "fill": colour,
-                    "stroke": colour,
+                    "fill": colour if hatched else pale,
+                    "stroke": colour if hatched else pale,
                 }
                 # The two-tone body, and only the body. queezz on the signal:
                 # "I think the shape gradient is a good signal. 'You are pumping
@@ -735,15 +749,16 @@ def predict(
                 # nothing is reaching it, which is the whole point of it.
                 if held:
                     body["sealed"] = True
-                    body["sealed_paint"] = _sealed_paint_id(colour)
                     body["state"] = held["was"]
+                    if hatched:
+                        body["sealed_paint"] = _sealed_paint_id(colour)
                 elif mix and mix in colors:
                     body["mix"] = colors[mix]
                     body["mix_state"] = mix
                 elements[element_id] = body
             else:
                 elements[element_id] = _line(
-                    name, held["was"] if held else verdict, colour, band, sealed=bool(held)
+                    name, held["was"] if held else verdict, pale, band, sealed=bool(held)
                 )
     # A gauge's stem is the short line from its symbol to what it reads, and it
     # belongs to that volume as much as any pipe does (queezz, 2026-09-08:
@@ -756,8 +771,13 @@ def predict(
         verdict = by_volume.get(volume_name, ISOLATED)
         held = sealed.get(volume_name)
         shown = held["was"] if held else verdict
+        stem_colour = colors.get(shown, "#000000")
         elements[stem] = _line(
-            volume_name, shown, colors.get(shown, "#000000"), band, sealed=bool(held)
+            volume_name,
+            shown,
+            sealed_pale(plumbing, stem_colour) if held else stem_colour,
+            band,
+            sealed=bool(held),
         )
     # A valve says its position with its body, at every size. An open one wears
     # the colour flowing through it; a shut one wears the closed ink, so the
@@ -786,20 +806,25 @@ def predict(
             held = sealed.get(through)
             verdict = held["was"] if held else by_volume.get(through, ISOLATED)
             colour = colors.get(verdict, "#000000")
+            # **A valve is never hatched, in any state** (owner, 2026-09-09,
+            # letter 20260908-db3ff048-8394c2, on a frame where the cross, the
+            # tee and the gate valve between them were all one hatched blob:
+            # "the dashed valve, it's like 'guess what shape this is and what
+            # this blob does'"). A valve keeps its own two looks and nothing
+            # else: open, filled and rimmed in the colour flowing through it;
+            # closed, white with a black rim. Inside a sealed space that colour
+            # is the paler sealed tone, so the valve still belongs to its pipes
+            # and is still unmistakably a valve at arm's length.
             item = {
                 "valve": True,
                 "open": True,
                 "volume": through,
                 "state": verdict,
-                "fill": colour,
-                "stroke": colour,
+                "fill": sealed_pale(plumbing, colour) if held else colour,
+                "stroke": sealed_pale(plumbing, colour) if held else colour,
             }
             if held:
-                # An open valve inside a sealed space is part of that space, so
-                # it wears the same hatch: a solid one would read as a route
-                # something is coming through right now.
                 item["sealed"] = True
-                item["sealed_paint"] = _sealed_paint_id(colour)
             elements[valve["id"]] = item
         else:
             elements[valve["id"]] = {
@@ -922,6 +947,41 @@ def predict(
 def _sealed_paint_id(colour: str) -> str:
     """The name of the hatch pattern for one remembered colour."""
     return "pihti-sealed-" + colour.replace("#", "")
+
+
+def _mix_hex(colour: str, toward: str, fraction: float) -> str:
+    """One colour moved a fraction of the way toward another."""
+    if not _safe_color(colour) or not _safe_color(toward):
+        return colour
+    a = [int(colour[index : index + 2], 16) for index in (1, 3, 5)]
+    b = [int(toward[index : index + 2], 16) for index in (1, 3, 5)]
+    fraction = min(1.0, max(0.0, fraction))
+    return "#" + "".join(
+        f"{round(left + (right - left) * fraction):02x}" for left, right in zip(a, b)
+    )
+
+
+def sealed_pale(plumbing: dict, colour: str) -> str:
+    """A sealed volume's pipe tone: the remembered colour, but quieter.
+
+    queezz, 2026-09-09, three letters in five minutes on the first build of the
+    hatch (``20260908-b1c0ba9c-342679``, ``20260908-a8f73fdc-616055``,
+    ``20260908-db3ff048-8394c2``): *"I don't like the broken lines. They are
+    pipes. That reads like a breakage."* A hatch painted onto a 4 px stroke is a
+    dashed line, whatever it was meant to be, and *"the dashed valve, it's like
+    'guess what shape this is and what this blob does'."* So the hatch is on the
+    two vessel bodies and nowhere else, and a sealed volume's pipes, tees,
+    crosses, gauge stems and open valves are **solid** in this paler tone of what
+    the volume is holding.
+
+    It is honestly quieter than the palette's own 3:1 floor against the stone
+    field, and that is the point: a sealed pipe is not a live claim. The floor
+    still governs every live colour; the amount lives in the map as
+    ``sealed_pale`` so it can be dialled without touching code.
+    """
+    drawing = plumbing.get("drawing") or {}
+    ground = drawing.get("ground") or "#e3dfd6"
+    return _mix_hex(colour, ground, float(drawing.get("sealed_pale") or 0.35))
 
 
 MARK_FRACTION = 0.45
@@ -1111,13 +1171,18 @@ def _line(
     glow: queezz saw the 0.11.2 halo and said "that's more readable, yes. Also
     way more ugly". An isolated line is never widened — the absence of a claim
     should not be the loudest thing on the drawing.
+
+    **A pipe is always a solid stroke** (owner standing rule, 2026-09-09, letter
+    ``20260908-a8f73fdc-616055``): *"I don't like the broken lines. They are
+    pipes. That reads like a breakage."* So ``sealed`` here says only that the
+    colour handed in is already the paler sealed tone; it never adds a pattern,
+    a dash or a gap, in any state.
     """
     item = {"volume": volume, "state": verdict, "stroke": colour}
     if verdict != ISOLATED and band > 1:
         item["band"] = band
     if sealed:
         item["sealed"] = True
-        item["sealed_paint"] = _sealed_paint_id(colour)
     return item
 
 

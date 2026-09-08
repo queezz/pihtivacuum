@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import tomllib
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -2800,3 +2801,145 @@ def test_h2_and_o2_are_written_with_a_true_subscript(client):
     # The legend and the readout say it in HTML, where <sub> is the right thing.
     assert "function formulaHtml(symbol)" in script
     assert 'document.createElement("sub")' in script
+
+
+def test_the_sealed_hatch_touches_a_chamber_body_and_nothing_else(client):
+    """A pipe is a solid stroke in every state, and a valve is never hatched.
+
+    Three letters in five minutes, 2026-09-09, on the first build of the hatch.
+    queezz watching the tree live: "The predictor is inventing something
+    hallucinogenic... for some reason lines broke down. Inventive destruction."
+    Then, plainly: "I don't like the broken lines. They are pipes. That reads
+    like a breakage." And on a close-up of the cross, the tee above it and the
+    gate valve between them all under one hatch: "the dashed valve, it's like
+    'guess what shape this is and what this blob does'."
+
+    A hatch painted onto a 4 px stroke *is* a dashed line, whatever it was meant
+    to be. So the hatch is on the two chamber bodies alone, and every pipe, tee,
+    cross, gauge stem and open valve in a sealed volume is **solid** in a paler
+    tone of what the volume is holding.
+    """
+    plumbing = client.get("/plumbing").json
+    colours = {state["id"]: state["color"] for state in plumbing["states"]}
+    started = datetime(2026, 9, 9, 14, 0, 0)
+    # Both sides of the open gas-line valve remember high vacuum, so the valve
+    # itself stands inside a sealed space and has to say so without a hatch.
+    memory = {
+        name: {
+            "state": "upstream-high-vacuum",
+            "since": started.strftime(plumbing_map.TIME_FORMAT),
+        }
+        for name in ("plasma-vessel", "gas-manifold")
+    }
+    reading = sealed_state_of(plumbing, {"gasline-main": "active"}, memory, started)
+    assert "plasma-vessel" in reading["sealed"]
+    blue = colours["upstream-high-vacuum"]
+    pale = plumbing_map.sealed_pale(plumbing, blue)
+    assert pale != blue
+
+    volume = plumbing["volumes"]["plasma-vessel"]
+    chamber = volume["vessel"]
+    # The chamber body, and only it, carries the hatch.
+    body = reading["elements"][chamber]
+    assert body["sealed_paint"] == "pihti-sealed-" + blue.lstrip("#")
+    assert body["fill"] == body["stroke"] == blue
+
+    # Every other element of that volume -- pipes, and the tees and crosses the
+    # map calls junctions -- is solid in the paler tone and carries no pattern.
+    others = [name for name in volume["elements"] if name != chamber]
+    assert others
+    for name in others:
+        item = reading["elements"][name]
+        assert "sealed_paint" not in item, name
+        assert item.get("stroke") == pale, name
+        assert "dash" not in item, name
+
+    # A gauge stem on that volume is a pipe like any other.
+    stems = [
+        gauge["stem"]
+        for gauge in plumbing["gauges"]
+        if gauge.get("volume") == "plasma-vessel" and gauge.get("stem")
+    ]
+    for stem in stems:
+        assert reading["elements"][stem]["stroke"] == pale, stem
+        assert "sealed_paint" not in reading["elements"][stem], stem
+
+    # And no valve anywhere is ever hatched: each keeps its own two looks, so it
+    # stays unmistakably a valve at arm's length in every state.
+    valves = [item for item in reading["elements"].values() if item.get("valve")]
+    assert valves
+    for item in valves:
+        assert "sealed_paint" not in item
+        if item["open"]:
+            assert item["fill"] == item["stroke"]
+        else:
+            assert (item["fill"], item["stroke"]) == ("#ffffff", "#000000")
+    # An open valve standing in a sealed space wears that space's paler tone, so
+    # it belongs to those pipes rather than shouting over them.
+    inside = [item for item in valves if item.get("sealed")]
+    assert inside
+    for item in inside:
+        held = reading["sealed"][item["volume"]]
+        assert item["fill"] == plumbing_map.sealed_pale(plumbing, colours[held["was"]])
+
+    # Nothing anywhere in a saved render paints a stroke with a pattern, and no
+    # element of any kind asks for a dash: a pipe is solid in every state.
+    saved = plumbing_map.style_rules(
+        plumbing, {"gasline-main": "active", plumbing_map.MEMORY_KEY: memory}, "membrane"
+    )
+    # No element is ever given an actual dash pattern. The one `stroke-dasharray`
+    # the render writes is the explicit `none` on the drawn valve the Line
+    # configuration governs, which is the opposite of a dash.
+    dashes = re.findall(r"stroke-dasharray:([^ ;}]+)", saved)
+    assert dashes and set(dashes) == {"none"}, dashes
+    # Exactly one rule in the whole render mentions the hatch, and it is the
+    # chamber's own -- fill and stroke alike, because a vessel body is one
+    # colour edge and all. Every other rule is a flat colour.
+    hatched_rules = [
+        rule for rule in saved.split("}") if "url(#pihti-sealed-" in rule
+    ]
+    assert len(hatched_rules) == 1
+    assert hatched_rules[0].startswith(f"#{chamber}{{")
+
+
+def test_live_always_beats_the_memory(client):
+    """"The rough pump pumps, it can really do that."
+
+    The sealed state belongs to a volume nothing reaches. The instant a pump, a
+    gas or air reaches it through open valves the memory stops being what the
+    drawing says and the live prediction takes over again -- and the memory is
+    rewritten to what it now holds, with no isolation moment on it, so the clock
+    restarts from the next time it is shut rather than from the last one.
+    """
+    plumbing = client.get("/plumbing").json
+    started = datetime(2026, 9, 9, 14, 0, 0)
+    memory = {
+        "plasma-vessel": {
+            "state": "upstream-high-vacuum",
+            "since": started.strftime(plumbing_map.TIME_FORMAT),
+        }
+    }
+    shut = sealed_state_of(plumbing, {}, memory, started)
+    assert shut["volumes"]["plasma-vessel"] == "isolated"
+    assert shut["sealed"]["plasma-vessel"]["was"] == "upstream-high-vacuum"
+
+    # Open the gate onto the running turbo: the vessel is high vacuum now, and
+    # nothing about it is sealed any more.
+    reached = sealed_state_of(
+        plumbing, {"GVU": "active", "TMPU": "active"}, memory, started
+    )
+    assert reached["volumes"]["plasma-vessel"] == "upstream-high-vacuum"
+    assert "plasma-vessel" not in reached["sealed"]
+    assert "sealed" not in reached["elements"][plumbing["volumes"]["plasma-vessel"]["vessel"]]
+
+    # And the memory follows the live reading, with its clock cleared.
+    after = plumbing_map.update_memory(plumbing, memory, reached, started)
+    assert after["plasma-vessel"] == {"state": "upstream-high-vacuum", "since": None}
+
+    # Air reaching it wins the same way, and the memory becomes air.
+    vented = sealed_state_of(plumbing, {"gaspanel-valve-vent": "active",
+                                        "gaspanel-valve-ar": "active",
+                                        "gasline-ar": "active",
+                                        "gasline-main": "active"}, memory, started)
+    assert vented["volumes"]["plasma-vessel"] == "air"
+    assert "plasma-vessel" not in vented["sealed"]

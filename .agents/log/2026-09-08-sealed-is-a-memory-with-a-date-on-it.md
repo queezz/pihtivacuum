@@ -302,6 +302,80 @@ kept pure with the memory as an argument precisely so the practice mode can run
 it over a local copy; and the scroll bar the last letter names was seen again in
 this walk, on the six-step *Vent Plasma* card at 1440×900.
 
+## Corrected within the session: the hatch was making dashed pipes
+
+Five more letters arrived while this was being written — queezz was watching the
+tree on his own service — and three of them are one correction to the release
+above, which is why it went in before this session ended rather than into the
+next ship's pile.
+
+His words, in order: *"The predictor is inventing something hallucinogenic...
+for some reason lines broke down. Inventive destruction."* Then, plainly: *"I
+don't like the broken lines. They are pipes. That reads like a breakage."* And
+on a close-up of the plasma cross, the tee above it and the gate valve between
+them all under one blue hatch: *"the dashed valve, it's like 'guess what shape
+this is and what this blob does'."*
+
+He is right and the cause is simple: **a hatch painted onto a 4 px stroke is a
+dashed line.** The pattern was applied to fills and strokes alike, so every pipe,
+tee, gauge stem and open valve in a sealed volume came out gapped. On a rig
+sitting shut down that is most of the drawing.
+
+The rule now, and it is a standing one:
+
+- **The hatch is on the two chamber bodies and nowhere else.** Not a tee, not a
+  cross, not a pipe, not a gauge stem, and never a valve. His own letter offered
+  the escape — *"drop it from tees too and hatch the two vessels alone"* — and
+  that is what was taken, because the blob he photographed was the tee and the
+  valve sharing the cross's hatch.
+- **Every pipe is a solid stroke in every state.** Nothing anywhere is given a
+  dash pattern; measured in the browser, zero elements in the whole SVG carry a
+  `stroke-dasharray`, and the only one a saved render writes is the explicit
+  `none` on the drawn valve the Line configuration governs.
+- **A sealed volume's pipes, tees, crosses, gauge stems and open valves are
+  solid in a paler tone** of what the volume is holding — 35 % of the way toward
+  the drawing's own ground, `sealed_pale` in the map so it can be dialled without
+  touching code.
+- **A valve keeps its own two looks in every state**: open, filled and rimmed in
+  the colour flowing through it; closed, white with a black rim.
+
+Measured after the fix, at 1440×900, with both vessels sealed: the two chamber
+bodies carry the pattern and no other element does; pipes solid at
+`rgb(100,140,210)`, tees solid at `rgb(189,105,176)`, GVU white on black; zero
+dashed elements anywhere in the drawing.
+
+**The honest cost, so he knows what he asked for.** The paler tones sit below
+the palette's own 3:1 floor against the stone field, deliberately — a sealed pipe
+is not a live claim:
+
+| state | live | on the field | sealed pale | on the field |
+| --- | --- | --- | --- | --- |
+| Air | `#c81d24` | 4.32 | `#d16162` | 2.82 |
+| Gas | `#a92a9c` | 4.51 | `#bd69b0` | 2.72 |
+| High vacuum, plasma side | `#1f5fd0` | 4.38 | `#648cd2` | 2.54 |
+| High vacuum, QMS side | `#0e8a46` | 3.33 | `#59a878` | 2.16 |
+| Rough vacuum | `#a86a00` | 3.34 | `#bd934b` | 2.12 |
+| Isolated, unknown | `#7f7b75` | 3.16 | `#a29e97` | 2.01 |
+
+The floor still governs every live colour and every legend chip; only the sealed
+tone goes under it, which is the whole signal.
+
+**And live still beats the memory**, which his first letter also asked to be
+sure of. It always did — a sealed reading is only ever produced for a volume the
+walk finds isolated — and it is now pinned by a test and was proved in the
+browser: with the plasma vessel sealed, opening GVU onto the running turbo made
+it full-strength high vacuum immediately, with no sealed flag and no hatch. What
+his frame actually showed is the *next* letter's subject: the rough pump could
+not reach that vessel because **the map treats a stopped turbo as a wall**, and
+he has now ruled that it is a passage. That is a change to the connectivity model
+rather than to the drawing, and it is recorded in directions for the next ship
+with his ruling attached — it also closes the standing question this repository
+had been holding open about exactly that.
+
+Two more tests: one that the hatch touches a chamber body and nothing else, in
+the prediction and in a saved render alike, and one that live always beats the
+memory. 71 passing.
+
 ## Usage receipt
 
 Provider Anthropic, model Claude Opus 5. Task: commander run round 7 resumed:
