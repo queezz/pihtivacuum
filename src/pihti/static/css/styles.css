@@ -405,6 +405,16 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 
 .guide-alert { margin: 0 0 10px; }
 
+/* The gas symbol drawn inside a vessel that is holding that gas: the same
+   white circle with a black rim the bottles wear on the drawing, so a reader
+   already knows what it means. queezz, 2026-09-08: "we can put a gas in a
+   circle (same as the bottle sign) inside the plasma vessel. Ar, O2, H2. So
+   it's visible big at a glance." It is never pressed, so it never takes the
+   pointer either. */
+#pihti-gas-symbols { pointer-events: none; }
+.gas-symbol-body { fill: #ffffff; stroke: #111111; stroke-width: 2; }
+.gas-symbol-text { fill: #111111; font-family: sans-serif; font-weight: bold; }
+
 /* Guide markers — the numbered beacons — sit on the authored diagram, so they
    are the one thing drawn in the page's own dark ink with a white rim: nothing
    on the diagram itself looks like them. The current step's markers carry a

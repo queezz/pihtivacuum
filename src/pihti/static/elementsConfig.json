@@ -263,7 +263,7 @@
     },
     {
         "id": "bypass-ionization-gauge",
-        "label": "Bypass ionization gauge",
+        "label": "Upstream ionization gauge",
         "colors": {
             "active": "#ffc75e",
             "inactive": "gray"

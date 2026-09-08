@@ -2,34 +2,49 @@
     "note": "Which drawn pipe belongs to which vacuum volume, and which valve joins which two volumes. Read from the names queezz gave the pipes in diagram.svg, never from where the lines happen to sit on the page. The vacuum state derived from this is a prediction from the valve positions an operator has entered, not a pressure measurement.",
     "prototype": true,
     "drawing": {
-        "note": "The field the drawing is painted on, and how much wider a coloured pipe is drawn than queezz authored it. The field is a quiet warm stone so the five state colours are the loudest thing on the page (owner permission 2026-09-08); the band is a solid widening of the pipe's own stroke, never a translucent glow. An isolated pipe is not widened at all: the absence of a claim should not shout.",
+        "note": "The field the drawing is painted on, how much wider the reading aid draws a coloured pipe, and the two inks a valve wears. The field is a quiet warm stone so the state colours are the loudest thing on the page (owner permission 2026-09-08). `band` is the widening the More switch offers; `band_default` is false since 0.15.0, because queezz's own strokes are the width he wants (letter 20260908-c8ef7df5-5f5e40) and a widening he did not ask for is the app talking over his drawing. `valve_closed` is the ink a shut valve wears: white, so a colour can never run through it and the pipe visibly stops short on both sides (queezz, 2026-09-08, 'GVU is closed... Yet at a glance it seems that it does'). An open valve wears the colour flowing through it instead, at every valve size, which is what makes a small open valve readable from arm's length.",
         "ground": "#e3dfd6",
-        "band": 1.6
+        "band": 1.6,
+        "band_default": false,
+        "valve_closed": "#ffffff"
     },
+    "states_note": "Seven roles since 0.15.0, chosen from Paul Tol's muted qualitative set first and Okabe-Ito second, then darkened only as far as the stone field demanded: every one of them clears 3:1 against `#e3dfd6`, which caps a colour's own luminance at about 0.21 and is why none of them is the source palette's own lightness. They also climb one ladder of weight — air is the darkest and isolated the lightest — so a reader who cannot separate two hues can still separate them by how heavy they look. High vacuum split in two on 2026-09-08 ('I think I'd rather have two high vacuum colors. Upstream and downstream. To see mixing clearly'), and a high-vacuum volume takes its colour from the vessel it is joined to. `sealed` is the seventh: a turbo-pumped volume that reaches no vessel at all — the pipe between a closed gate and its own turbo — which must never wear a vessel's colour, because that is exactly the glance that read as open.",
     "states": [
         {
             "id": "air",
             "label": "Air",
-            "color": "#8a0026",
+            "color": "#701225",
             "meaning": "a vent is open"
         },
         {
             "id": "gas",
             "label": "Gas",
-            "color": "#6a1fb5",
-            "meaning": "a bottle or N2 is open"
+            "color": "#752f69",
+            "meaning": "a bottle or N2 is open, and its symbol is drawn in the vessel"
         },
         {
-            "id": "high-vacuum",
-            "label": "High vacuum",
-            "color": "#1150cc",
-            "meaning": "a turbo is running"
+            "id": "upstream-high-vacuum",
+            "label": "High vacuum, plasma side",
+            "color": "#005e92",
+            "meaning": "a turbo reaches it, and so does the plasma vessel"
+        },
+        {
+            "id": "downstream-high-vacuum",
+            "label": "High vacuum, QMS side",
+            "color": "#117733",
+            "meaning": "a turbo reaches it, and so does the QMS vessel"
         },
         {
             "id": "rough-vacuum",
             "label": "Rough vacuum",
-            "color": "#0a7268",
+            "color": "#936500",
             "meaning": "a rough pump only"
+        },
+        {
+            "id": "sealed",
+            "label": "Pumped, sealed off",
+            "color": "#6d7786",
+            "meaning": "a turbo pumps it, but no vessel reaches it"
         },
         {
             "id": "isolated",
@@ -38,11 +53,15 @@
             "meaning": "nothing open to it"
         }
     ],
+    "volumes_note": "A `vessel` is the drawn body of a chamber and a `junction` a small one (a tee, a cross); both say their state by their body rather than by an outline. A vessel also declares, since 0.15.0, the `high_vacuum` colour anything joined to it wears, its `rank` (the lower one leads when the two chambers are joined, which puts the plasma vessel first), and a `symbol_box` -- the rectangle inside its drawn shape where a gas symbol may stand. The box is written here rather than derived because the plasma vessel is a cross, not a rectangle, and the middle of its bounding box is not the middle of anything a circle fits in; a test proves each box really is inside the shape it names, so an edit in Inkscape that moved a vessel cannot leave a symbol floating outside it.",
     "volumes": {
         "plasma-vessel": {
             "label": "Plasma vessel",
             "group": "pipes-plasma-vacuum",
             "vessel": "plasma-vacuum",
+            "high_vacuum": "upstream-high-vacuum",
+            "rank": 1,
+            "symbol_box": [221.14, 267.94, 401.14, 326.94],
             "elements": [
                 "plasma-vacuum",
                 "plasma-vacuum-gas-manifold",
@@ -71,6 +90,9 @@
             "label": "QMS vessel",
             "vessel": "qms-vacuum",
             "group": "pipes-qms-vacuum",
+            "high_vacuum": "downstream-high-vacuum",
+            "rank": 2,
+            "symbol_box": [595.95, 292.59, 664.89, 385.48],
             "elements": [
                 "qms-vacuum",
                 "qms-vacuum-gauges-port",
@@ -248,12 +270,13 @@
         {"id": "Rough-Bypass", "kind": "rough", "volume": "bypass-pumpline"},
         {"id": "gaspanel-pump", "kind": "rough", "volume": "gas-panel-pumpline"}
     ],
+    "gas_sources_note": "`symbol` is what the bottle wears on the drawing, and since 0.15.0 it is also drawn large inside any vessel the gas reaches (queezz, 2026-09-08: 'we can put a gas in a circle (same as the bottle sign) inside the plasma vessel. Ar, O2, H2. So it's visible big at a glance'). Several gases open at once draw several circles. Nothing is derived from the gas name: the symbol is written here beside it.",
     "gas_sources": [
-        {"id": "hydrogen-bottle", "volume": "hydrogen-line", "gas": "hydrogen"},
-        {"id": "oxygen-bottle", "volume": "oxygen-line", "gas": "oxygen"},
-        {"id": "argon-bottle", "volume": "argon-line", "gas": "argon"},
-        {"id": "helium-bottle", "volume": "argon-line", "gas": "helium"},
-        {"id": "gaspanel-valve-n", "volume": "gas-panel-manifold", "gas": "nitrogen"}
+        {"id": "hydrogen-bottle", "volume": "hydrogen-line", "gas": "hydrogen", "symbol": "H2"},
+        {"id": "oxygen-bottle", "volume": "oxygen-line", "gas": "oxygen", "symbol": "O2"},
+        {"id": "argon-bottle", "volume": "argon-line", "gas": "argon", "symbol": "Ar"},
+        {"id": "helium-bottle", "volume": "argon-line", "gas": "helium", "symbol": "He"},
+        {"id": "gaspanel-valve-n", "volume": "gas-panel-manifold", "gas": "nitrogen", "symbol": "N2"}
     ],
     "line_configuration": {
         "note": "What sits in the narrow pipe between the two vessels, from the Line configuration annotation an operator sets on the Vacuum page. Only 'Pipe open' is a connection: with a membrane installed, something is mounted across the whole pipe and each valve on it opens onto its own private side of the barrier, so the two vessels are separate spaces (owner review 2026-09-08). Boron deposition uses the same pipe, but its far (downstream) end is not joined at all: queezz, 2026-09-08 (letter 20260907-dc825e44-e6d89e) -- 'Boron uses same pipe. But other end not connected to downstream. Could be pumped from plasma side via bypass.' -- so `dead_end_valve` names the downstream valve that never reaches this pipe in that mode, whatever position it is in; the pipe then simply takes the plasma side's own predicted state (or isolated, if even that side is shut), and it can still be pumped from the plasma side through the bypass manifold because that reach never ran through this pipe's far end. Until an operator has recorded which configuration applies, the prediction does not claim a connection nobody has told it about. `linked_valve` names the drawn valve this whole annotation also governs directly (owner decision 2026-09-08, same letter: 'Membrane installed and the membrane valve should be linked') -- it has no press of its own any more, closed only under `closed_mode` and open under every other configuration, so its own colour and what it does to the diagram's connectivity can never disagree.",
@@ -266,13 +289,13 @@
         },
         "linked_valve": {"id": "Membrane", "closed_mode": "membrane"}
     },
-    "gauges_note": "`stem` is the short line from a gauge symbol to the pipe or vessel it reads. queezz drew each one as an Inkscape-named path beside its gauge and asked whether the app could work with that rather than name six more elements (2026-09-08). It can: three sit inside their gauge's own group as its only plain line, and three are the plain line drawn immediately before their gauge at the top level of the drawing. Nothing was guessed — each id below is that one line, and a test proves it is still the gauge's own neighbour so a regroup in Inkscape cannot silently point a stem at the wrong volume. `kind: \"ionization\"` marks the two gauges that must not see gas or air while they are switched on, and it is on exactly the two whose own names say so; queezz settled the rest on 2026-09-04 — when venting, 'only ionization gauges go off (Baratron, Pirani, the Pfeiffer single gauge and the Ulvac membrane gauge work at one atmosphere)'. Nothing else here is read as an ionization gauge, and a gauge with no `kind` is simply never warned about.",
+    "gauges_note": "`stem` is the short line from a gauge symbol to the pipe or vessel it reads. queezz drew each one as an Inkscape-named path beside its gauge and asked whether the app could work with that rather than name six more elements (2026-09-08). It can: three sit inside their gauge's own group as its only plain line, and three are the plain line drawn immediately before their gauge at the top level of the drawing. Nothing was guessed — each id below is that one line, and a test proves it is still the gauge's own neighbour so a regroup in Inkscape cannot silently point a stem at the wrong volume. `kind: \"ionization\"` marks the two gauges that must not see gas or air while they are switched on, and it is on exactly the two whose own names say so; queezz settled the rest on 2026-09-04 — when venting, 'only ionization gauges go off (Baratron, Pirani, the Pfeiffer single gauge and the Ulvac membrane gauge work at one atmosphere)'. Nothing else here is read as an ionization gauge, and a gauge with no `kind` is simply never warned about. **Moved 2026-09-08** (owner, letter 20260908-c8ef7df5-5f5e40: 'moved the upstream IG to gauges manifold, where it is physically now for some time already'): `bypass-ionization-gauge` reads the **plasma vessel** now, not the bypass manifold — queezz moved its whole group onto the plasma vessel's gauge manifold in the drawing, beside the single gauge and the upstream Baratron, and the map follows the drawing. Its id and its stem are unchanged, because an id is his to rename and this was a move, not a rename. The bypass manifold is therefore left with one gauge and no ionization gauge at all: `bypass-absolute-gauge`, the Ulvac the two pump-down guides already send you to read.",
     "warnings_note": "The two press warnings of 0.13.0 are read from this map and from nothing else: a switched-on gauge marked `kind: \"ionization\"` whose volume the press would join to gas or vent air, and a running pump of `kind: \"turbo\"` whose own volume the press would join to vent air. A turbo is a boundary in the prediction, so the volume that matters for it is its own, never everything behind it. Both are predictions from the valve positions an operator entered — the same walk that colours the pipes — and never an interlock: nothing here reads a pressure, refuses a press, or protects any hardware.",
     "gauges": [
         {"id": "upstream-single-gauge", "volume": "plasma-vessel", "stem": "path1464-1-2-8-9-3-9"},
         {"id": "upstream-baratron", "volume": "plasma-vessel", "stem": "path1464-1-2-8-9-7"},
         {"id": "bypass-absolute-gauge", "volume": "bypass-manifold", "stem": "path1464-1-2-8-9"},
-        {"id": "bypass-ionization-gauge", "kind": "ionization", "volume": "bypass-manifold", "stem": "path1464-1-2-8-9-3"},
+        {"id": "bypass-ionization-gauge", "kind": "ionization", "volume": "plasma-vessel", "stem": "path1464-1-2-8-9-3"},
         {"id": "downstream-ionization-gauge", "kind": "ionization", "volume": "qms-vessel", "stem": "path1464-1-2-8-9-3-8"},
         {"id": "downstream-baratron", "volume": "qms-vessel", "stem": "path1464-1-2-8-9-7-3"}
     ]

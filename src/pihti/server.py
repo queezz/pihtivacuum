@@ -240,13 +240,17 @@ def render_state_svg(
     state: dict,
     plumbing: dict | None = None,
     line_mode: str | None = None,
+    wide: bool = False,
 ) -> str:
     """Return the authored SVG with operator-entered fills applied as a style block.
 
     With a volume map, the pipes also carry their predicted vacuum state as a
-    stroke colour, the solid band that widens them, and the two vessels and the
-    manifold junctions their state colour as a fill — the same prediction the
-    page draws, so a saved or historical render reads the same way.
+    stroke colour with round caps and joins, the two vessels and the manifold
+    junctions their state colour as a fill — two-tone where two things reach
+    them — every valve its open or closed ink, and any vessel holding gas the
+    bottle symbols drawn inside it. That is the same prediction the page paints,
+    so a saved or historical render reads the same way. ``wide`` is the page's
+    own widening switch, off by default since 0.15.0.
 
     A drawn valve the map links to the Line configuration (the ``Membrane``
     element) is read through that configuration here too, so its own fill in
@@ -254,20 +258,35 @@ def render_state_svg(
     to it.
     """
     rules = []
+    overlay = ""
+    predicted_fills: set[str] = set()
     if plumbing:
         state = plumbing_map.apply_line_mode_to_state(plumbing, state, line_mode)
+        prediction = plumbing_map.predict(plumbing, state, line_mode)
         rules.append(
             plumbing_map.style_rules(
                 plumbing,
                 state,
                 line_mode,
                 plumbing_map.authored_stroke_widths(svg_text),
+                wide=wide,
             )
         )
+        overlay = plumbing_map.overlay_markup(plumbing, state, line_mode, svg_text)
+        predicted_fills = {
+            element_id
+            for element_id, item in prediction["elements"].items()
+            if item.get("fill")
+        }
     for item in element_config:
         element_id = item.get("id")
         colors = item.get("colors") or {}
         if not element_id or not isinstance(colors, dict):
+            continue
+        # A valve says its position in the prediction's own colours now, so the
+        # operator palette must not paint over it (0.15.0). Pumps, gauges and
+        # the gas bottles keep theirs: they are equipment, not volumes.
+        if element_id in predicted_fills:
             continue
         active = state.get(element_id) in ("active", True)
         fill = colors.get("active" if active else "inactive")
@@ -279,7 +298,7 @@ def render_state_svg(
     closing = svg_text.rfind("</svg>")
     if closing < 0:
         return svg_text
-    return svg_text[:closing] + style + svg_text[closing:]
+    return svg_text[:closing] + style + overlay + svg_text[closing:]
 
 
 def operator_required(view):
@@ -569,6 +588,18 @@ def create_app(test_config: dict | None = None) -> Flask:
     def current_state_flags() -> dict[str, bool]:
         return {key: value == "active" for key, value in elements_state.items()}
 
+    def current_prediction(mode: str | None = None) -> dict:
+        """The prediction for the state as it stands, this second.
+
+        One walk over the volume map: a few hundred dictionary lookups, no file
+        read and no drawing parsed. It rides back on the two routes that change
+        something so the page can repaint from the same answer that made the
+        change (0.15.0), instead of asking ``/predicted-vacuum`` for it in a
+        second round trip — which is what queezz felt as "membrane installed to
+        open pipe is VERY slow. And no reason for it to be slow."
+        """
+        return plumbing_map.predict(plumbing, elements_state, mode or current_line_mode())
+
     def current_line_mode() -> str:
         """What an operator last said is mounted in the line between the vessels."""
         context = _load_json(Path(app.config["OPERATION_CONTEXT_FILE"]), {})
@@ -621,8 +652,11 @@ def create_app(test_config: dict | None = None) -> Flask:
             state = state_at_index(events, current_state_flags(), idx)
             mode = line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment)
         svg_text = (Path(app.static_folder) / "diagram.svg").read_text(encoding="utf-8")
+        # `?wide=1` matches a browser whose reading-aid switch is on. Off is the
+        # default on both sides since 0.15.0, so the two agree without asking.
+        wide = request.args.get("wide") in {"1", "true", "on"}
         return Response(
-            render_state_svg(svg_text, element_config, state, plumbing, mode),
+            render_state_svg(svg_text, element_config, state, plumbing, mode, wide=wide),
             mimetype="image/svg+xml",
         )
 
@@ -639,7 +673,13 @@ def create_app(test_config: dict | None = None) -> Flask:
                 {"error": f"{element_id} follows the Line configuration and cannot be set directly."}
             ), 400
         if elements_state.get(element_id, "inactive") == status:
-            return jsonify({"message": "State unchanged", "state": elements_state})
+            return jsonify(
+                {
+                    "message": "State unchanged",
+                    "state": elements_state,
+                    "prediction": current_prediction(),
+                }
+            )
 
         touch_operator()
 
@@ -656,7 +696,16 @@ def create_app(test_config: dict | None = None) -> Flask:
         logs.append(log_entry)
         del logs[:-MAX_LOGS]
         save_log_csv(log_entry, Path(app.config["LOG_FILE"]))
-        return jsonify({"message": "State updated successfully", "state": elements_state})
+        # The new prediction travels back with the press. It is the same walk
+        # `/predicted-vacuum` would answer with a moment later, and sending it
+        # here is what lets the page redraw in one round trip instead of two.
+        return jsonify(
+            {
+                "message": "State updated successfully",
+                "state": elements_state,
+                "prediction": current_prediction(),
+            }
+        )
 
     @app.route("/download_logs")
     def download_logs():
@@ -777,7 +826,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         if mode not in {"membrane", "open", "boron"}:
             return jsonify({"error": "Invalid line configuration"}), 400
         if context.get("line_mode") == mode:
-            return jsonify(context)
+            return jsonify({**context, "prediction": current_prediction(mode)})
         touch_operator()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         context = {
@@ -799,7 +848,11 @@ def create_app(test_config: dict | None = None) -> Flask:
             writer.writerow(
                 {"timestamp": timestamp, "line_mode": mode, "user": session["username"]}
             )
-        return jsonify(context)
+        # The prediction for the configuration just recorded rides back with it,
+        # so the drawing redraws from this answer rather than from two more
+        # round trips (0.15.0; queezz on 0.13.0: "membrane installed to open pipe
+        # is VERY slow. And no reason for it to be slow.").
+        return jsonify({**context, "state": elements_state, "prediction": current_prediction(mode)})
 
     @app.route("/version")
     def version():

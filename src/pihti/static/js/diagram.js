@@ -25,7 +25,10 @@
     /* The last prediction the server sent, so the band switch can repaint from
      * it without asking again. */
     let lastPrediction = null;
-    let bandOn = true;
+    /* The widening is off by default from 0.15.0: queezz drew the pipe widths
+     * he wants, and an app that redraws them wider without being asked is
+     * talking over his drawing. The More switch still offers it. */
+    let bandOn = false;
 
     function normalizedStatus(value) {
         return value === "active" || value === true ? "active" : "inactive";
@@ -104,8 +107,10 @@
 
     async function toggleElementStatus(element, config) {
         if (isInteracting) return;
-        const currentFill = rgbToHex(element.style.fill || window.getComputedStyle(element).fill);
-        const newStatus = currentFill === config.colors.active ? "inactive" : "active";
+        // Read the press from the recorded state, never off the paint: a valve
+        // wears the volume's colour now, so its fill no longer says whether it
+        // is open (0.15.0).
+        const newStatus = normalizedStatus(vacuumState[element.id]) === "active" ? "inactive" : "active";
         // Held from here rather than from after the box, so the five-second
         // refresh cannot repaint the drawing out from under an open question.
         isInteracting = true;
@@ -119,7 +124,6 @@
             // still asks when there is something to say.
             if ((notice || config.confirmToggle)
                 && !window.confirm(notice ? `${notice}\n\n${question}` : question)) return;
-            element.style.fill = newStatus === "active" ? config.colors.active : config.colors.inactive;
             const response = await fetch("/update", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -133,7 +137,7 @@
                 return;
             }
             vacuumState = result.state || {...vacuumState, [element.id]: newStatus};
-            applyState(vacuumState);
+            applyState(vacuumState, undefined, result.prediction);
         } catch (error) {
             applyState(vacuumState);
             console.error("Diagram state update failed", error);
@@ -360,11 +364,19 @@
                 line.textContent = `${state.label}: ${state.meaning}.`;
                 return line;
             });
-            const vessels = document.createElement("p");
-            vessels.className = "muted";
-            vessels.textContent =
-                "The two vessels, and the manifold tees and cross, are filled with the same colour.";
-            lines.push(vessels);
+            // Three sentences, each said once for the whole surface: what a
+            // filled body means, what a two-tone one means, and what a valve's
+            // own two inks mean. Nothing else on the page explains them again.
+            [
+                "The two vessels, the manifold tees and the cross are filled with the same colour.",
+                "A two-tone body means two things reach it.",
+                "An open valve wears the colour running through it; a closed one is white, and the colour stops on both sides of it."
+            ].forEach((sentence) => {
+                const line = document.createElement("p");
+                line.className = "muted";
+                line.textContent = sentence;
+                lines.push(line);
+            });
             const band = document.createElement("p");
             band.className = "band-switch";
             const label = document.createElement("label");
@@ -418,11 +430,97 @@
      * sentence repeating it in the rail was a second telling of the same fact,
      * and it grew with the number of volumes until it took the guide's own
      * room (measured 2026-09-08). */
+    /* One gradient per pair of colours that meet, kept in the drawing's own
+     * defs so a body can point at it by name. An SVG gradient is painted across
+     * a shape's bounding box rather than along a path, which is exactly why it
+     * is used on the shapes and never on a bent pipe. */
+    function mixGradient(svg, dominant, contributing) {
+        const name = `pihti-mix-${dominant}-${contributing}`.replace(/#/g, "");
+        let defs = svg.querySelector("#pihti-mix-defs");
+        if (!defs) {
+            defs = document.createElementNS(SVG_NS, "defs");
+            defs.id = "pihti-mix-defs";
+            svg.insertBefore(defs, svg.firstChild);
+        }
+        if (!defs.querySelector(`#${CSS.escape(name)}`)) {
+            const gradient = document.createElementNS(SVG_NS, "linearGradient");
+            gradient.id = name;
+            gradient.setAttribute("x1", "0");
+            gradient.setAttribute("y1", "0");
+            gradient.setAttribute("x2", "1");
+            gradient.setAttribute("y2", "0");
+            [[0, dominant], [1, contributing]].forEach(([offset, colour]) => {
+                const stop = document.createElementNS(SVG_NS, "stop");
+                stop.setAttribute("offset", String(offset));
+                stop.setAttribute("stop-color", colour);
+                gradient.appendChild(stop);
+            });
+            defs.appendChild(gradient);
+        }
+        return `url(#${name})`;
+    }
+
+    /* The bottle symbol, drawn large inside a vessel that is holding that gas.
+     * queezz, 2026-09-08: "we can put a gas in a circle (same as the bottle
+     * sign) inside the plasma vessel. Ar, O2, H2. So it's visible big at a
+     * glance." Several gases draw several circles. It sits below the guide
+     * overlay, so a beacon is never painted over. */
+    function renderGasSymbols(svg, drawn) {
+        svg.querySelector("#pihti-gas-symbols")?.remove();
+        if (!drawn || !drawn.length) return;
+        const group = document.createElementNS(SVG_NS, "g");
+        group.id = "pihti-gas-symbols";
+        group.setAttribute("aria-hidden", "true");
+        drawn.forEach((item) => {
+            // The box is the map's, in the drawing's own coordinates: the
+            // plasma vessel is a cross, and the middle of its bounding box is
+            // not the middle of anything a circle fits inside.
+            const [left, top, right, bottom] = item.box || [];
+            if (![left, top, right, bottom].every((value) => typeof value === "number")) return;
+            const width = right - left;
+            const height = bottom - top;
+            const count = item.symbols.length;
+            const radius = Math.max(9, Math.min(width / (2.2 * count), height / 2.6));
+            const step = radius * 2.2;
+            const middleY = top + height / 2;
+            const start = left + width / 2 - step * (count - 1) / 2;
+            item.symbols.forEach((symbol, index) => {
+                const circle = document.createElementNS(SVG_NS, "circle");
+                circle.setAttribute("class", "gas-symbol-body");
+                circle.setAttribute("cx", String(start + step * index));
+                circle.setAttribute("cy", String(middleY));
+                circle.setAttribute("r", String(radius));
+                const text = document.createElementNS(SVG_NS, "text");
+                text.setAttribute("class", "gas-symbol-text");
+                text.setAttribute("x", String(start + step * index));
+                text.setAttribute("y", String(middleY));
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("dominant-baseline", "central");
+                text.setAttribute("font-size", String(radius * 0.9));
+                text.textContent = symbol;
+                group.append(circle, text);
+            });
+        });
+        const overlay = svg.querySelector("#operation-guide-overlay");
+        if (overlay) svg.insertBefore(group, overlay);
+        else svg.appendChild(group);
+    }
+
     function paintPrediction(prediction) {
         lastPrediction = prediction;
+        const svg = document.querySelector("#diagram-container svg");
         Object.entries(prediction.elements || {}).forEach(([id, item]) => {
             const element = document.getElementById(id);
             if (!element) return;
+            if (item.valve) {
+                // A valve says its position with its body now, at every size:
+                // an open one wears the colour flowing through it, a shut one
+                // the closed ink, so a colour never runs through a closed valve
+                // and a small open one is readable from arm's length. It keeps
+                // the black outline queezz drew.
+                element.style.fill = item.fill;
+                return;
+            }
             if (item.fill) {
                 // One colour, body and edge alike. queezz, 2026-09-08: "I think
                 // I'd like it without black shape borders. All one color. Why
@@ -430,15 +528,28 @@
                 // vessel, a tee and a cross drop the outline he drew and stand
                 // in the state colour alone. Valves, pumps and gauges keep
                 // theirs: they are equipment, not volumes.
-                element.style.fill = item.fill;
+                // Two things reaching one volume show on the shape and nowhere
+                // else: a two-stop fill from the dominant colour to the
+                // contributing one. queezz: "I think the shape gradient is a
+                // good signal. 'You are pumping from two sides, take note'."
+                element.style.fill = item.mix && svg
+                    ? mixGradient(svg, item.fill, item.mix)
+                    : item.fill;
                 if (item.stroke) element.style.stroke = item.stroke;
+                element.style.strokeLinejoin = "round";
                 return;
             }
             const authored = widthOf(element);
             element.style.stroke = item.stroke;
+            // Round caps and joins close the notches a butt end leaves where a
+            // gauge stem meets its pipe, without touching the drawing itself
+            // (queezz, 2026-09-08: "I see small defect when line is enlarged").
+            element.style.strokeLinecap = "round";
+            element.style.strokeLinejoin = "round";
             if (!authored) return;
             element.style.strokeWidth = String(bandOn && item.band ? authored * item.band : authored);
         });
+        if (svg) renderGasSymbols(svg, prediction.gas_symbols || []);
         // The drawn valve the Line configuration links to itself (the
         // `Membrane` element): its colour is this configuration's own operator
         // colour, read here rather than from a press, so it can never disagree
@@ -456,7 +567,9 @@
                 // nothing mounted there, so it is drawn as an empty dashed
                 // outline and the line reads straight through it.
                 const installed = status === "inactive";
-                element.style.fill = installed ? config.colors[status] : "none";
+                element.style.fill = installed
+                    ? (plumbing?.drawing?.valve_closed || "#ffffff")
+                    : "none";
                 element.style.strokeDasharray = installed ? "none" : "5 4";
                 element.style.opacity = installed ? "1" : "0.45";
             }
@@ -476,7 +589,7 @@
         if (!toggle) return;
         let stored = null;
         try { stored = window.localStorage.getItem("pihti.pipeBand"); } catch (error) { stored = null; }
-        bandOn = stored !== "off";
+        bandOn = stored === "on";
         toggle.checked = bandOn;
         toggle.addEventListener("change", () => {
             bandOn = toggle.checked;
@@ -576,19 +689,30 @@
         }
     }
 
-    function applyState(state, moment) {
+    function applyState(state, moment, prediction) {
         if (!elementsConfig.length) return;
+        // Everything the prediction fills — every valve, and the five bodies —
+        // is the prediction's to paint (0.15.0). Painting the operator palette
+        // over it first and correcting it a moment later is what a flicker is.
+        const predicted = lastPrediction?.elements || {};
         elementsConfig.forEach((element) => {
             // The Line configuration sets this element's fill in
             // paintPrediction, from the same annotation it has no press of its
             // own to disagree with — a raw press-state fill here would only be
             // overwritten, and could flash first.
             if (element.followsLineMode) return;
+            if (predicted[element.id]?.fill) return;
             const diagramElement = document.getElementById(element.id);
             if (!diagramElement) return;
             const status = normalizedStatus(state[element.id]);
             diagramElement.style.fill = element.colors[status];
         });
+        // A prediction that came back with the change itself needs no second
+        // request: one small round trip, one redraw in place.
+        if (prediction) {
+            paintPrediction(prediction);
+            return;
+        }
         renderGuide();
         refreshPrediction(moment);
     }
@@ -671,8 +795,16 @@
                 // 2026-09-08: "pipe open doesn't change its state" — measured
                 // on 0.13.0, the membrane symbol was still drawn open six
                 // seconds after the press, and longer in a background tab where
-                // the browser throttles the timer.
-                await fetchAndUpdateStates();
+                // the browser throttles the timer. Since 0.15.0 the answer to
+                // the press carries the new prediction with it, so this costs
+                // one round trip rather than three: "VERY slow. And no reason
+                // for it to be slow."
+                if (result.prediction) {
+                    if (result.state) vacuumState = result.state;
+                    applyState(vacuumState, undefined, result.prediction);
+                } else {
+                    await fetchAndUpdateStates();
+                }
             });
         });
     }

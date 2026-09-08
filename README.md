@@ -2,7 +2,7 @@
 
 PIHTI is a LAN-native, operator-annotated vacuum-system diagram with state history and control-unit plots. The diagram is an operating aid, not a control panel, pressure measurement, safety interlock, or source of hardware truth.
 
-Current release: **0.14.0**. The same version appears in the navigation bar and at `/version`.
+Current release: **0.15.0**. The same version appears in the navigation bar and at `/version`.
 
 ## What the landing page does
 
@@ -16,7 +16,11 @@ Current release: **0.14.0**. The same version appears in the navigation bar and 
 
 The four sequences live in `src/pihti/static/operationGuides.json`, in queezz's own words after his review of 2026-09-08. A step names the parts the diagram can check in `targets`; `separates` asks the prediction whether two volumes are still joined, so an isolation step cannot go stale when the plumbing map is corrected; `marks` places a beacon on a part the step names without claiming the diagram can judge it, such as a turbo whose stopping is the operator's own choice. `onlyWhen` gates a step on a fact about this rig that no valve position carries — today only `FLOW_CALIBRATION_PIPE_CONNECTED`, below.
 
-Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. The field and the five state colours are one palette, chosen by measured contrast: the field is a quiet warm stone so the colours are the loudest thing on the page, and every colour clears 3:1 against it while differing in lightness as well as hue. A coloured line is drawn wider than authored — a plain multiple of queezz's own stroke, with a switch in the key under the drawing — and an isolated line is not widened at all. The two vessels, the two bypass tees and the cross take the full state colour as their fill and as their outline, so they read as one colour rather than as an outlined shape (owner decision 2026-09-08: "Color speaks vacuum. Black border speaks... shapes?"); valves, pumps and gauges keep the black he drew, because they are equipment rather than volumes. Each gauge's stem takes the colour of the volume it reads.
+Pipes are coloured by the volume map in `src/pihti/static/plumbing.json`, which is read from the names on the drawing's own pipes. There are **seven** states since 0.15.0 — air, gas, high vacuum on the plasma side, high vacuum on the QMS side, rough vacuum, *pumped, sealed off*, and isolated — chosen from Paul Tol's muted qualitative set first and Okabe-Ito second, then darkened only as far as the stone field demanded. Every colour clears 3:1 against the field and they climb one ladder of weight, so two of them differ by hue *and* by how heavy they look; a test also compares every pair through simulated protanopia and deuteranopia.
+
+Three rules decide which colour a volume wears. **High vacuum takes its colour from the vessel it is joined to**, so a pipe running from a *closed* gate valve up to its own spinning turbo reaches no vessel at all and wears the seventh colour instead — pumped, and sealed off — rather than the vessel's blue (owner report 2026-09-08: "GVU is closed, so TMP is not pumping plasma-vacuum. Yet at a glance it seems that it does"). **A valve says its position with its own body**: an open one wears the colour running through it, a closed one is white, so a colour never runs through a shut valve and a small open valve is readable from arm's length. And **mixing shows on the shapes alone**: when a rough pump also reaches a turbo-pumped volume, or when the two vessels are joined, the drawn bodies — the plasma cross, the bypass tees and cross, the QMS box, the probe cross — carry a two-colour gradient from the dominant colour to the contributing one, while every pipe stays one colour. A vessel holding gas also carries that gas's bottle symbol (Ar, O2, H2, He, N2) drawn large inside it, one circle per gas.
+
+The two vessels, the two bypass tees and the cross take the state colour as their fill and as their outline, so they read as one colour rather than as an outlined shape (owner decision 2026-09-08: "Color speaks vacuum. Black border speaks... shapes?"); pumps and gauges keep the black he drew, because they are equipment rather than volumes. Each gauge's stem takes the colour of the volume it reads. Coloured lines and bodies are drawn with round caps and joins, which closes the notches a butt end leaves where a gauge stem meets its pipe. The widening switch in the key under the drawing is **off by default from 0.15.0** — queezz's own stroke widths are the widths he wants — and can still be turned on per browser.
 
 Under the drawing, one line per vessel says in words what the prediction finds it joined to: the other vessel, a gas, vent air through a named valve, a pump, or nothing. All of it is a prediction from the entered valve positions, never a measurement.
 
@@ -76,13 +80,13 @@ error.
 
 ## Machine-readable state
 
-- `/state.svg` returns the authored diagram with the operator-entered fills applied, and the predicted vacuum state as pipe strokes and vessel tints. `/state.svg?at=YYYY-MM-DD HH:MM:SS` renders the state at that moment, with the line configuration recorded then.
+- `/state.svg` returns the authored diagram with the operator-entered fills applied, and the predicted vacuum state as pipe strokes, valve and body fills, two-colour gradients where two things reach one volume, and the gas symbols inside a vessel holding gas. `/state.svg?at=YYYY-MM-DD HH:MM:SS` renders the state at that moment, with the line configuration recorded then; `?wide=1` matches a browser whose widening switch is on.
 - `/history/state-at?ts=YYYY-MM-DD HH:MM:SS` returns the absolute element state at that moment as JSON.
 - Both are operator-entered annotation, never a pressure measurement.
 
 ## SVG contract
 
-Interactive equipment IDs and colors are defined in `src/pihti/static/elementsConfig.json`. Existing valve, pump, and gauge fills represent operator-entered operational state and are not pressure-domain colors.
+Interactive equipment IDs and colors are defined in `src/pihti/static/elementsConfig.json`. Pump and gauge fills represent operator-entered operational state and are not pressure-domain colors. **Valves are the one exception, by owner decision of 2026-09-08** (letters `20260908-6819c50d-04e4ba` and `20260908-06105d79-6b7535`): a valve's fill is the prediction's, because a closed valve that does not visibly break the colour lets a shut gate read as open, and a small open valve in pale green against grey could not be read at arm's length. Their `colors` entries stay in the file for the history replay and for any surface that has not moved.
 
 Connectivity is read from `plumbing.json`, which maps the names queezz gave the pipes in `diagram.svg`, never from inferred path geometry. Actual pressure evidence must show instrument ID, units, timestamp, and stale/unknown state.
 

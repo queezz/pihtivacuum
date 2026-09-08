@@ -14,6 +14,8 @@ import re
 from pathlib import Path
 
 ISOLATED = "isolated"
+SEALED = "sealed"
+ROUGH = "rough-vacuum"
 
 
 def load_plumbing(static_folder: str | Path) -> dict:
@@ -169,7 +171,11 @@ def _connections(
             "state": by_volume.get(name, ISOLATED),
             "joined": [other for other in vessels if other != name and other in space],
             "gas": [
-                {"id": source["id"], "gas": source.get("gas", "gas")}
+                {
+                    "id": source["id"],
+                    "gas": source.get("gas", "gas"),
+                    "symbol": source.get("symbol", ""),
+                }
                 for source in plumbing.get("gas_sources") or []
                 if source["volume"] in space and _is(state, source["id"], "active")
             ],
@@ -187,6 +193,83 @@ def _connections(
             ],
         }
     return answers
+
+
+def _verdict(
+    plumbing: dict, state: dict, component: set[str], volumes: dict
+) -> tuple[str, str | None]:
+    """What one continuous space holds, and what else reaches it.
+
+    The first answer is the **dominant** one: the best pump reaching the space,
+    turbo before rough, with gas and vent air beating both because those are the
+    readings an operator needs first. The second is the **contributing** one,
+    and it exists because queezz asked what a two-sided pumping job should look
+    like — "if I open a rotary into the TMP pumped volume, the pressure may drop
+    a bit, but stay HV side" (2026-09-08). It is never painted on a pipe: a pipe
+    wears one colour, the dominant one, and only the drawn shapes show the
+    second ("we have shapes in all important places. plasma-vacuum, bypass
+    connector, and qms-vacuum").
+
+    High vacuum takes its colour **from the vessel it is joined to**, which is
+    the whole repair of the glance he reported: with GVU shut and the turbo
+    spinning, the pipe from the closed gate up to the turbo used to wear the
+    same blue as the plasma vessel, so the closed gate read as open. That pipe
+    reaches no vessel at all, so it is ``sealed`` — pumped, and sealed off — and
+    it can never be mistaken for either vessel again.
+    """
+    if any(volumes.get(name, {}).get("always") == "air" for name in component):
+        return "air", None
+    if any(
+        source["volume"] in component and _is(state, source["id"], "active")
+        for source in plumbing.get("gas_sources") or []
+    ):
+        return "gas", None
+    running = [
+        pump
+        for pump in plumbing.get("pumps") or []
+        if pump["volume"] in component and _is(state, pump["id"], "active")
+    ]
+    turbos = [pump for pump in running if pump.get("kind") == "turbo"]
+    roughs = [pump for pump in running if pump.get("kind") != "turbo"]
+    if not turbos:
+        return (ROUGH, None) if roughs else (ISOLATED, None)
+    # The vessels this space reaches, best-ranked first. Two of them means the
+    # two chambers are joined, and the joined space wears the first one's colour
+    # with the second one's as the contribution — "both vessels' colours meeting".
+    vessels = sorted(
+        (name for name in component if volumes.get(name, {}).get("vessel")),
+        key=lambda name: volumes[name].get("rank", 99),
+    )
+    if not vessels:
+        return SEALED, ROUGH if roughs else None
+    dominant = volumes[vessels[0]].get("high_vacuum") or ISOLATED
+    if len(vessels) > 1:
+        return dominant, volumes[vessels[1]].get("high_vacuum")
+    return dominant, ROUGH if roughs else None
+
+
+_FAMILY = {"upstream-high-vacuum": "high-vacuum", "downstream-high-vacuum": "high-vacuum"}
+
+
+def _agreed_side(plumbing: dict, sides: list[str]) -> str:
+    """The one state a divided pipe may claim, from what each of its sides holds.
+
+    A single drawn line with a barrier partway along it cannot honestly carry
+    two answers, so when its two sides hold different *kinds* of thing it stays
+    ``isolated`` — the rule since 0.12.1. Splitting high vacuum in two (0.15.0)
+    would otherwise turn every membrane-installed pipe grey the moment both
+    vessels were pumped, which claims *less* than the truth rather than more:
+    the two sides agree that this is high vacuum and disagree only about which
+    chamber it belongs to. So sides of the same kind are allowed, and the line
+    takes whichever of them the map lists first — the plasma side, by the order
+    of ``states``.
+    """
+    if not sides:
+        return ISOLATED
+    if len({_FAMILY.get(side, side) for side in sides}) != 1:
+        return ISOLATED
+    order = [item["id"] for item in plumbing.get("states") or []]
+    return sorted(sides, key=lambda side: order.index(side) if side in order else 99)[0]
 
 
 def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
@@ -240,33 +323,21 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
             joins = [stub if name == divided else name for name in joins]
         edges.append(tuple(joins))
     by_volume: dict[str, str] = {}
+    mix_of: dict[str, str] = {}
     for component in _components(list(dict.fromkeys(names)), edges):
-        verdict = ISOLATED
-        if any(volumes.get(name, {}).get("always") == "air" for name in component):
-            verdict = "air"
-        elif any(
-            source["volume"] in component and _is(state, source["id"], "active")
-            for source in plumbing.get("gas_sources") or []
-        ):
-            verdict = "gas"
-        else:
-            running = [
-                pump
-                for pump in plumbing.get("pumps") or []
-                if pump["volume"] in component and _is(state, pump["id"], "active")
-            ]
-            if any(pump.get("kind") == "turbo" for pump in running):
-                verdict = "high-vacuum"
-            elif running:
-                verdict = "rough-vacuum"
+        verdict, mix = _verdict(plumbing, state, component, volumes)
         for name in component:
             by_volume[name] = verdict
+            if mix:
+                mix_of[name] = mix
 
     if divided:
         # The drawn pipe is one line with a barrier partway along it. It may
         # only claim a state both sides agree on.
-        sides = {by_volume.pop(stub) for stub in stubs}
-        by_volume[divided] = sides.pop() if len(sides) == 1 else ISOLATED
+        sides = [by_volume.pop(stub) for stub in stubs]
+        for stub in stubs:
+            mix_of.pop(stub, None)
+        by_volume[divided] = _agreed_side(plumbing, sides)
 
     colors = {item["id"]: item["color"] for item in plumbing.get("states") or []}
     band = float((plumbing.get("drawing") or {}).get("band") or 1)
@@ -288,14 +359,22 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
         bodies = set(volume.get("junctions") or ())
         if volume.get("vessel"):
             bodies.add(volume["vessel"])
+        mix = mix_of.get(name)
         for element_id in volume.get("elements") or []:
             if element_id in bodies:
-                elements[element_id] = {
+                body = {
                     "volume": name,
                     "state": verdict,
                     "fill": colour,
                     "stroke": colour,
                 }
+                # The two-tone body, and only the body. queezz on the signal:
+                # "I think the shape gradient is a good signal. 'You are pumping
+                # from two sides, take note'."
+                if mix and mix in colors:
+                    body["mix"] = colors[mix]
+                    body["mix_state"] = mix
+                elements[element_id] = body
             else:
                 elements[element_id] = _line(name, verdict, colour, band)
     # A gauge's stem is the short line from its symbol to what it reads, and it
@@ -308,19 +387,81 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
             continue
         verdict = by_volume.get(volume_name, ISOLATED)
         elements[stem] = _line(volume_name, verdict, colors.get(verdict, "#000000"), band)
+    # A valve says its position with its body, at every size. An open one wears
+    # the colour flowing through it; a shut one wears the closed ink, so the
+    # colour visibly stops short on both sides and a closed gate can never read
+    # as an open one (queezz, 2026-09-08: "GVU is closed, so TMP is not pumping
+    # plasma-vacuum. Yet at a glance it seems that it does", and, on the small
+    # ones, "a green wedge against a grey wedge at that size"). It keeps the
+    # black outline he drew: a valve is still equipment, and the outline is what
+    # keeps its shape readable inside a coloured line.
+    closed_ink = (plumbing.get("drawing") or {}).get("valve_closed") or "#ffffff"
+    for valve in plumbing.get("valves") or []:
+        joins = list(valve.get("joins") or ())
+        if _is(state, valve["id"], valve.get("open_when", "active")):
+            # Both sides of an open valve are one space by construction, so
+            # either side names the same colour; the barrier cases keep the
+            # side the map lists first.
+            through = next((name for name in joins if name in by_volume), None)
+            verdict = by_volume.get(through, ISOLATED)
+            elements[valve["id"]] = {
+                "valve": True,
+                "open": True,
+                "volume": through,
+                "state": verdict,
+                "fill": colors.get(verdict, "#000000"),
+            }
+        else:
+            elements[valve["id"]] = {
+                "valve": True,
+                "open": False,
+                "state": "closed",
+                "fill": closed_ink,
+            }
     air = sorted(
         volumes[name].get("label", name)
         for name, verdict in by_volume.items()
         if verdict == "air" and volumes.get(name, {}).get("always") != "air"
     )
+    connections = _connections(
+        plumbing, state, list(dict.fromkeys(names)), edges, by_volume
+    )
     return {
         "volumes": by_volume,
+        "mixes": mix_of,
         "elements": elements,
         "air": air,
-        "connections": _connections(plumbing, state, list(dict.fromkeys(names)), edges, by_volume),
+        "connections": connections,
+        "gas_symbols": _gas_symbols(volumes, connections),
         "line_mode": line_mode or "unknown",
         "linked_valve": linked_valve_status(plumbing, line_mode),
     }
+
+
+def _gas_symbols(volumes: dict, connections: dict) -> list[dict]:
+    """Which bottle symbol to draw large inside which vessel, and how many.
+
+    queezz, 2026-09-08: "for the gas fill, we can put a gas in a circle (same as
+    the bottle sign) inside the plasma vessel. Ar, O2, H2. So it's visible big
+    at a glance." Only a vessel whose predicted state is *gas* carries one, one
+    circle per gas open into it, and the symbol is the one written beside that
+    bottle in the map rather than derived from its name.
+    """
+    drawn = []
+    for name, item in connections.items():
+        if item.get("state") != "gas":
+            continue
+        volume = volumes.get(name) or {}
+        element = volume.get("vessel")
+        box = volume.get("symbol_box")
+        symbols = [
+            source["symbol"] for source in item.get("gas") or [] if source.get("symbol")
+        ]
+        if element and box and symbols:
+            drawn.append(
+                {"volume": name, "element": element, "box": box, "symbols": symbols}
+            )
+    return drawn
 
 
 AIR = "air"
@@ -467,11 +608,181 @@ def authored_stroke_widths(svg_text: str) -> dict[str, float]:
     return widths
 
 
+def _mix_gradient_id(dominant: str, contributing: str) -> str:
+    return "pihti-mix-" + (dominant + "-" + contributing).replace("#", "")
+
+
+def _bbox(svg_text: str, element_id: str) -> tuple[float, float, float, float] | None:
+    """The drawn box of one authored shape, or ``None`` when it cannot be read.
+
+    Only the five bodies need this, and queezz drew every one of them as a
+    rectangle or as a closed run of horizontal and vertical moves, so the
+    subset understood here is exactly ``M m H h V v Z z`` plus ``<rect>``.
+    Anything else — a curve, an arc, a transform on the shape or its parent —
+    returns ``None`` and the saved render simply carries no symbol rather than
+    a symbol in the wrong place. Nothing is guessed.
+    """
+    tag = _element_tag(svg_text, element_id)
+    if tag is None or "transform=" in tag:
+        return None
+    if tag.lstrip("<").startswith("rect"):
+        try:
+            x = float(re.search(r'\bx="([-0-9.]+)"', tag).group(1))
+            y = float(re.search(r'\by="([-0-9.]+)"', tag).group(1))
+            w = float(re.search(r'\bwidth="([-0-9.]+)"', tag).group(1))
+            h = float(re.search(r'\bheight="([-0-9.]+)"', tag).group(1))
+        except (AttributeError, ValueError):
+            return None
+        return x, y, x + w, y + h
+    found = re.search(r'\bd="([^"]+)"', tag)
+    if not found:
+        return None
+    tokens = re.findall(r"[A-Za-z]|-?[0-9.]+", found.group(1))
+    x = y = 0.0
+    xs: list[float] = []
+    ys: list[float] = []
+    index = 0
+    command = ""
+    while index < len(tokens):
+        token = tokens[index]
+        if token.isalpha():
+            command = token
+            index += 1
+            if command in "Zz":
+                continue
+        if command in "Mm":
+            try:
+                dx, dy = float(tokens[index]), float(tokens[index + 1])
+            except (IndexError, ValueError):
+                return None
+            x, y = (x + dx, y + dy) if command == "m" else (dx, dy)
+            index += 2
+            command = "l" if command == "m" else "L"
+        elif command in "Hh":
+            try:
+                value = float(tokens[index])
+            except (IndexError, ValueError):
+                return None
+            x = x + value if command == "h" else value
+            index += 1
+        elif command in "Vv":
+            try:
+                value = float(tokens[index])
+            except (IndexError, ValueError):
+                return None
+            y = y + value if command == "v" else value
+            index += 1
+        elif command in "Ll":
+            try:
+                dx, dy = float(tokens[index]), float(tokens[index + 1])
+            except (IndexError, ValueError):
+                return None
+            x, y = (x + dx, y + dy) if command == "l" else (dx, dy)
+            index += 2
+        else:
+            return None
+        xs.append(x)
+        ys.append(y)
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def box_inside(svg_text: str, element_id: str, box: list) -> bool:
+    """Does an authored symbol box really sit inside the shape it names?
+
+    The box is written in the map because the plasma vessel is a cross and the
+    middle of its bounding box is not the middle of anything a circle fits in.
+    Writing it down is only safe if a wandering box is caught, so this is the
+    guard: a box that has left its shape draws nothing rather than a symbol
+    floating in the wrong place. An unreadable shape is treated the same way.
+    """
+    drawn = _bbox(svg_text, element_id)
+    if not drawn or len(box) != 4:
+        return False
+    left, top, right, bottom = (float(value) for value in box)
+    return (
+        drawn[0] - 0.5 <= left < right <= drawn[2] + 0.5
+        and drawn[1] - 0.5 <= top < bottom <= drawn[3] + 0.5
+    )
+
+
+def _element_tag(svg_text: str, element_id: str) -> str | None:
+    for tag in _TAG.findall(svg_text):
+        found = _ID.search(tag)
+        if found and found.group(1) == element_id:
+            return tag
+    return None
+
+
+def overlay_markup(
+    plumbing: dict, state: dict, line_mode: str | None, svg_text: str
+) -> str:
+    """The gradients and gas symbols a saved render needs, as SVG markup.
+
+    ``style_rules`` can only write CSS, and two of this release's answers are
+    not CSS: a two-colour body needs a gradient to point at, and a vessel
+    holding gas needs the bottle symbol drawn inside it. Both are written here
+    from the same prediction the page paints from, so ``/state.svg`` and the
+    screen it was saved from still cannot disagree.
+    """
+    prediction = predict(plumbing, state, line_mode)
+    parts = []
+    gradients = {
+        _mix_gradient_id(item["fill"], item["mix"]): (item["fill"], item["mix"])
+        for item in prediction["elements"].values()
+        if item.get("mix") and _safe_color(item.get("fill")) and _safe_color(item["mix"])
+    }
+    if gradients:
+        stops = "".join(
+            f'<linearGradient id="{name}" x1="0" y1="0" x2="1" y2="0">'
+            f'<stop offset="0" stop-color="{dominant}"/>'
+            f'<stop offset="1" stop-color="{contributing}"/></linearGradient>'
+            for name, (dominant, contributing) in sorted(gradients.items())
+        )
+        parts.append(f"<defs>{stops}</defs>")
+    symbols = []
+    for item in prediction.get("gas_symbols") or []:
+        if not box_inside(svg_text, item["element"], item["box"]):
+            continue
+        symbols.append(_gas_symbol_markup(item["box"], item["symbols"]))
+    if symbols:
+        parts.append(
+            '<g id="pihti-gas-symbols" aria-hidden="true">' + "".join(symbols) + "</g>"
+        )
+    return "".join(parts)
+
+
+def _gas_symbol_markup(box: list, symbols: list[str]) -> str:
+    """One white circle per gas, drawn across the middle of the vessel."""
+    left, top, right, bottom = (float(value) for value in box)
+    width, height = right - left, bottom - top
+    middle_y = top + height / 2
+    radius = max(9.0, min(width / (2.2 * len(symbols)), height / 2.6))
+    step = radius * 2.2
+    start = left + width / 2 - step * (len(symbols) - 1) / 2
+    out = []
+    for index, symbol in enumerate(symbols):
+        if not symbol.isalnum():
+            continue
+        centre = start + step * index
+        out.append(
+            f'<circle cx="{centre:.2f}" cy="{middle_y:.2f}" r="{radius:.2f}" '
+            f'fill="#ffffff" stroke="#111111" stroke-width="2"/>'
+            f'<text x="{centre:.2f}" y="{middle_y:.2f}" text-anchor="middle" '
+            f'dominant-baseline="central" fill="#111111" '
+            f'font-family="sans-serif" font-weight="bold" '
+            f'font-size="{radius * 0.9:.2f}">{symbol}</text>'
+        )
+    return "".join(out)
+
+
 def style_rules(
     plumbing: dict,
     state: dict,
     line_mode: str | None = None,
     widths: dict[str, float] | None = None,
+    wide: bool = False,
 ) -> str:
     """The prediction as CSS, for the server-rendered ``/state.svg``.
 
@@ -480,9 +791,16 @@ def style_rules(
     rules this used to write were overridden by the drawing's own black and the
     saved render came back uncoloured.
 
-    ``widths`` are the authored stroke widths, so a saved render carries the
-    same solid band the page draws instead of a thinner drawing that reads
-    differently from the screen it was saved from.
+    ``widths`` are the authored stroke widths, and ``wide`` is the page's own
+    reading aid: off by default since 0.15.0, because queezz's strokes are the
+    width he wants. ``/state.svg?wide=1`` turns it on, so a render saved from a
+    browser with the switch on can still match the screen it was saved from.
+
+    Round caps and joins are written on every painted line and body. With the
+    widening off and his 4 px lines, a butt end stops exactly at its own
+    coordinate, and a stem that meets a pipe there leaves a notch; a round cap
+    reaches half a stroke past it and closes the seam without touching the
+    drawing (queezz, 2026-09-08: "I see small defect when line is enlarged").
     """
     prediction = predict(plumbing, state, line_mode)
     rules = []
@@ -493,12 +811,18 @@ def style_rules(
         if _safe_color(item.get("stroke")):
             declarations.append(f"stroke:{item['stroke']} !important")
         authored = (widths or {}).get(element_id)
-        if item.get("band") and authored:
+        if wide and item.get("band") and authored:
             declarations.append(
                 f"stroke-width:{round(authored * item['band'], 3)} !important"
             )
-        if _safe_color(item.get("fill")):
+        if item.get("mix") and _safe_color(item.get("fill")) and _safe_color(item["mix"]):
+            gradient = _mix_gradient_id(item["fill"], item["mix"])
+            declarations.append(f"fill:url(#{gradient}) !important")
+        elif _safe_color(item.get("fill")):
             declarations.append(f"fill:{item['fill']} !important")
+        if not item.get("valve"):
+            declarations.append("stroke-linecap:round")
+            declarations.append("stroke-linejoin:round")
         if declarations:
             rules.append(f"#{element_id}{{{';'.join(declarations)}}}")
     return "".join(rules)
