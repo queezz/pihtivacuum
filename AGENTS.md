@@ -110,6 +110,20 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   gradient is painted across a bounding box rather than along a path and would
   streak the wrong way on a bend (queezz: *"we have shapes in all important
   places"*).
+- **A turbo has two states in the map: running, when it is a pump, and stopped,
+  when it is a piece of pipe** (owner ruling 2026-09-09, letter
+  `20260908-948b8dbc-b1eb0d`, built in 0.17.1). queezz, watching TMPD stopped
+  with the QMS rotary running on its backing line: *"The rough pump pumps, it
+  can really do that."* Gas goes through a stationary rotor, so a stopped turbo
+  joins its own inlet line to its `backed_by` line exactly as an open valve
+  would — the vessel above a stopped TMPD with GVD open is rough vacuum, pumped
+  by the QMS rotary through it, and the readout names that pump. A running turbo
+  is the pump and the boundary again, with the rough pump behind it as its
+  backing. **Only a closed valve blocks.** The passage is declared in
+  `plumbing.json` (`stopped: "passage"`) rather than inferred from `kind`, and a
+  rough pump carries neither field because it exhausts to the room. The knock-on
+  is deliberate: venting a backing line under a stopped turbo now reaches the
+  vessel above it, so the 0.13.0 press warning has something to warn about.
 - Turbo-pump and gauge warnings derived from toggle state are advisory operator warnings, never proof of hardware state or safety (owner decision 2026-09-03). Actual pressure evidence must use Raspberry Pi fields with explicit instrument IDs, units, timestamps, and stale-data handling, and must fail to “unknown.”
 - Operation guides only annotate the diagram and list operator steps. They never perform device mutations. The four sequences in `static/operationGuides.json` stopped being provisional on 2026-09-08, when queezz corrected them line by line (letter `20260908-7a3c9ac3-bbd7aa`); a route none of them names is a question for him, never a guess. A step may check the diagram (`targets`), ask the prediction whether two volumes are still joined (`separates`), place a beacon without judging it (`marks`), or apply only on a rig where something is plugged in (`onlyWhen`, answered by the machine-local settings file). Every id a step names, in `targets` or in `marks`, is read out loud in the rail, so it must carry a `label` in `elementsConfig.json`.
 - **The beacon pulses under `prefers-reduced-motion: reduce` too.** Windows with its animation effects switched off makes Chromium — so queezz's Brave — answer *true* to that query, and a `@media` block that said `animation: none` left the beacons dead on his desk for two releases while the CSS read as correct. Under `reduce` the ring keeps a slow opacity pulse at one fixed radius: less motion, never less information. Proving a beacon means measuring it in a rendered browser — `element.getAnimations()` non-empty on the current step's ring, computed `animation-name` not `none`, and two frames a half period apart that differ — never reading the stylesheet.

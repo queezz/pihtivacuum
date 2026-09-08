@@ -73,9 +73,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.17.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.17.0"}
-    assert b"v0.17.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.17.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.17.1"}
+    assert b"v0.17.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -2003,10 +2003,20 @@ def test_each_vessel_says_in_words_what_it_is_joined_to(client):
     assert [valve["id"] for valve in vented["plasma-vessel"]["air"]] == ["gaspanel-valve-vent"]
     assert vented["plasma-vessel"]["state"] == "air"
     assert vented["qms-vessel"]["state"] == "isolated"
-    not_through_a_turbo = plumbing_map.predict(
-        plumbing, {"GVU": "active", "upstream-pumpline-vent-valve": "active"}, "membrane"
+    # Through a *running* turbo it does not: the running turbo is the boundary.
+    # Through a stopped one it does, because a stationary rotor is a piece of
+    # pipe (owner ruling 2026-09-09, letter 20260908-948b8dbc-b1eb0d).
+    backing_line_vent = {"GVU": "active", "upstream-pumpline-vent-valve": "active"}
+    not_through_a_running_turbo = plumbing_map.predict(
+        plumbing, dict(backing_line_vent, TMPU="active"), "membrane"
     )["connections"]
-    assert not_through_a_turbo["plasma-vessel"]["air"] == []
+    assert not_through_a_running_turbo["plasma-vessel"]["air"] == []
+    through_a_stopped_turbo = plumbing_map.predict(
+        plumbing, backing_line_vent, "membrane"
+    )["connections"]
+    assert [valve["id"] for valve in through_a_stopped_turbo["plasma-vessel"]["air"]] == [
+        "upstream-pumpline-vent-valve"
+    ]
 
     # Both vessels open to air, and still not joined to each other: the room is
     # not a pipe, so the reach behind this readout never runs through open air.
@@ -2943,3 +2953,118 @@ def test_live_always_beats_the_memory(client):
                                         "gasline-main": "active"}, memory, started)
     assert vented["volumes"]["plasma-vessel"] == "air"
     assert "plasma-vessel" not in vented["sealed"]
+
+
+# --- A stopped turbo is a passage, not a wall (0.17.1) -----------------------
+#
+# queezz, 2026-09-09, watching the 0.17.0 tree with TMPD stopped and the QMS
+# rotary running on its backing line (letter ``20260908-948b8dbc-b1eb0d``):
+# "The rough pump pumps, it can really do that." Gas goes through a stationary
+# rotor, so a turbo has two states in the map now -- running, when it is the
+# pump and the wall, and stopped, when it is a piece of pipe. Only a closed
+# valve blocks.
+
+
+def test_a_stopped_turbo_lets_the_rough_pump_through_to_the_vessel(client):
+    """His own frame: the QMS rotary pumping the vessel through a stopped TMPD.
+
+    The gate above the turbo is open, the turbo is off, and the scroll pump on
+    its backing line is running. The vessel above it is rough vacuum -- pumped
+    by the QMS rotary through the stopped turbo -- and the readout names that
+    pump, because the same walk answers the colours and the words.
+    """
+    plumbing = client.get("/plumbing").json
+    through = plumbing_map.predict(
+        plumbing, {"GVD": "active", "TMPD": "inactive", "RoughD": "active"}, "membrane"
+    )
+    assert through["volumes"]["qms-vessel"] == "rough-vacuum"
+    assert through["volumes"]["qms-turbo-line"] == "rough-vacuum"
+    assert through["volumes"]["qms-foreline"] == "rough-vacuum"
+    assert [pump["id"] for pump in through["connections"]["qms-vessel"]["pumps"]] == [
+        "RoughD"
+    ]
+
+    # The plasma side is untouched by it: its own gate is shut.
+    assert through["volumes"]["plasma-vessel"] == "isolated"
+
+    # And the gate is what blocks, exactly as before. Close GVD and the vessel
+    # is on its own again while the backing line stays rough.
+    gate_shut = plumbing_map.predict(
+        plumbing, {"TMPD": "inactive", "RoughD": "active"}, "membrane"
+    )
+    assert gate_shut["volumes"]["qms-vessel"] == "isolated"
+    assert gate_shut["volumes"]["qms-turbo-line"] == "rough-vacuum"
+
+
+def test_a_running_turbo_is_still_the_pump_and_still_the_wall(client):
+    """The other of the turbo's two states, and it is unchanged.
+
+    With TMPD spinning, the vessel above it is high vacuum in the QMS side's
+    own colour and the scroll pump behind it is the turbo's backing rather than
+    a second thing reaching the vessel: the rough pump is on the far side of a
+    running turbo, which is a boundary.
+    """
+    plumbing = client.get("/plumbing").json
+    running = plumbing_map.predict(
+        plumbing, {"GVD": "active", "TMPD": "active", "RoughD": "active"}, "membrane"
+    )
+    assert running["volumes"]["qms-vessel"] == "downstream-high-vacuum"
+    assert running["volumes"]["qms-turbo-line"] == "downstream-high-vacuum"
+    assert running["volumes"]["qms-foreline"] == "rough-vacuum"
+    assert [pump["id"] for pump in running["connections"]["qms-vessel"]["pumps"]] == [
+        "TMPD"
+    ]
+
+
+def test_only_a_turbo_declared_a_passage_ever_becomes_one(client):
+    """A rough pump exhausts to the room, so a stopped one joins nothing.
+
+    The two sides a stopped turbo joins are the ones the map itself names --
+    the pump's own ``volume`` and its ``backed_by`` line -- and the passage
+    exists only where the map says ``stopped: "passage"``. The rough pumps
+    carry neither field, so nothing about them changed.
+    """
+    plumbing = client.get("/plumbing").json
+    turbos = [pump for pump in plumbing["pumps"] if pump.get("kind") == "turbo"]
+    assert [pump["id"] for pump in turbos] == ["TMPU", "TMPD"]
+    for pump in turbos:
+        assert pump["stopped"] == "passage"
+        assert pump["backed_by"] in plumbing["volumes"]
+    for pump in plumbing["pumps"]:
+        if pump.get("kind") != "turbo":
+            assert "stopped" not in pump and "backed_by" not in pump
+
+    everything_stopped = dict(plumbing_map.passage_edges(plumbing, {}))
+    assert everything_stopped == {
+        "plasma-turbo-line": "plasma-foreline",
+        "qms-turbo-line": "qms-foreline",
+    }
+    assert plumbing_map.passage_edges(plumbing, {"TMPU": "active", "TMPD": "active"}) == []
+
+
+def test_venting_a_backing_line_under_a_stopped_turbo_now_warns(client):
+    """The knock-on queezz named when he answered the standing question.
+
+    Venting the backing line under a *stopped* turbo has a path up to the
+    vessel above it now, so the 0.13.0 press warning has something to warn
+    about: the ionization gauge standing in that vessel would newly see air.
+    Under a *running* turbo the same press reaches nothing new, and the
+    prediction stays quiet -- a warning is owed for what a press changes.
+    """
+    plumbing = client.get("/plumbing").json
+    standing = {"GVD": "active", "downstream-ionization-gauge": "active"}
+    warned = plumbing_map.press_warnings(
+        plumbing, standing, "downstream-pumpline-vent-valve", "active", "membrane"
+    )
+    assert [(item["kind"], item["id"], item["state"]) for item in warned] == [
+        ("gauge", "downstream-ionization-gauge", "air")
+    ]
+
+    quiet = plumbing_map.press_warnings(
+        plumbing,
+        dict(standing, TMPD="active"),
+        "downstream-pumpline-vent-valve",
+        "active",
+        "membrane",
+    )
+    assert quiet == []

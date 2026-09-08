@@ -375,6 +375,33 @@ def _verdict(
     return dominant, mix
 
 
+def passage_edges(plumbing: dict, state: dict) -> list[tuple[str, str]]:
+    """The pumps that are, right now, a piece of pipe rather than a pump.
+
+    queezz, 2026-09-09, watching TMPD stopped with the QMS rotary running on its
+    backing line (letter ``20260908-948b8dbc-b1eb0d``): *"The rough pump pumps,
+    it can really do that."* Gas goes through a stationary rotor, so a **stopped**
+    turbo joins the two volumes it sits between exactly as an open valve would:
+    the vessel above a stopped TMPD with its gate open is rough vacuum, pumped by
+    the rotary *through* the stopped turbo, and the readout says so.
+
+    A **running** turbo is the pump and stays a boundary; the rough pump behind
+    it is its backing, which the second-tone rule already covers. Only a closed
+    valve blocks. The two sides are the pump's own ``volume`` (its inlet) and its
+    ``backed_by`` line, and a pump joins them only where the map itself says
+    ``stopped: "passage"`` — a rough pump exhausts to the room and joins nothing.
+    """
+    edges = []
+    for pump in plumbing.get("pumps") or []:
+        backing = pump.get("backed_by")
+        if pump.get("stopped") != "passage" or not backing:
+            continue
+        if _is(state, pump["id"], "active"):
+            continue
+        edges.append((pump["volume"], backing))
+    return edges
+
+
 def _component_gas_symbols(plumbing: dict, state: dict, component: set[str]) -> list[str]:
     """The bottle symbols open into one continuous space, in map order."""
     return [
@@ -674,6 +701,10 @@ def predict(
             names.append(stub)
             joins = [stub if name == divided else name for name in joins]
         edges.append(tuple(joins))
+    # A stopped turbo is a passage, not a wall (owner ruling 2026-09-09). It
+    # joins its inlet line to its backing line exactly as an open valve would,
+    # so a rough pump behind it reaches whatever the gate above it is open to.
+    edges.extend(passage_edges(plumbing, state))
     by_volume: dict[str, str] = {}
     mix_of: dict[str, str] = {}
     gases_of: dict[str, list[str]] = {}
