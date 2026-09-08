@@ -230,15 +230,39 @@
             .forEach((marker) => marker.classList.toggle("spot", on));
     }
 
+    /* Where a beacon stands: the element's top-right corner, stepped a little
+     * further out, never its centre. queezz, 2026-09-08 (letter
+     * 20260908-3688eabd-587dfe), with Vent Plasma running: "venting plasma
+     * works. But numbered circles are obstructing the interactions." A disc
+     * centred on a valve hides the very valve the step is asking you to press,
+     * and a valve you cannot see is a valve you cannot aim at — so the disc
+     * steps off the shape and points back at it. The beacons already take no
+     * pointer events, and the CSS says so on the ring and the disc as well as
+     * the group, so the press underneath always lands on the valve.
+     *
+     * A step's own `markerOffset` still applies on top of the corner, so the
+     * few nudges the guides author by hand keep working. */
+    const MARKER_STEP = 14;
+
     function rootPointForElement(svg, element, offset) {
         const rect = element.getBoundingClientRect();
-        const point = svg.createSVGPoint();
-        point.x = rect.left + rect.width / 2;
-        point.y = rect.top + rect.height / 2;
-        const rootPoint = point.matrixTransform(svg.getScreenCTM().inverse());
-        rootPoint.x += (offset || [0, 0])[0];
-        rootPoint.y += (offset || [0, 0])[1];
-        return rootPoint;
+        const inverse = svg.getScreenCTM().inverse();
+        const middle = svg.createSVGPoint();
+        middle.x = rect.left + rect.width / 2;
+        middle.y = rect.top + rect.height / 2;
+        const centre = middle.matrixTransform(inverse);
+        const corner = svg.createSVGPoint();
+        corner.x = rect.right;
+        corner.y = rect.top;
+        const point = corner.matrixTransform(inverse);
+        // Step outward along the diagonal away from the shape's own middle, so
+        // the disc clears the corner rather than sitting on it.
+        const span = Math.hypot(point.x - centre.x, point.y - centre.y) || 1;
+        point.x += ((point.x - centre.x) / span) * MARKER_STEP;
+        point.y += ((point.y - centre.y) / span) * MARKER_STEP;
+        point.x += (offset || [0, 0])[0];
+        point.y += (offset || [0, 0])[1];
+        return point;
     }
 
     function renderGuideMarkers(stepStates) {
@@ -345,32 +369,50 @@
         const more = document.getElementById("vacuum-more");
         if (!list || !plumbing) return;
         const states = plumbing.states || [];
+        // A full swatch, not a thin bar. queezz, 2026-09-08: "Make the legend
+        // chips larger, a full swatch rather than a thin bar, so the colour can
+        // be read there at all" — a five-pixel line of colour is not enough of
+        // it to judge, and judging it in the legend is the legend's whole job.
         list.replaceChildren(...states.map((state) => {
             const item = document.createElement("li");
             const swatch = document.createElement("span");
             swatch.className = "vacuum-swatch";
-            const line = document.createElement("i");
-            line.style.background = state.color;
-            swatch.appendChild(line);
+            swatch.style.background = state.color;
             const label = document.createElement("span");
             label.textContent = state.label;
             item.append(swatch, label);
             return item;
         }));
         if (detail) {
-            const lines = states.map((state) => {
+            // The seven in a row at the top of More, big enough to compare one
+            // against another rather than each against the drawing.
+            const row = document.createElement("div");
+            row.className = "vacuum-swatch-row";
+            states.forEach((state) => {
+                const cell = document.createElement("figure");
+                const block = document.createElement("span");
+                block.className = "vacuum-swatch-big";
+                block.style.background = state.color;
+                const caption = document.createElement("figcaption");
+                caption.textContent = state.label;
+                cell.append(block, caption);
+                row.appendChild(cell);
+            });
+            const lines = [row, ...states.map((state) => {
                 const line = document.createElement("p");
                 line.className = "muted";
                 line.textContent = `${state.label}: ${state.meaning}.`;
                 return line;
-            });
-            // Three sentences, each said once for the whole surface: what a
-            // filled body means, what a two-tone one means, and what a valve's
-            // own two inks mean. Nothing else on the page explains them again.
+            })];
+            // Four sentences, each said once for the whole surface: what a
+            // filled body means, what a two-tone one means, what a valve's own
+            // two inks mean, and what a pump's colour says. Nothing else on the
+            // page explains them again.
             [
                 "The two vessels, the manifold tees and the cross are filled with the same colour.",
                 "A two-tone body means two things reach it.",
-                "An open valve wears the colour running through it; a closed one is white, and the colour stops on both sides of it."
+                "An open valve wears the colour running through it, edge and all; a closed one is white with a black outline, and the colour stops on both sides of it.",
+                "A running pump wears what it is doing; a stopped one stays yellow."
             ].forEach((sentence) => {
                 const line = document.createElement("p");
                 line.className = "muted";
@@ -512,13 +554,34 @@
         Object.entries(prediction.elements || {}).forEach(([id, item]) => {
             const element = document.getElementById(id);
             if (!element) return;
-            if (item.valve) {
-                // A valve says its position with its body now, at every size:
-                // an open one wears the colour flowing through it, a shut one
-                // the closed ink, so a colour never runs through a closed valve
-                // and a small open one is readable from arm's length. It keeps
-                // the black outline queezz drew.
+            if (item.valve || item.pump) {
+                // A valve says its position with its body, at every size: an
+                // open one wears the colour flowing through it, a shut one the
+                // closed ink, so a colour never runs through a closed valve and
+                // a small open one is readable from arm's length. Its edge goes
+                // with its fill (queezz, 2026-09-08: "I think I like the valves
+                // edge to be same color as the fill. When closed, black border
+                // white fill is good. Stands out.") — so an open valve has no
+                // black edge and reads as part of the pipe, and a closed one is
+                // the single dark-rimmed shape on the drawing.
+                //
+                // A pump wears what it is doing beside it: a running turbo the
+                // high-vacuum colour of the side it serves, a running rotary or
+                // scroll the rough-vacuum colour, a stopped one the yellow.
                 element.style.fill = item.fill;
+                if (item.stroke) element.style.stroke = item.stroke;
+                element.style.strokeDasharray = item.dash || "none";
+                element.style.opacity = typeof item.opacity === "number" ? String(item.opacity) : "";
+                return;
+            }
+            if (item.flange) {
+                // The blank flange: not a vacuum claim at all, so it wears the
+                // flange tone and never a state colour or the closed grey.
+                element.style.stroke = item.stroke;
+                element.style.strokeLinecap = "round";
+                element.style.strokeLinejoin = "round";
+                const drawn = widthOf(element);
+                if (drawn) element.style.strokeWidth = String(drawn);
                 return;
             }
             if (item.fill) {
@@ -550,30 +613,15 @@
             element.style.strokeWidth = String(bandOn && item.band ? authored * item.band : authored);
         });
         if (svg) renderGasSymbols(svg, prediction.gas_symbols || []);
-        // The drawn valve the Line configuration links to itself (the
-        // `Membrane` element): its colour is this configuration's own operator
-        // colour, read here rather than from a press, so it can never disagree
-        // with what the configuration just did to the prediction beside it.
-        if (prediction.linked_valve) {
-            const {id, status} = prediction.linked_valve;
-            const element = document.getElementById(id);
-            const config = elementsConfig.find((item) => item.id === id);
-            if (element && config) {
-                // Present or absent, not merely a different shade of the same
-                // blob. queezz, 2026-09-08: "Membrane. Can't click it. Which may
-                // be fine. But pipe open doesn't change its state." Under
-                // *Membrane installed* the symbol is a solid plug across the
-                // line; under *Pipe open* and *Boron deposition* there is
-                // nothing mounted there, so it is drawn as an empty dashed
-                // outline and the line reads straight through it.
-                const installed = status === "inactive";
-                element.style.fill = installed
-                    ? (plumbing?.drawing?.valve_closed || "#ffffff")
-                    : "none";
-                element.style.strokeDasharray = installed ? "none" : "5 4";
-                element.style.opacity = installed ? "1" : "0.45";
-            }
-        }
+        // The drawn valve the Line configuration governs (the `Membrane`
+        // element) is painted by the prediction itself now, in the loop above,
+        // so `/state.svg` and this page cannot disagree about it. Present or
+        // absent, not merely a different shade of the same blob: under
+        // *Membrane installed* it is a solid plug across the line, and under
+        // *Pipe open*, *Blank* and *Boron deposition* nothing of the app's is
+        // mounted there, so it is an empty dashed outline and the line reads
+        // straight through it. Under *Blank* the blank itself is said further
+        // along, by the probe segment in the flange tone.
         renderConnections(prediction.connections || {});
         // A guide step may be satisfied by the prediction rather than by a valve
         // position, so the steps are read again now that this prediction has
@@ -751,11 +799,59 @@
         });
     }
 
+    /* The configurations the card offers, in the order queezz named them, read
+     * from the map rather than typed here twice: "1. membrane installed. 2. pipe
+     * open... 3. blank, bellows not connected. 4. boron deposition sample holder
+     * installed" (owner decision 2026-09-08). The one-line meaning beside each
+     * lives in the map too, and the card's More prints them. */
+    function lineModeConfig() {
+        return (plumbing && plumbing.line_configuration) || {};
+    }
+
+    function lineModeLabel(mode) {
+        const modes = lineModeConfig().modes || {};
+        return (modes[mode] || modes.unknown || {}).label || "Unknown";
+    }
+
+    function buildLineModeChoices() {
+        const holder = document.getElementById("line-mode-choices");
+        const detail = document.getElementById("line-mode-detail");
+        const more = document.getElementById("line-mode-more");
+        const config = lineModeConfig();
+        const order = config.order || [];
+        const modes = config.modes || {};
+        if (holder) {
+            holder.replaceChildren(...order.map((mode) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.dataset.lineMode = mode;
+                button.textContent = (modes[mode] || {}).label || mode;
+                return button;
+            }));
+        }
+        if (detail) {
+            detail.replaceChildren(...order.map((mode) => {
+                const line = document.createElement("p");
+                line.className = "muted";
+                line.textContent = `${(modes[mode] || {}).label || mode}: ${(modes[mode] || {}).meaning || ""}.`;
+                return line;
+            }));
+        }
+        if (more && !more.dataset.wired) {
+            more.dataset.wired = "1";
+            more.addEventListener("click", () => {
+                const open = more.getAttribute("aria-expanded") === "true";
+                more.setAttribute("aria-expanded", String(!open));
+                more.textContent = open ? "More" : "Less";
+                if (detail) detail.hidden = open;
+            });
+        }
+    }
+
     function renderLineMode(context) {
-        const labels = {unknown: "Unknown", membrane: "Membrane installed", open: "Pipe open", boron: "Boron deposition"};
         const status = document.getElementById("line-mode-status");
         const note = document.getElementById("line-mode-note");
-        if (status) status.textContent = labels[context.line_mode] || labels.unknown;
+        if (status) status.textContent = lineModeLabel(context.line_mode);
         document.querySelectorAll("[data-line-mode]").forEach((button) => {
             const selected = button.dataset.lineMode === context.line_mode;
             button.setAttribute("aria-pressed", String(selected));
@@ -770,6 +866,7 @@
 
     function setupLineModes(initialContext) {
         let context = initialContext;
+        buildLineModeChoices();
         renderLineMode(context);
         document.querySelectorAll("[data-line-mode]").forEach((button) => {
             button.addEventListener("click", async () => {

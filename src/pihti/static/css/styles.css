@@ -429,7 +429,16 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
    ("pic 2, the beacon css broken in the vent guide"). The ring is also drawn in
    the marker's dark ink rather than white now: white was invisible on the coral
    field's replacement. */
+/* The beacon takes no pointer events, and every part of it says so rather than
+   inheriting it: queezz, 2026-09-08, with Vent Plasma running — "venting plasma
+   works. But numbered circles are obstructing the interactions." The larger
+   half of that repair is in `diagram.js`, which now stands the disc at the
+   element's corner instead of over its middle, because a valve you cannot see
+   is a valve you cannot aim at. This half makes the press land on the valve
+   whatever sits above it. */
+#operation-guide-overlay { pointer-events: none; }
 .operation-marker { pointer-events: none; transition: transform 120ms ease-out; }
+.operation-marker circle, .operation-marker text { pointer-events: none; }
 .operation-marker circle:not(.halo) { fill: #1c1f26; stroke: #ffffff; stroke-width: 3.5; }
 .operation-marker text { fill: #ffffff; font: bold 18px sans-serif; }
 .operation-marker .halo { display: none; fill: none; stroke: #1c1f26; stroke-width: 3; opacity: 0.9; }
@@ -768,20 +777,52 @@ button.tiny {
 #vacuum-legend-detail p:last-child { margin-bottom: 0; }
 #vacuum-more { margin-top: 10px; }
 
-/* The swatch stands on the diagram's own ground, so the colour in the legend
+/* A full swatch, not a thin bar (queezz, 2026-09-08: "Make the legend chips
+   larger, a full swatch rather than a thin bar, so the colour can be read there
+   at all"). It stands on the diagram's own ground, so the colour in the legend
    is the colour the eye will meet on the drawing. */
 .vacuum-swatch {
-  display: grid;
-  align-content: center;
   flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
+  width: 26px;
+  height: 16px;
   border-radius: 3px;
-  background: var(--diagram-ground);
-  transform: translateY(2px);
+  box-shadow: 0 0 0 2px var(--diagram-ground);
+  transform: translateY(1px);
 }
 
-.vacuum-swatch i { display: block; height: 5px; }
+/* And the seven in a row at the top of More, on the same ground and big enough
+   to compare one against another rather than each against the drawing. */
+.vacuum-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--diagram-ground);
+}
+
+.vacuum-swatch-row figure {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  width: 78px;
+}
+
+.vacuum-swatch-big {
+  display: block;
+  width: 100%;
+  height: 34px;
+  border-radius: 4px;
+}
+
+.vacuum-swatch-row figcaption {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  text-align: center;
+  color: #2b2822;
+}
 
 /* The two vessel lines: what the prediction finds each one joined to, in
    words, above the key that explains the colour beside them. queezz asked for

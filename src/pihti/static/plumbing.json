@@ -2,48 +2,51 @@
     "note": "Which drawn pipe belongs to which vacuum volume, and which valve joins which two volumes. Read from the names queezz gave the pipes in diagram.svg, never from where the lines happen to sit on the page. The vacuum state derived from this is a prediction from the valve positions an operator has entered, not a pressure measurement.",
     "prototype": true,
     "drawing": {
-        "note": "The field the drawing is painted on, how much wider the reading aid draws a coloured pipe, and the two inks a valve wears. The field is a quiet warm stone so the state colours are the loudest thing on the page (owner permission 2026-09-08). `band` is the widening the More switch offers; `band_default` is false since 0.15.0, because queezz's own strokes are the width he wants (letter 20260908-c8ef7df5-5f5e40) and a widening he did not ask for is the app talking over his drawing. `valve_closed` is the ink a shut valve wears: white, so a colour can never run through it and the pipe visibly stops short on both sides (queezz, 2026-09-08, 'GVU is closed... Yet at a glance it seems that it does'). An open valve wears the colour flowing through it instead, at every valve size, which is what makes a small open valve readable from arm's length.",
+        "note": "The field the drawing is painted on, how much wider the reading aid draws a coloured pipe, and the inks that are not vacuum states. The field is a quiet warm stone so the state colours are the loudest thing on the page (owner permission 2026-09-08). `band` is the widening the More switch offers; `band_default` is false since 0.15.0, because queezz's own strokes are the width he wants (letter 20260908-c8ef7df5-5f5e40) and a widening he did not ask for is the app talking over his drawing. `valve_closed` and `valve_closed_edge` are the two inks a shut valve wears: white with a black outline, the one dark-rimmed shape on the drawing, so it stands out as the break (queezz, 2026-09-08, letter 20260908-3308e02d-3021dd: 'When closed, black border white fill is good. Stands out'). An open valve wears the colour flowing through it as fill *and* outline — 'I think I like the valves edge to be same color as the fill' — so it reads as part of the pipe at every valve size, gas panel included. `flange` is the blank-flange tone: a light steel that is neither the open green nor the closed grey nor any state colour, worn by the probe segment when a blank is installed in place of the probe. `pump_idle` is the yellow a stopped pump keeps (letter 20260908-3688eabd-587dfe): a running pump wears what it is doing, so the yellow now means 'not pumping' and a stopped turbo is visible at a glance.",
         "ground": "#e3dfd6",
         "band": 1.6,
         "band_default": false,
-        "valve_closed": "#ffffff"
+        "valve_closed": "#ffffff",
+        "valve_closed_edge": "#000000",
+        "flange": "#9aa7b5",
+        "pump_idle": "yellow"
     },
-    "states_note": "Seven roles since 0.15.0, chosen from Paul Tol's muted qualitative set first and Okabe-Ito second, then darkened only as far as the stone field demanded: every one of them clears 3:1 against `#e3dfd6`, which caps a colour's own luminance at about 0.21 and is why none of them is the source palette's own lightness. They also climb one ladder of weight — air is the darkest and isolated the lightest — so a reader who cannot separate two hues can still separate them by how heavy they look. High vacuum split in two on 2026-09-08 ('I think I'd rather have two high vacuum colors. Upstream and downstream. To see mixing clearly'), and a high-vacuum volume takes its colour from the vessel it is joined to. `sealed` is the seventh: a turbo-pumped volume that reaches no vessel at all — the pipe between a closed gate and its own turbo — which must never wear a vessel's colour, because that is exactly the glance that read as open.",
+    "states_note": "Seven roles, redrawn on 2026-09-08 for the second time that day. queezz on the first seven: 'Gas color and rough vacuum color are indistinguishable', and, amending the brief that produced them, 'I don't want muted, actually. No color blind people here. But those colors are nicer than maxed RGBs. So design nice, not color blind nice. Tol inspired is still fine' (letters 20260908-92656592-3a679a and 20260908-630efd50-e4c7ab). So the ladder-of-weight rule that made all seven crowd the dark end is gone: six of them now sit at nearly one lightness (L* 42 to 52) and are told apart by **hue**, which is what a 4 px line and a legend chip actually carry. Every one still clears 3:1 both on the stone field and against the gas panel's green valve, which caps a colour's own luminance at about 0.204 — that cap is the floor's price, and it is why these are deep jewel tones rather than Tol's own lightness. Chroma is spent rather than saved: C* 54 to 76 for the six, against 35 to 55 before. The pairs are checked by arithmetic, not by eye: every pair of the seven is at least 21 CIEDE2000 units apart (the closest is the plasma blue against the sealed teal, 21.3, where the old palette's closest was 11.6), and gas and rough vacuum now sit in different hue families — magenta at 332 degrees against amber at 73 — where before they were plum and ochre, both warm and both dark. High vacuum stays split in two ('I think I'd rather have two high vacuum colors. Upstream and downstream. To see mixing clearly'), and a high-vacuum volume takes its colour from the vessel it is joined to. `sealed` is the seventh: a turbo-pumped volume that reaches no vessel at all — the pipe between a closed gate and its own turbo — which must never wear a vessel's colour, because that is exactly the glance that read as open. `isolated` is the one deliberately grey of the seven and stays the quietest on the field: it is the absence of a claim, not an eighth thing competing for the eye.",
     "states": [
         {
             "id": "air",
             "label": "Air",
-            "color": "#701225",
+            "color": "#c81d24",
             "meaning": "a vent is open"
         },
         {
             "id": "gas",
             "label": "Gas",
-            "color": "#752f69",
+            "color": "#a92a9c",
             "meaning": "a bottle or N2 is open, and its symbol is drawn in the vessel"
         },
         {
             "id": "upstream-high-vacuum",
             "label": "High vacuum, plasma side",
-            "color": "#005e92",
+            "color": "#1f5fd0",
             "meaning": "a turbo reaches it, and so does the plasma vessel"
         },
         {
             "id": "downstream-high-vacuum",
             "label": "High vacuum, QMS side",
-            "color": "#117733",
+            "color": "#0e8a46",
             "meaning": "a turbo reaches it, and so does the QMS vessel"
         },
         {
             "id": "rough-vacuum",
             "label": "Rough vacuum",
-            "color": "#936500",
+            "color": "#a86a00",
             "meaning": "a rough pump only"
         },
         {
             "id": "sealed",
             "label": "Pumped, sealed off",
-            "color": "#6d7786",
+            "color": "#00798f",
             "meaning": "a turbo pumps it, but no vessel reaches it"
         },
         {
@@ -149,6 +152,7 @@
             ]
         },
         "probe-line": {
+            "note": "Four drawn segments meeting at one cross, and one volume. queezz split the run in Inkscape on 2026-09-08 (letter 20260908-520505af-9047d4) so a blank flange could be shown: `probe-pipe` now stops at the cross instead of running through it, and `probe-pipe-cross-to-GVBD` carries on from the cross down to GVBD. The cross itself joins all four — the probe segment from above, the line from bypass-l1 across, and the GVBD segment below — so they are one continuous space and there is no valve between them to split them at. What the split buys is a *segment the drawing can paint on its own*: under the Blank configuration the probe segment wears the blank-flange tone while the rest of this volume keeps its predicted colour. Adding `probe-pipe-cross-to-GVBD` here is also the repair of a real gap: it was drawn but unmapped, so nothing coloured it at all.",
             "label": "Probe line",
             "group": "pipes-probe",
             "junctions": [
@@ -157,7 +161,8 @@
             "elements": [
                 "probe-pipe",
                 "probe-pipe-cross",
-                "probe-pipe-cross-line"
+                "probe-pipe-cross-line",
+                "probe-pipe-cross-to-GVBD"
             ]
         },
         "vessel-crossover": {
@@ -262,9 +267,10 @@
         {"id": "downstream-pumpline-vent-valve", "joins": ["qms-foreline", "atmosphere"], "vent": true},
         {"id": "bypass-pumpline-vent-valve", "joins": ["bypass-pumpline", "atmosphere"], "vent": true}
     ],
+    "pumps_note": "`serves` is the vessel a turbo belongs to, and it is a fact about the rig rather than about today's valve positions: TMPU is the plasma vessel's turbo whether or not GVU is open. A running pump wears what it is doing — a turbo the high-vacuum colour of the side it serves, a rotary or a scroll the rough-vacuum colour — and a stopped one keeps the yellow (queezz, 2026-09-08, letter 20260908-3688eabd-587dfe: 'why don't we change the TMP on color to its HV color? Same for rough pumps'). Every pump here already had an on/off an operator presses and confirms, recorded in history like a valve, and the prediction has always read it: a stopped turbo makes no high vacuum, and never did.",
     "pumps": [
-        {"id": "TMPU", "kind": "turbo", "volume": "plasma-turbo-line", "backed_by": "plasma-foreline"},
-        {"id": "TMPD", "kind": "turbo", "volume": "qms-turbo-line", "backed_by": "qms-foreline"},
+        {"id": "TMPU", "kind": "turbo", "volume": "plasma-turbo-line", "backed_by": "plasma-foreline", "serves": "plasma-vessel"},
+        {"id": "TMPD", "kind": "turbo", "volume": "qms-turbo-line", "backed_by": "qms-foreline", "serves": "qms-vessel"},
         {"id": "RoughU", "kind": "rough", "volume": "plasma-foreline"},
         {"id": "RoughD", "kind": "rough", "volume": "qms-foreline"},
         {"id": "Rough-Bypass", "kind": "rough", "volume": "bypass-pumpline"},
@@ -280,14 +286,46 @@
     ],
     "line_configuration": {
         "note": "What sits in the narrow pipe between the two vessels, from the Line configuration annotation an operator sets on the Vacuum page. Only 'Pipe open' is a connection: with a membrane installed, something is mounted across the whole pipe and each valve on it opens onto its own private side of the barrier, so the two vessels are separate spaces (owner review 2026-09-08). Boron deposition uses the same pipe, but its far (downstream) end is not joined at all: queezz, 2026-09-08 (letter 20260907-dc825e44-e6d89e) -- 'Boron uses same pipe. But other end not connected to downstream. Could be pumped from plasma side via bypass.' -- so `dead_end_valve` names the downstream valve that never reaches this pipe in that mode, whatever position it is in; the pipe then simply takes the plasma side's own predicted state (or isolated, if even that side is shut), and it can still be pumped from the plasma side through the bypass manifold because that reach never ran through this pipe's far end. Until an operator has recorded which configuration applies, the prediction does not claim a connection nobody has told it about. `linked_valve` names the drawn valve this whole annotation also governs directly (owner decision 2026-09-08, same letter: 'Membrane installed and the membrane valve should be linked') -- it has no press of its own any more, closed only under `closed_mode` and open under every other configuration, so its own colour and what it does to the diagram's connectivity can never disagree.",
+        "four_note": "The four queezz actually runs, in his own order and his own words (owner decision 2026-09-08, letter 20260908-b429ce4b-2ad897): '1. membrane installed. 2. pipe open, but the membrane probe in or bellows, which is vacuum wise the same. 3. blank, bellows not connected. 4. boron deposition sample holder installed. Are good and actual variants we run now.' `order` is that order and the card follows it; `meaning` is the one line the card's More prints beside each. **Blank** is vacuum-wise the same as Membrane installed — the crossover is closed at the flange — so it appears in `closed_modes` beside `membrane` and connects nothing; what it looks like is different, and that is what `flange_element` is for: the probe segment is drawn in the blank-flange tone and no plug is drawn at the membrane position, because there is no probe there to draw. `aliases` resolves any older spelling of a stored value on read, so a configuration recorded before this release still names the same mode; anything unrecognised falls back to `unknown` rather than to a guess.",
         "volume": "vessel-crossover",
-        "modes": {
-            "membrane": {"label": "Membrane installed", "connects": false},
-            "open": {"label": "Pipe open", "connects": true},
-            "boron": {"label": "Boron deposition", "connects": false, "dead_end_valve": "bypass-vcr-d"},
-            "unknown": {"label": "Not recorded", "connects": false}
+        "order": ["membrane", "open", "blank", "boron"],
+        "aliases": {
+            "membrane-installed": "membrane",
+            "pipe-open": "open",
+            "blank-flange": "blank",
+            "blank_flange": "blank",
+            "boron-deposition": "boron"
         },
-        "linked_valve": {"id": "Membrane", "closed_mode": "membrane"}
+        "modes": {
+            "membrane": {
+                "label": "Membrane installed",
+                "connects": false,
+                "meaning": "the membrane separates the two vessels at the crossover"
+            },
+            "open": {
+                "label": "Pipe open",
+                "connects": true,
+                "meaning": "the membrane probe is in, or the bellows — either way a vacuum connection between the vessels"
+            },
+            "blank": {
+                "label": "Blank",
+                "connects": false,
+                "flange_element": "probe-pipe",
+                "meaning": "the bellows is not connected and a blank flange closes the crossover; vacuum-wise like a membrane"
+            },
+            "boron": {
+                "label": "Boron deposition",
+                "connects": false,
+                "dead_end_valve": "bypass-vcr-d",
+                "meaning": "the sample holder is installed; the pipe is a plasma-side dead end, never joined to the QMS vessel"
+            },
+            "unknown": {
+                "label": "Not recorded",
+                "connects": false,
+                "meaning": "nobody has said what is mounted, so nothing is claimed"
+            }
+        },
+        "linked_valve": {"id": "Membrane", "closed_modes": ["membrane", "blank"], "plug_mode": "membrane"}
     },
     "gauges_note": "`stem` is the short line from a gauge symbol to the pipe or vessel it reads. queezz drew each one as an Inkscape-named path beside its gauge and asked whether the app could work with that rather than name six more elements (2026-09-08). It can: three sit inside their gauge's own group as its only plain line, and three are the plain line drawn immediately before their gauge at the top level of the drawing. Nothing was guessed — each id below is that one line, and a test proves it is still the gauge's own neighbour so a regroup in Inkscape cannot silently point a stem at the wrong volume. `kind: \"ionization\"` marks the two gauges that must not see gas or air while they are switched on, and it is on exactly the two whose own names say so; queezz settled the rest on 2026-09-04 — when venting, 'only ionization gauges go off (Baratron, Pirani, the Pfeiffer single gauge and the Ulvac membrane gauge work at one atmosphere)'. Nothing else here is read as an ionization gauge, and a gauge with no `kind` is simply never warned about. **Moved 2026-09-08** (owner, letter 20260908-c8ef7df5-5f5e40: 'moved the upstream IG to gauges manifold, where it is physically now for some time already'): `bypass-ionization-gauge` reads the **plasma vessel** now, not the bypass manifold — queezz moved its whole group onto the plasma vessel's gauge manifold in the drawing, beside the single gauge and the upstream Baratron, and the map follows the drawing. Its id and its stem are unchanged, because an id is his to rename and this was a move, not a rename. The bypass manifold is therefore left with one gauge and no ionization gauge at all: `bypass-absolute-gauge`, the Ulvac the two pump-down guides already send you to read.",
     "warnings_note": "The two press warnings of 0.13.0 are read from this map and from nothing else: a switched-on gauge marked `kind: \"ionization\"` whose volume the press would join to gas or vent air, and a running pump of `kind: \"turbo\"` whose own volume the press would join to vent air. A turbo is a boundary in the prediction, so the volume that matters for it is its own, never everything behind it. Both are predictions from the valve positions an operator entered — the same walk that colours the pipes — and never an interlock: nothing here reads a pressure, refuses a press, or protects any hardware.",

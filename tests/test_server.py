@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import tomllib
 import xml.etree.ElementTree as ET
 from datetime import timedelta
@@ -71,9 +72,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.15.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.15.0"}
-    assert b"v0.15.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.16.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.16.0"}
+    assert b"v0.16.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -279,20 +280,26 @@ def test_history_moment_and_rendered_state_svg(client):
     current = client.get("/state.svg")
     assert current.mimetype == "image/svg+xml"
     body = current.data.decode("utf-8")
-    assert "#TMPU{fill:yellow !important}" in body
-    # A valve wears the prediction's own colour now, never the operator green
-    # (0.15.0): GVU is open onto a turbo-pumped plasma vessel, so it wears that
-    # vessel's own high-vacuum colour and the operator palette never writes it.
-    assert "#GVU{fill:#005e92 !important}" in body
+    # A running turbo wears the high-vacuum colour of the side it serves, and a
+    # stopped one keeps the yellow (0.16.0): TMPU is running here, so it wears
+    # the plasma side's blue and TMPD, which is not, stays yellow.
+    assert "#TMPU{stroke:#000000 !important;fill:#1f5fd0 !important}" in body
+    assert "#TMPD{stroke:#000000 !important;fill:yellow !important}" in body
+    # A valve wears the prediction's own colour, never the operator green
+    # (0.15.0), and its edge goes with its fill (0.16.0): GVU is open onto a
+    # turbo-pumped plasma vessel, so both its fill and its outline are that
+    # vessel's own high-vacuum colour.
+    assert "#GVU{stroke:#1f5fd0 !important;fill:#1f5fd0 !important}" in body
     assert "#GVU{fill:#9bf08d !important}" not in body
-    # And a closed valve is white, so the colour visibly stops on both sides.
-    assert "#GVD{fill:#ffffff !important}" in body
+    # And a closed valve is white with a black outline, the one dark-rimmed
+    # shape on the drawing, so the colour visibly stops on both sides.
+    assert "#GVD{stroke:#000000 !important;fill:#ffffff !important}" in body
     assert body.rstrip().endswith("</svg>")
     ET.fromstring(current.data)
 
     historical = client.get("/state.svg", query_string={"at": first_ts.replace(" ", "T")})
     assert historical.status_code == 200
-    assert "#TMPU{fill:yellow !important}" in historical.data.decode("utf-8")
+    assert "#TMPU{stroke:#000000 !important;fill:#1f5fd0 !important}" in historical.data.decode("utf-8")
     assert client.get("/state.svg", query_string={"at": "bad"}).status_code == 400
 
 
@@ -873,11 +880,24 @@ def test_the_line_between_the_vessels_follows_the_line_configuration(client):
     assert agreed["volumes"]["vessel-crossover"] == "upstream-high-vacuum"
     assert agreed["volumes"]["qms-vessel"] == "downstream-high-vacuum"
 
-    # Every button the page offers is a configuration the map knows.
-    modes = plumbing["line_configuration"]["modes"]
-    assert {"membrane", "open", "boron", "unknown"} == set(modes)
+    # Every button the page offers is a configuration the map knows, and the
+    # card offers exactly the four queezz named, in his order (owner decision
+    # 2026-09-08, letter 20260908-b429ce4b-2ad897).
+    config = plumbing["line_configuration"]
+    modes = config["modes"]
+    assert {"membrane", "open", "blank", "boron", "unknown"} == set(modes)
+    assert config["order"] == ["membrane", "open", "blank", "boron"]
+    assert [modes[name]["label"] for name in config["order"]] == [
+        "Membrane installed",
+        "Pipe open",
+        "Blank",
+        "Boron deposition",
+    ]
+    # One line of meaning each, for the card's More.
+    for name in config["order"]:
+        assert modes[name]["meaning"].strip()
     assert [name for name, mode in modes.items() if mode["connects"]] == ["open"]
-    assert plumbing["line_configuration"]["volume"] in plumbing["volumes"]
+    assert config["volume"] in plumbing["volumes"]
 
 
 def test_boron_deposition_leaves_the_pipe_a_dead_end_on_the_plasma_side(client):
@@ -972,25 +992,285 @@ def test_the_membrane_element_follows_the_line_configuration_not_a_press(client)
     assert membrane_config["followsLineMode"] is True
 
     linked = plumbing["line_configuration"]["linked_valve"]
-    assert linked == {"id": "Membrane", "closed_mode": "membrane"}
+    # Shut by two configurations, and only one of them draws a plug: a blank
+    # flange closes the crossover exactly as a membrane does, but there is no
+    # probe mounted at that position to draw.
+    assert linked == {
+        "id": "Membrane",
+        "closed_modes": ["membrane", "blank"],
+        "plug_mode": "membrane",
+    }
 
     # A stale "active" (open) press recorded for Membrane is overridden by the
     # configuration on every mode -- it never gets a say.
     stale_state = {"Membrane": "active", "Rough-Bypass": "active", "bypass-l2": "active"}
-    for mode, expect_open in (("membrane", False), ("open", True), ("boron", True), ("unknown", True), (None, True)):
+    for mode, expect_open in (
+        ("membrane", False),
+        ("blank", False),
+        ("open", True),
+        ("boron", True),
+        ("unknown", True),
+        (None, True),
+    ):
         prediction = plumbing_map.predict(plumbing, stale_state, mode)
         assert prediction["linked_valve"] == {
             "id": "Membrane",
             "status": "active" if expect_open else "inactive",
+            "plug": mode == "membrane",
         }, mode
         assert prediction["volumes"]["probe-line"] == (
             "rough-vacuum" if expect_open else "isolated"
         ), mode
+        # And the plug is drawn only where a probe really is mounted.
+        drawn = prediction["elements"]["Membrane"]
+        assert drawn["plug"] is (mode == "membrane"), mode
+        assert drawn["fill"] == ("#ffffff" if mode == "membrane" else "none"), mode
 
     # And the reverse: a stale "inactive" (closed) press is overridden too.
     stale_closed = {"Membrane": "inactive", "Rough-Bypass": "active", "bypass-l2": "active"}
     open_from_configuration = plumbing_map.predict(plumbing, stale_closed, "open")
     assert open_from_configuration["volumes"]["probe-line"] == "rough-vacuum"
+
+
+def test_the_four_line_configurations_each_paint_the_line_their_own_way(client):
+    """The four queezz runs, and what each one does to the drawing.
+
+    Owner decision 2026-09-08 (letter ``20260908-b429ce4b-2ad897``), in his own
+    words: "1. membrane installed. 2. pipe open, but the membrane probe in or
+    bellows, which is vacuum wise the same. 3. blank, bellows not connected.
+    4. boron deposition sample holder installed. Are good and actual variants we
+    run now."
+
+    **Blank** is the new one, and it is vacuum-wise a membrane -- the crossover
+    is closed at the flange -- so the connectivity assertions below are
+    identical for the two. What differs is the drawing: the probe segment is
+    painted in the blank-flange tone, because with the bellows disconnected
+    there is no volume in it to predict, and no plug is drawn at the membrane
+    position, because there is no probe mounted there.
+    """
+    plumbing = client.get("/plumbing").json
+    colours = {state["id"]: state["color"] for state in plumbing["states"]}
+    flange = plumbing["drawing"]["flange"]
+    # Both sides fully pumped, every valve on both routes open, so each
+    # configuration's own answer is the only thing that can differ.
+    everything_open = {
+        "TMPU": "active",
+        "GVU": "active",
+        "RoughU": "active",
+        "TMPD": "active",
+        "GVD": "active",
+        "RoughD": "active",
+        "bypass-vcr-u": "active",
+        "bypass-vcr-d": "active",
+        "GVBD": "active",
+        "bypass-l1": "active",
+    }
+
+    # (mode, the narrow pipe, the probe segment, the cross-to-GVBD segment,
+    #  the plasma vessel, the QMS vessel)
+    expected = [
+        (
+            "membrane",
+            "upstream-high-vacuum",
+            "downstream-high-vacuum",
+            "downstream-high-vacuum",
+            "upstream-high-vacuum",
+            "downstream-high-vacuum",
+        ),
+        (
+            "open",
+            "upstream-high-vacuum",
+            "upstream-high-vacuum",
+            "upstream-high-vacuum",
+            "upstream-high-vacuum",
+            "upstream-high-vacuum",
+        ),
+        (
+            "blank",
+            "upstream-high-vacuum",
+            None,  # the flange tone, not a state at all
+            "downstream-high-vacuum",
+            "upstream-high-vacuum",
+            "downstream-high-vacuum",
+        ),
+        (
+            "boron",
+            "upstream-high-vacuum",
+            "downstream-high-vacuum",
+            "downstream-high-vacuum",
+            "upstream-high-vacuum",
+            "downstream-high-vacuum",
+        ),
+    ]
+    for mode, narrow, probe, to_gvbd, plasma, qms in expected:
+        prediction = plumbing_map.predict(plumbing, everything_open, mode)
+        assert prediction["volumes"]["vessel-crossover"] == narrow, mode
+        assert prediction["volumes"]["plasma-vessel"] == plasma, mode
+        assert prediction["volumes"]["qms-vessel"] == qms, mode
+        assert prediction["elements"]["probe-pipe-cross-to-GVBD"]["stroke"] == colours[to_gvbd], mode
+        segment = prediction["elements"]["probe-pipe"]
+        if probe is None:
+            # The blank flange: neither a state colour nor the closed grey.
+            assert segment["flange"] is True, mode
+            assert segment["stroke"] == flange, mode
+            assert flange not in set(colours.values())
+        else:
+            assert segment["stroke"] == colours[probe], mode
+        # And the plug is drawn under Membrane installed alone.
+        assert prediction["elements"]["Membrane"]["plug"] is (mode == "membrane"), mode
+
+    # Only *Pipe open* joins the two vessels through the narrow pipe.
+    for mode in ("membrane", "blank", "boron", "unknown"):
+        connections = plumbing_map.predict(plumbing, everything_open, mode)["connections"]
+        assert connections["plasma-vessel"]["joined"] == [], mode
+    joined = plumbing_map.predict(plumbing, everything_open, "open")["connections"]
+    assert joined["plasma-vessel"]["joined"] == ["qms-vessel"]
+
+    # The segment queezz split off in Inkscape is really in the map: it was
+    # drawn and unmapped before this release, so nothing coloured it at all.
+    probe_line = plumbing["volumes"]["probe-line"]["elements"]
+    assert "probe-pipe-cross-to-GVBD" in probe_line
+    assert "probe-pipe" in probe_line
+
+    # The server takes the fourth configuration and refuses anything else.
+    identify(client)
+    assert client.post("/operation-context", json={"line_mode": "blank"}).status_code == 200
+    assert client.get("/operation-context").json["line_mode"] == "blank"
+    assert client.post("/operation-context", json={"line_mode": "bellows"}).status_code == 400
+
+
+def test_a_stored_line_configuration_is_read_through_the_map_s_own_aliases(client):
+    """A configuration recorded under an older spelling still names its mode.
+
+    A stored annotation outlives the release that wrote it, so the map carries
+    an alias table and every read goes through it. Anything the map does not
+    know becomes ``unknown``: the prediction says nothing rather than guessing
+    which configuration an unreadable value meant.
+    """
+    plumbing = client.get("/plumbing").json
+    assert plumbing_map.resolve_line_mode(plumbing, "blank-flange") == "blank"
+    assert plumbing_map.resolve_line_mode(plumbing, "membrane-installed") == "membrane"
+    assert plumbing_map.resolve_line_mode(plumbing, "blank") == "blank"
+    assert plumbing_map.resolve_line_mode(plumbing, "something-else") == "unknown"
+    assert plumbing_map.resolve_line_mode(plumbing, None) == "unknown"
+    # An alias predicts exactly as the mode it names.
+    state = {"TMPU": "active", "GVU": "active", "bypass-vcr-u": "active"}
+    assert plumbing_map.predict(plumbing, state, "blank-flange")["volumes"] == (
+        plumbing_map.predict(plumbing, state, "blank")["volumes"]
+    )
+    # `unknown` is never offered as a button.
+    assert "unknown" not in plumbing_map.line_modes(plumbing)
+
+
+def test_a_pump_wears_what_it_is_doing(client):
+    """A running pump says which vacuum it is making; a stopped one stays yellow.
+
+    queezz, 2026-09-08 (letter ``20260908-3688eabd-587dfe``): "why don't we
+    change the TMP on color to its HV color? Same for rough pumps. Rotaries and
+    Scroll?" -- so a stopped turbo is visible at a glance and the pump-down
+    guide's "start the turbo when the pressure is low" has a shape to point at.
+
+    A turbo takes the high-vacuum colour of the **side it serves**, which is a
+    fact about the rig rather than about today's valves: TMPU belongs to the
+    plasma vessel whether or not GVU is open. Every pump here already had a
+    confirmed on/off recorded in history like a valve, and the prediction has
+    always read it -- a stopped turbo has never made high vacuum here, which
+    this test also pins down.
+    """
+    plumbing = client.get("/plumbing").json
+    colours = {state["id"]: state["color"] for state in plumbing["states"]}
+    idle = plumbing["drawing"]["pump_idle"]
+    element_config = client.get("/elements-config").json
+    pressable = {item["id"]: item for item in element_config}
+
+    running = plumbing_map.predict(
+        plumbing,
+        {
+            "TMPU": "active",
+            "TMPD": "active",
+            "RoughU": "active",
+            "Rough-Bypass": "active",
+        },
+        "membrane",
+    )
+    assert running["elements"]["TMPU"]["fill"] == colours["upstream-high-vacuum"]
+    assert running["elements"]["TMPD"]["fill"] == colours["downstream-high-vacuum"]
+    assert running["elements"]["RoughU"]["fill"] == colours["rough-vacuum"]
+    assert running["elements"]["Rough-Bypass"]["fill"] == colours["rough-vacuum"]
+    # RoughD was not pressed, so it stays yellow beside the ones that were.
+    assert running["elements"]["RoughD"]["fill"] == idle
+    assert running["elements"]["RoughD"]["running"] is False
+
+    # Every pump answers, keeps the black outline it was drawn with, and is an
+    # ordinary confirmed toggle an operator presses and history records.
+    for pump in plumbing["pumps"]:
+        item = running["elements"][pump["id"]]
+        assert item["pump"] is True, pump["id"]
+        assert item["stroke"] == "#000000", pump["id"]
+        assert item["fill"] == idle or item["fill"] in set(colours.values()), pump["id"]
+        assert pump["id"] in pressable, pump["id"]
+
+    # A turbo that is not running makes no high vacuum, and its own line is not
+    # even sealed -- nothing is pumping it.
+    stopped = plumbing_map.predict(plumbing, {"GVU": "active"}, "membrane")
+    assert stopped["volumes"]["plasma-vessel"] == "isolated"
+    assert stopped["elements"]["TMPU"]["fill"] == idle
+    # And a turbo behind a shut gate still says which side it belongs to.
+    behind_the_gate = plumbing_map.predict(plumbing, {"TMPU": "active"}, "membrane")
+    assert behind_the_gate["volumes"]["plasma-turbo-line"] == "sealed"
+    assert behind_the_gate["elements"]["TMPU"]["fill"] == colours["upstream-high-vacuum"]
+
+
+def test_a_beacon_stands_off_the_shape_and_never_takes_the_pointer(client):
+    """The numbered beacons stopped covering the valves they point at.
+
+    queezz, 2026-09-08, with Vent Plasma running (letter
+    ``20260908-3688eabd-587dfe``): "venting plasma works. But numbered circles
+    are obstructing the interactions." The disc sat on the middle of the very
+    valve the step was asking him to press. Two halves to the repair, and the
+    larger one is the placement: the disc now stands at the element's top-right
+    corner, stepped further out along the diagonal, so the valve underneath
+    stays visible and can be aimed at. The other half is that every part of a
+    beacon says it takes no pointer, rather than relying on inheritance.
+
+    The pulse itself is proved in a browser, never here: a stylesheet that reads
+    correct is exactly what hid the dead beacon for two releases.
+    """
+    css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    assert "#operation-guide-overlay { pointer-events: none; }" in css
+    assert ".operation-marker { pointer-events: none;" in css
+    assert ".operation-marker circle, .operation-marker text { pointer-events: none; }" in css
+
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    # The corner, not the middle: `rect.right`/`rect.top` rather than the
+    # centre the placement used before.
+    assert "corner.x = rect.right;" in script
+    assert "corner.y = rect.top;" in script
+    assert "MARKER_STEP" in script
+    # A step's own authored nudge still applies on top of the corner.
+    assert 'point.x += (offset || [0, 0])[0];' in script
+
+    # And every id a guide step marks is still a real element with a name, so
+    # the moved beacon is still pointing at something a person can be told to
+    # press.
+    guides = client.get("/operation-guides").json
+    names = {item["id"] for item in client.get("/elements-config").json}
+    svg = (PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").read_text(
+        encoding="utf-8"
+    )
+    for guide in guides["guides"]:
+        for step in guide["steps"]:
+            marked = list(step.get("targets") or [])
+            marked += list(step.get("marks") or [])
+            if step.get("targetId"):
+                marked.append({"id": step["targetId"]})
+            for target in marked:
+                assert target["id"] in names, (guide["id"], target["id"])
+                assert f'id="{target["id"]}"' in svg, (guide["id"], target["id"])
 
 
 def test_membrane_cannot_be_set_directly(client):
@@ -1353,17 +1633,25 @@ def test_a_coloured_pipe_is_widened_solidly_and_an_isolated_one_is_not(client):
 
 
 def test_every_state_colour_is_readable_on_the_diagram_ground(client):
-    """Seven colours, checked against the field and against colour vision.
+    """Seven colours, designed for the eye and checked by arithmetic.
 
-    queezz, 2026-09-08: "what about 'nicer' colors, not pure BLUE-BLUE-BLUE...
-    But not gray looking either... Color vision aware not saturated colors."
-    They are chosen from Paul Tol's muted qualitative set first and Okabe-Ito
-    second, then darkened only as far as the stone field demanded: clearing 3:1
-    against ``#e3dfd6`` caps a colour's own luminance at about 0.21, which is
-    why none of them is the source palette's own lightness. Nothing here is
-    judged by eye: the contrast is computed, the ladder of weight is computed,
-    and the pairs are compared again through simulated protanopia and
-    deuteranopia, the two common kinds of red-green colour vision.
+    Two owner letters wrote this test. The first (2026-09-08,
+    ``20260908-630efd50-e4c7ab``) retired the constraint the previous seven were
+    built under: "On the Tol muted colors... I don't want muted, actually. No
+    color blind people here. But those colors are nicer than maxed RGBs. So
+    design nice, not color blind nice. Tol inspired is still fine." The second
+    (``20260908-92656592-3a679a``) said what had gone wrong without it: "Gas
+    color and rough vacuum color are indistinguishable", and asked for the check
+    to be **pairwise**, in numbers, with the smallest pair named.
+
+    So the ladder of weight is gone -- it was the colour-vision aid, and it was
+    what crowded all seven into the dark end where a plum and an ochre look
+    alike on a 4 px line. What replaces it is hue: six of the seven now sit at
+    nearly one lightness and are told apart by where they stand on the colour
+    circle. What stays is the floor -- 3:1 against the stone field the drawing
+    is painted on, and against the one green valve the prediction does not
+    paint -- which caps a colour's own luminance at about 0.204 and is why these
+    are deep jewel tones rather than Tol's own lightness.
     """
     css = (PROJECT_ROOT / "src" / "pihti" / "static" / "css" / "styles.css").read_text(
         encoding="utf-8"
@@ -1373,6 +1661,10 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
     # One field, recorded in two places because CSS paints it and the map
     # documents it; they may never drift apart.
     assert f"--diagram-ground: {ground};" in css
+    # The gas panel's nitrogen valve is a gas source rather than a valve in the
+    # map, so it keeps the operator green and a state colour must stay readable
+    # against it too.
+    operator_green = "#9bf08d"
 
     def channels(value):
         return [int(value.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)]
@@ -1388,8 +1680,9 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
         first, second = luminance(one), luminance(other)
         return (max(first, second) + 0.05) / (min(first, second) + 0.05)
 
-    def lab(rgb):
+    def lab(value):
         """CIE L*a*b*, so two colours can be compared as the eye compares them."""
+        rgb = linear(value)
         matrix = (
             (0.4124564, 0.3575761, 0.1804375),
             (0.2126729, 0.7151522, 0.0721750),
@@ -1400,28 +1693,62 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
         f = [t ** (1 / 3) if t > 216 / 24389 else (841 / 108) * t + 4 / 29 for t in xyz]
         return (116 * f[1] - 16, 500 * (f[0] - f[1]), 200 * (f[1] - f[2]))
 
-    def dichromat(value, kind):
-        """Vienot's simulation of protanopia and deuteranopia, in linear light."""
-        red, green, blue = linear(value)
-        long = 17.8824 * red + 43.5161 * green + 4.11935 * blue
-        medium = 3.45565 * red + 27.1554 * green + 3.86714 * blue
-        short = 0.0299566 * red + 0.184309 * green + 1.46709 * blue
-        if kind == "protanopia":
-            long = 2.02344 * medium - 2.52581 * short
-        else:
-            medium = 0.494207 * long + 1.24827 * short
-        return (
-            0.0809444479 * long - 0.130504409 * medium + 0.116721066 * short,
-            -0.0102485335 * long + 0.0540193266 * medium - 0.113614708 * short,
-            -0.000365296938 * long - 0.00412161469 * medium + 0.693511405 * short,
-        )
+    def chroma(value):
+        _, a, b = lab(value)
+        return math.hypot(a, b)
 
-    def distance(one, other, kind=None):
-        if kind is None:
-            first, second = lab(linear(one)), lab(linear(other))
+    def hue(value):
+        _, a, b = lab(value)
+        return math.degrees(math.atan2(b, a)) % 360
+
+    def ciede2000(one, other):
+        """The CIE's own 2000 colour-difference formula, as the letter asked."""
+        light1, a1, b1 = lab(one)
+        light2, a2, b2 = lab(other)
+        chroma1, chroma2 = math.hypot(a1, b1), math.hypot(a2, b2)
+        mean_chroma = (chroma1 + chroma2) / 2
+        grey = 0.5 * (1 - math.sqrt(mean_chroma**7 / (mean_chroma**7 + 25**7))) if mean_chroma else 0.5
+        a1p, a2p = (1 + grey) * a1, (1 + grey) * a2
+        c1p, c2p = math.hypot(a1p, b1), math.hypot(a2p, b2)
+        h1p = math.degrees(math.atan2(b1, a1p)) % 360 if (a1p or b1) else 0.0
+        h2p = math.degrees(math.atan2(b2, a2p)) % 360 if (a2p or b2) else 0.0
+        d_light = light2 - light1
+        d_chroma = c2p - c1p
+        if c1p * c2p == 0:
+            d_hue_angle = 0.0
         else:
-            first, second = lab(dichromat(one, kind)), lab(dichromat(other, kind))
-        return sum((a - b) ** 2 for a, b in zip(first, second)) ** 0.5
+            raw = h2p - h1p
+            d_hue_angle = raw - 360 if raw > 180 else raw + 360 if raw < -180 else raw
+        d_hue = 2 * math.sqrt(c1p * c2p) * math.sin(math.radians(d_hue_angle) / 2)
+        mean_light = (light1 + light2) / 2
+        mean_c = (c1p + c2p) / 2
+        if c1p * c2p == 0:
+            mean_hue = h1p + h2p
+        else:
+            total = h1p + h2p
+            if abs(h1p - h2p) > 180:
+                mean_hue = (total + 360) / 2 if total < 360 else (total - 360) / 2
+            else:
+                mean_hue = total / 2
+        weight = (
+            1
+            - 0.17 * math.cos(math.radians(mean_hue - 30))
+            + 0.24 * math.cos(math.radians(2 * mean_hue))
+            + 0.32 * math.cos(math.radians(3 * mean_hue + 6))
+            - 0.20 * math.cos(math.radians(4 * mean_hue - 63))
+        )
+        turn = 30 * math.exp(-(((mean_hue - 275) / 25) ** 2))
+        roll = 2 * math.sqrt(mean_c**7 / (mean_c**7 + 25**7)) if mean_c else 0.0
+        s_light = 1 + (0.015 * (mean_light - 50) ** 2) / math.sqrt(20 + (mean_light - 50) ** 2)
+        s_chroma = 1 + 0.045 * mean_c
+        s_hue = 1 + 0.015 * mean_c * weight
+        rotation = -math.sin(math.radians(2 * turn)) * roll
+        return math.sqrt(
+            (d_light / s_light) ** 2
+            + (d_chroma / s_chroma) ** 2
+            + (d_hue / s_hue) ** 2
+            + rotation * (d_chroma / s_chroma) * (d_hue / s_hue)
+        )
 
     states = {state["id"]: state["color"] for state in plumbing["states"]}
     assert set(states) == {
@@ -1435,31 +1762,59 @@ def test_every_state_colour_is_readable_on_the_diagram_ground(client):
     }
     assert len(set(states.values())) == len(states)
 
-    # Every colour clears 3:1 on the field; the four loudest claims clear 4:1.
-    floors = {"air": 4.0, "gas": 4.0, "upstream-high-vacuum": 4.0, "downstream-high-vacuum": 4.0}
+    # The floor, on both fields the colours are read against.
     for name, colour in states.items():
-        assert contrast(colour, ground) >= floors.get(name, 3.0), (name, contrast(colour, ground))
+        assert contrast(colour, ground) >= 3.0, (name, contrast(colour, ground))
+        assert contrast(colour, operator_green) >= 3.0, (name, contrast(colour, operator_green))
     # Isolated is the quietest of the seven on purpose: it is the absence of a
     # claim, not an eighth thing competing for the eye.
     quietest = min(states, key=lambda name: contrast(states[name], ground))
     assert quietest == "isolated"
-    # No two sit at the same weight, so a reader who cannot separate two hues
-    # can still separate them by how heavy they look. Seven colours under a
-    # luminance ceiling of about 0.21 cannot climb in big steps, so the step is
-    # small and the colour-vision check below is what carries the real load.
-    steps = sorted(luminance(colour) for colour in states.values())
-    for lighter, darker in zip(steps, steps[1:]):
-        assert (darker + 0.05) / (lighter + 0.05) >= 1.07, steps
 
-    # And the pairs stay apart for the two common kinds of colour vision
-    # deficiency, not only for full colour vision. 12 is a comfortable margin in
-    # CIE L*a*b*; two colours a few units apart would read as one.
+    # Designed, not muted and not maxed. Every colour but the deliberately grey
+    # `isolated` carries real chroma, and none of them is a maxed primary.
+    for name, colour in states.items():
+        if name == "isolated":
+            assert chroma(colour) < 15, (name, chroma(colour))
+            continue
+        assert chroma(colour) >= 25, (name, round(chroma(colour), 1))
+        assert set(channels(colour)) != {0.0, 1.0}, name
+        assert max(channels(colour)) < 1.0, name
+
+    # Every PAIR must be told apart, on a 4 px line and on a chip alike -- the
+    # letter's own rule, checked pairwise rather than only against the field.
+    # 18 CIEDE2000 units is a comfortable margin; the closest pair here is the
+    # plasma blue against the sealed teal at about 21, where the palette this
+    # replaced had a pair at 11.6.
     names = sorted(states)
-    for index, first in enumerate(names):
-        for second in names[index + 1 :]:
-            for kind in (None, "protanopia", "deuteranopia"):
-                apart = distance(states[first], states[second], kind)
-                assert apart >= 12, (first, second, kind, round(apart, 1))
+    pairs = [
+        (ciede2000(states[first], states[second]), first, second)
+        for index, first in enumerate(names)
+        for second in names[index + 1 :]
+    ]
+    closest = min(pairs)
+    assert closest[0] >= 18, (closest[1], closest[2], round(closest[0], 1))
+
+    # And the one pair queezz named by hand may not merely clear that bar: gas
+    # and rough vacuum must sit in different hue families. "Gas color and rough
+    # vacuum color are indistinguishable" was said about a plum and an ochre,
+    # both warm and both dark.
+    apart = abs(hue(states["gas"]) - hue(states["rough-vacuum"])) % 360
+    assert min(apart, 360 - apart) >= 90, round(apart, 1)
+
+    # And the legend shows enough of each colour to judge it there: a full
+    # swatch rather than a thin bar, and the seven in a row at the top of More.
+    script = (PROJECT_ROOT / "src" / "pihti" / "static" / "js" / "diagram.js").read_text(
+        encoding="utf-8"
+    )
+    assert "swatch.style.background = state.color;" in script
+    assert 'row.className = "vacuum-swatch-row";' in script
+    assert 'block.className = "vacuum-swatch-big";' in script
+    assert ".vacuum-swatch-row {" in css
+    assert ".vacuum-swatch-big {" in css
+    # The old thin-bar rule is gone rather than left behind to confuse the next
+    # reader: nothing writes a `<i>` inside a swatch any more.
+    assert ".vacuum-swatch i" not in css
 
 
 def test_a_saved_render_really_carries_the_prediction(client):
@@ -1510,7 +1865,9 @@ def test_the_guide_beacons_keep_their_ring_under_the_colour_layer():
     marker_rules = [
         line
         for line in css.splitlines()
-        if line.startswith(".operation-marker") and "circle" in line
+        if line.startswith(".operation-marker")
+        and "circle" in line
+        and "pointer-events" not in line
     ]
     assert len(marker_rules) >= 4
     for rule in marker_rules:
@@ -1794,9 +2151,20 @@ def test_a_valve_says_its_position_with_its_own_body(client):
     for valve in plumbing["valves"]:
         item = pumping["elements"][valve["id"]]
         assert item["valve"] is True, valve["id"]
+        if item.get("linked"):
+            # The Line-configuration valve is drawn as present or absent rather
+            # than open or shut, and has its own test.
+            continue
         assert item["fill"] == closed_ink or item["fill"] in set(colours.values())
-        # A valve keeps the black outline queezz drew: it is equipment.
-        assert "stroke" not in item, valve["id"]
+        # An open valve's edge goes with its fill, so it reads as part of the
+        # pipe; a closed one keeps a black outline and is the single dark-rimmed
+        # shape on the drawing (queezz, 2026-09-08, letter
+        # 20260908-3308e02d-3021dd: "I think I like the valves edge to be same
+        # color as the fill. When closed, black border white fill is good.
+        # Stands out.").
+        assert item["stroke"] == (
+            item["fill"] if item["open"] else plumbing["drawing"]["valve_closed_edge"]
+        ), valve["id"]
 
     # The page reads a press from the recorded state now, never off the paint,
     # because a valve's fill no longer says whether it is open.
@@ -1872,21 +2240,52 @@ def test_two_things_reaching_one_volume_show_on_the_shape_and_not_the_pipe(clien
     assert colours["upstream-high-vacuum"] in markup
     assert colours["downstream-high-vacuum"] in markup
 
-    # Gas and air still beat every pump, and neither ever mixes.
-    vented = plumbing_map.predict(
+    # Gas and air still beat every pump for the *dominant* reading -- and, since
+    # 0.16.0, they no longer suppress the second tone. queezz, 2026-09-08, on a
+    # vented plasma vessel with the roughing bypass still reaching it (letter
+    # 20260908-aed40a4e-c9a286): "Rotary from bypass is pumping, but I see no
+    # gradient." The vented vessel is red, and the rotary is the amber tone
+    # beside it -- which is exactly the case worth a glance.
+    vented_and_roughed = plumbing_map.predict(
         plumbing,
         {
-            "TMPU": "active",
-            "GVU": "active",
-            "gaspanel-valve-vent": "active",
-            "gaspanel-valve-ar": "active",
-            "gasline-ar": "active",
-            "gasline-main": "active",
+            "GVBU": "active",
+            "bypass-l2": "active",
+            "bypass-pumpline-vent-valve": "active",
+            "Rough-Bypass": "active",
         },
         "membrane",
     )
-    assert vented["volumes"]["plasma-vessel"] == "air"
-    assert "plasma-vessel" not in vented["mixes"]
+    assert vented_and_roughed["volumes"]["plasma-vessel"] == "air"
+    assert vented_and_roughed["mixes"]["plasma-vessel"] == "rough-vacuum"
+    assert vented_and_roughed["elements"]["plasma-vacuum"]["mix"] == colours["rough-vacuum"]
+
+    # A vessel on gas with a rough pump still reaching it says the same way.
+    gassed_and_roughed = plumbing_map.predict(
+        plumbing,
+        {
+            "argon-bottle": "active",
+            "gasline-ar": "active",
+            "gasline-main": "active",
+            "GVBU": "active",
+            "Rough-Bypass": "active",
+            "bypass-l2": "active",
+        },
+        "membrane",
+    )
+    assert gassed_and_roughed["volumes"]["plasma-vessel"] == "gas"
+    assert gassed_and_roughed["mixes"]["plasma-vessel"] == "rough-vacuum"
+
+    # One thing reaching it, no gradient.
+    vented_only = plumbing_map.predict(
+        plumbing, {"GVU": "active", "upstream-pumpline-vent-valve": "active"}, "membrane"
+    )
+    assert vented_only["volumes"]["plasma-foreline"] == "air"
+    assert "plasma-foreline" not in vented_only["mixes"]
+
+    # And a pipe never carries the second tone, whatever reaches its volume.
+    for element_id in ("plasma-vacuum-gate-port", "plasma-vacuum-pump-manifold"):
+        assert "mix" not in vented_and_roughed["elements"][element_id], element_id
 
 
 def test_a_vessel_holding_gas_wears_its_bottle_symbol(client):

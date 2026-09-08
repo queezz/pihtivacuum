@@ -33,6 +33,20 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
 
 ## Diagram invariants
 
+- **Four line configurations, and the fourth is drawn rather than deduced**
+  (owner decision 2026-09-08, letters `20260908-b429ce4b-2ad897` and
+  `20260908-520505af-9047d4`, built in 0.16.0). The card offers exactly
+  *Membrane installed*, *Pipe open*, *Blank* and *Boron deposition*, in that
+  order, each with a one-line meaning in its More, all read from
+  `plumbing.json` rather than typed into the template. **Blank** — "the bellows
+  is not connected and a blank flange closes the crossover" — is vacuum-wise a
+  membrane and so appears beside `membrane` in the linked valve's
+  `closed_modes`; what differs is the drawing, so `plug_mode` names the one
+  configuration that draws a plug and `flange_element` names the segment
+  (`probe-pipe`, from the membrane position to the cross) that wears the
+  blank-flange tone instead. A stored configuration is read through the map's
+  own `aliases` table, so an older spelling still names its mode and an
+  unreadable one falls back to `unknown` rather than to a guess.
 - **A pipe's name is what says which volume it belongs to.** queezz named every pipe, cross and T in `diagram.svg` by the volume it carries (`plasma-vacuum-*`, `qms-vacuum-*`, `bypass-manifold-*`, `gasline-*`, `*-vent-air-side`, and the rest), and `static/plumbing.json` is the map built from those names: which elements each volume owns, which two volumes each valve joins, which pump sits where. Connectivity is read from that file and never inferred from path geometry. This replaces the `zone-*` group plan of 0.5.0 — a name survives an edit that regroups the drawing (0.11.0). Ask the owner to name or split ambiguous pipework; never rename his ids without his say-so — the spelling and oddity corrections of 0.11.1 (owner decision 2026-09-08, letter 20260907-b9fddf7b-4768ce) are the one exception, and `src/pihti/server.py`'s `ID_ALIASES` keeps every old id from real history resolving to its current one on read.
 - **The 18 `pipes-*` groups are the drawing's own filing, not a data structure.** They exist so a person can find a pipe by name in Inkscape's object list and so pipes paint below valves, gauges and labels. Group membership mirrors `plumbing.json` and nothing reads it at runtime. Regrouping must leave the render byte-identical: three opaque white junction shapes (`probe-pipe-cross`, the two `bypass-manifold-t-*`) sit on top of the lines they join, so alphabetical order inside a group is bent wherever a filled shape overlaps a line, and the two vessel bodies stay at their own depth. Prove it by exporting both SVGs to PNG and comparing the hash.
 - Live component colors may be derived from the operator-entered diagram state (owner decision 2026-09-03), but must be labelled as a diagram connectivity prediction, not measured pressure or an interlock. Pipe colour (0.11.0) is that prediction: air beats gas beats high vacuum beats rough vacuum beats isolated, pumps are boundaries rather than connections, and the key sits under the drawing saying "predicted from the valve positions, not measured" — once per page, never twice.
@@ -50,8 +64,23 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   break in the colour on both sides and an open GVBD readable from arm's length.
   Only valves moved. Pumps stay yellow when running, gauges keep their own
   colours, the gas bottles keep theirs, and `elementsConfig.json` keeps every
-  valve's `colors` entry so nothing that has not moved is broken. A valve also
-  keeps the black outline queezz drew, because it is still equipment.
+  valve's `colors` entry so nothing that has not moved is broken.
+  **Amended twice more the same evening, by his review of the shipped release
+  (applied in 0.16.0).** First, the outline: an *open* valve no longer keeps the
+  black he drew. His words (letter `20260908-3308e02d-3021dd`): *"I think I like
+  the valves edge to be same color as the fill. When closed, black border white
+  fill is good. Stands out."* So an open valve is one colour, fill and edge
+  alike, and reads as part of the pipe; a closed one is white with a black
+  outline and is the single dark-rimmed shape on the drawing. Second, the pumps
+  moved after all (letter `20260908-3688eabd-587dfe`): *"why don't we change the
+  TMP on color to its HV color? Same for rough pumps. Rotaries and Scroll?"* A
+  running turbo now wears the high-vacuum colour of the side it serves —
+  `serves` in `plumbing.json`, a fact about the rig rather than about today's
+  valve positions — a running rotary or scroll wears rough vacuum, and a stopped
+  pump keeps the yellow, which is what makes a stopped turbo visible at a
+  glance. Gauges and the gas bottles still keep their own colours, and every
+  pump and valve keeps the confirmed on/off an operator presses and history
+  records.
 - **A high-vacuum volume takes its colour from the vessel it is joined to
   (2026-09-08).** Upstream and downstream are two colours, not one — queezz: *"I
   think I'd rather have two high vacuum colors. Upstream and downstream. To see
@@ -60,13 +89,34 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   closed gate and its own turbo wears. Mixing — a rough pump reaching a
   turbo-pumped volume, or the two vessels joined — is shown on the drawn
   **shapes** alone, as a two-colour gradient from the dominant colour to the
-  contributing one; a pipe wears one colour and only one, because an SVG
+  contributing one.
+  **Amended 2026-09-08 (owner, letter `20260908-aed40a4e-c9a286`, applied in
+  0.16.0):** air and gas no longer suppress that second tone. They did, and it
+  threw away the case worth a glance — queezz, on a frame with the plasma vessel
+  vented while the roughing bypass still reached it: *"Rotary from bypass is
+  pumping, but I see no gradient."* The dominant colour is unchanged; the second
+  tone is now whatever *else* reaches the vessel that is not the dominant thing,
+  in every state, so a vented vessel with a rotary still pumping into it shows
+  red with an amber tone. One second tone only, chosen in a written order: a gas
+  under vent air, then the best pump that is not already the dominant reading,
+  then the other vessel when the two chambers are joined.
+  A pipe still wears one colour and only one, because an SVG
   gradient is painted across a bounding box rather than along a path and would
   streak the wrong way on a bend (queezz: *"we have shapes in all important
   places"*).
 - Turbo-pump and gauge warnings derived from toggle state are advisory operator warnings, never proof of hardware state or safety (owner decision 2026-09-03). Actual pressure evidence must use Raspberry Pi fields with explicit instrument IDs, units, timestamps, and stale-data handling, and must fail to “unknown.”
 - Operation guides only annotate the diagram and list operator steps. They never perform device mutations. The four sequences in `static/operationGuides.json` stopped being provisional on 2026-09-08, when queezz corrected them line by line (letter `20260908-7a3c9ac3-bbd7aa`); a route none of them names is a question for him, never a guess. A step may check the diagram (`targets`), ask the prediction whether two volumes are still joined (`separates`), place a beacon without judging it (`marks`), or apply only on a rig where something is plugged in (`onlyWhen`, answered by the machine-local settings file). Every id a step names, in `targets` or in `marks`, is read out loud in the rail, so it must carry a `label` in `elementsConfig.json`.
 - **The beacon pulses under `prefers-reduced-motion: reduce` too.** Windows with its animation effects switched off makes Chromium — so queezz's Brave — answer *true* to that query, and a `@media` block that said `animation: none` left the beacons dead on his desk for two releases while the CSS read as correct. Under `reduce` the ring keeps a slow opacity pulse at one fixed radius: less motion, never less information. Proving a beacon means measuring it in a rendered browser — `element.getAnimations()` non-empty on the current step's ring, computed `animation-name` not `none`, and two frames a half period apart that differ — never reading the stylesheet.
+- **A beacon stands beside what it points at, never on top of it (2026-09-08,
+  letter `20260908-3688eabd-587dfe`).** queezz, with Vent Plasma running:
+  *"venting plasma works. But numbered circles are obstructing the
+  interactions."* A disc centred on a valve hides the very valve the step is
+  asking you to press. The disc now stands at the element's top-right corner,
+  stepped further out along the diagonal, and a step's own authored
+  `markerOffset` still applies on top of it; every part of a beacon declares
+  `pointer-events: none` rather than relying on inheritance, so the press
+  underneath always lands on the valve. Proving this means pressing a beaconed
+  valve in a rendered browser with a guide active, never reading the CSS.
 - **A change costs one request and one redraw.** `/update` and the
   `/operation-context` write both answer with the new prediction, so the page
   repaints from the answer that made the change rather than asking

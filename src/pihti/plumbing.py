@@ -16,6 +16,8 @@ from pathlib import Path
 ISOLATED = "isolated"
 SEALED = "sealed"
 ROUGH = "rough-vacuum"
+AIR = "air"
+GAS = "gas"
 
 
 def load_plumbing(static_folder: str | Path) -> dict:
@@ -50,19 +52,57 @@ def _components(volumes: list[str], edges: list[tuple[str, str]]) -> list[set[st
     return list(groups.values())
 
 
-def line_connects(plumbing: dict, line_mode: str | None) -> bool:
-    """Is the line between the two vessels a connection in this configuration?
+def line_modes(plumbing: dict) -> list[str]:
+    """The configurations the card offers, in the order queezz named them.
 
-    Only ``Pipe open`` is. With a membrane installed, or with the line set up
-    for boron deposition, something is mounted in that pipe and the two vessels
-    are separate spaces (owner review 2026-09-08). An unrecorded configuration
-    is not a connection either: the prediction does not claim a route nobody
-    has told it about.
+    Four since 2026-09-08 (owner decision, letter ``20260908-b429ce4b-2ad897``):
+    "1. membrane installed. 2. pipe open, but the membrane probe in or bellows,
+    which is vacuum wise the same. 3. blank, bellows not connected. 4. boron
+    deposition sample holder installed." ``unknown`` is never offered — it is
+    what the app says before anyone has answered, not something to choose.
     """
     config = plumbing.get("line_configuration") or {}
     modes = config.get("modes") or {}
-    mode = modes.get(line_mode or "unknown", modes.get("unknown") or {})
-    return bool(mode.get("connects"))
+    order = [name for name in (config.get("order") or []) if name in modes]
+    if order:
+        return order
+    return [name for name in modes if name != "unknown"]
+
+
+def resolve_line_mode(plumbing: dict, value: str | None) -> str:
+    """A stored configuration value, read as one of the modes this map knows.
+
+    A recorded value outlives the release that wrote it, so an older spelling
+    resolves through the map's own ``aliases`` table rather than being lost.
+    Anything the map does not know becomes ``unknown``: the prediction says
+    nothing rather than guessing which configuration an unreadable value meant.
+    """
+    config = plumbing.get("line_configuration") or {}
+    modes = config.get("modes") or {}
+    if not isinstance(value, str) or not value:
+        return "unknown"
+    if value in modes:
+        return value
+    alias = (config.get("aliases") or {}).get(value)
+    return alias if alias in modes else "unknown"
+
+
+def _mode(plumbing: dict, line_mode: str | None) -> dict:
+    config = plumbing.get("line_configuration") or {}
+    modes = config.get("modes") or {}
+    return modes.get(resolve_line_mode(plumbing, line_mode), modes.get("unknown") or {})
+
+
+def line_connects(plumbing: dict, line_mode: str | None) -> bool:
+    """Is the line between the two vessels a connection in this configuration?
+
+    Only ``Pipe open`` is. With a membrane installed, with a blank flange in
+    place of the probe, or with the line set up for boron deposition, something
+    is mounted in that pipe and the two vessels are separate spaces (owner
+    review 2026-09-08). An unrecorded configuration is not a connection either:
+    the prediction does not claim a route nobody has told it about.
+    """
+    return bool(_mode(plumbing, line_mode).get("connects"))
 
 
 def _divided_volume(plumbing: dict, line_mode: str | None) -> str | None:
@@ -85,34 +125,60 @@ def _dead_end_valve(plumbing: dict, line_mode: str | None) -> str | None:
     other valve on the divided volume keeps the ordinary private-side-of-the-
     barrier treatment ``predict`` already gives it.
     """
-    config = plumbing.get("line_configuration") or {}
-    modes = config.get("modes") or {}
-    mode = modes.get(line_mode or "unknown", modes.get("unknown") or {})
-    return mode.get("dead_end_valve")
+    return _mode(plumbing, line_mode).get("dead_end_valve")
 
 
-def linked_valve(plumbing: dict) -> tuple[str, str] | None:
-    """The drawn valve the Line configuration overrides, and the mode that shuts it.
+def _flange_element(plumbing: dict, line_mode: str | None) -> str | None:
+    """The drawn segment this mode paints in the blank-flange tone, if any.
 
-    ``None`` when the map declares no such link.
+    Only *Blank* has one. queezz, 2026-09-08 (letter
+    ``20260908-520505af-9047d4``): "Sometimes we remove the probe and put the
+    blank instead of the probe. So vacuum wise it's like with membrane
+    installed... show the blank (not green, not gray, blank-flange color)."
+    """
+    return _mode(plumbing, line_mode).get("flange_element")
+
+
+def linked_valve(plumbing: dict) -> tuple[str, list[str]] | None:
+    """The drawn valve the Line configuration overrides, and the modes that shut it.
+
+    ``None`` when the map declares no such link. ``closed_mode`` — one name
+    rather than a list — is still read, so a map written before *Blank* existed
+    still resolves.
     """
     config = plumbing.get("line_configuration") or {}
     linked = config.get("linked_valve") or {}
     valve_id = linked.get("id")
-    closed_mode = linked.get("closed_mode")
-    if not valve_id or not closed_mode:
+    closed = linked.get("closed_modes") or (
+        [linked["closed_mode"]] if linked.get("closed_mode") else []
+    )
+    if not valve_id or not closed:
         return None
-    return valve_id, closed_mode
+    return valve_id, list(closed)
 
 
 def linked_valve_status(plumbing: dict, line_mode: str | None) -> dict | None:
-    """The linked valve's id and its Line-configuration-derived status, or ``None``."""
+    """The linked valve's id, its status, and whether its plug is drawn.
+
+    Two different questions, and *Blank* is why they had to come apart. Vacuum-
+    wise a blank flange is a membrane: the valve is shut and the two vessels are
+    separate spaces. On the drawing it is not: there is no probe mounted at that
+    position to draw a plug for, so the plug belongs to *Membrane installed*
+    alone and the blank says itself, further along the line, in the flange tone.
+    """
     linked = linked_valve(plumbing)
     if not linked:
         return None
-    valve_id, closed_mode = linked
-    status = "inactive" if (line_mode or "unknown") == closed_mode else "active"
-    return {"id": valve_id, "status": status}
+    valve_id, closed_modes = linked
+    config = plumbing.get("line_configuration") or {}
+    plug_mode = (config.get("linked_valve") or {}).get("plug_mode")
+    mode = resolve_line_mode(plumbing, line_mode)
+    shut = mode in closed_modes
+    return {
+        "id": valve_id,
+        "status": "inactive" if shut else "active",
+        "plug": shut if plug_mode is None else mode == plug_mode,
+    }
 
 
 def apply_line_mode_to_state(plumbing: dict, state: dict, line_mode: str | None) -> dict:
@@ -216,14 +282,22 @@ def _verdict(
     same blue as the plasma vessel, so the closed gate read as open. That pipe
     reaches no vessel at all, so it is ``sealed`` — pumped, and sealed off — and
     it can never be mistaken for either vessel again.
+
+    **Corrected 2026-09-08** (owner, letter ``20260908-aed40a4e-c9a286``, on a
+    frame with the plasma vessel vented while the roughing bypass still reached
+    it): "Rotary from bypass is pumping, but I see no gradient." Air and gas used
+    to suppress the second tone, which threw away exactly the case worth a
+    glance. They no longer do: the second tone is whatever *else* reaches the
+    space that is not the dominant thing, in every state, so a vented vessel with
+    a rotary still pumping into it now shows red with an amber tone. One second
+    tone only, and this is the order it is chosen in.
     """
-    if any(volumes.get(name, {}).get("always") == "air" for name in component):
-        return "air", None
-    if any(
-        source["volume"] in component and _is(state, source["id"], "active")
+    open_air = any(volumes.get(name, {}).get("always") == "air" for name in component)
+    gases = [
+        source
         for source in plumbing.get("gas_sources") or []
-    ):
-        return "gas", None
+        if source["volume"] in component and _is(state, source["id"], "active")
+    ]
     running = [
         pump
         for pump in plumbing.get("pumps") or []
@@ -231,8 +305,6 @@ def _verdict(
     ]
     turbos = [pump for pump in running if pump.get("kind") == "turbo"]
     roughs = [pump for pump in running if pump.get("kind") != "turbo"]
-    if not turbos:
-        return (ROUGH, None) if roughs else (ISOLATED, None)
     # The vessels this space reaches, best-ranked first. Two of them means the
     # two chambers are joined, and the joined space wears the first one's colour
     # with the second one's as the contribution — "both vessels' colours meeting".
@@ -240,12 +312,38 @@ def _verdict(
         (name for name in component if volumes.get(name, {}).get("vessel")),
         key=lambda name: volumes[name].get("rank", 99),
     )
-    if not vessels:
-        return SEALED, ROUGH if roughs else None
-    dominant = volumes[vessels[0]].get("high_vacuum") or ISOLATED
-    if len(vessels) > 1:
-        return dominant, volumes[vessels[1]].get("high_vacuum")
-    return dominant, ROUGH if roughs else None
+    turbo_state = None
+    if turbos:
+        turbo_state = (
+            (volumes[vessels[0]].get("high_vacuum") or ISOLATED) if vessels else SEALED
+        )
+
+    if open_air:
+        dominant = AIR
+    elif gases:
+        dominant = GAS
+    elif turbo_state:
+        dominant = turbo_state
+    elif roughs:
+        dominant = ROUGH
+    else:
+        return ISOLATED, None
+
+    # What else reaches this space, in the order the second tone is chosen:
+    # a gas under vent air, then the best pump that is not already the
+    # dominant reading, then the other vessel when the two chambers are joined.
+    candidates: list[str | None] = []
+    if dominant == AIR and gases:
+        candidates.append(GAS)
+    if dominant in (AIR, GAS):
+        candidates.append(turbo_state or (ROUGH if roughs else None))
+    else:
+        if turbo_state and len(vessels) > 1:
+            candidates.append(volumes[vessels[1]].get("high_vacuum"))
+        if turbo_state and roughs:
+            candidates.append(ROUGH)
+    mix = next((name for name in candidates if name and name != dominant), None)
+    return dominant, mix
 
 
 _FAMILY = {"upstream-high-vacuum": "high-vacuum", "downstream-high-vacuum": "high-vacuum"}
@@ -392,10 +490,18 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     # colour visibly stops short on both sides and a closed gate can never read
     # as an open one (queezz, 2026-09-08: "GVU is closed, so TMP is not pumping
     # plasma-vacuum. Yet at a glance it seems that it does", and, on the small
-    # ones, "a green wedge against a grey wedge at that size"). It keeps the
-    # black outline he drew: a valve is still equipment, and the outline is what
-    # keeps its shape readable inside a coloured line.
-    closed_ink = (plumbing.get("drawing") or {}).get("valve_closed") or "#ffffff"
+    # ones, "a green wedge against a grey wedge at that size").
+    #
+    # Its **outline** goes with its fill, settled the same evening (letter
+    # 20260908-3308e02d-3021dd): "I think I like the valves edge to be same
+    # color as the fill. When closed, black border white fill is good. Stands
+    # out." So an open valve has no black edge at all and reads as part of the
+    # pipe, while a closed one is the single dark-rimmed shape on the drawing.
+    # This retires the older rule that a valve always keeps the black queezz
+    # drew — for open valves only; a pump and a gauge still keep theirs.
+    drawing = plumbing.get("drawing") or {}
+    closed_ink = drawing.get("valve_closed") or "#ffffff"
+    closed_edge = drawing.get("valve_closed_edge") or "#000000"
     for valve in plumbing.get("valves") or []:
         joins = list(valve.get("joins") or ())
         if _is(state, valve["id"], valve.get("open_when", "active")):
@@ -404,12 +510,14 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
             # side the map lists first.
             through = next((name for name in joins if name in by_volume), None)
             verdict = by_volume.get(through, ISOLATED)
+            colour = colors.get(verdict, "#000000")
             elements[valve["id"]] = {
                 "valve": True,
                 "open": True,
                 "volume": through,
                 "state": verdict,
-                "fill": colors.get(verdict, "#000000"),
+                "fill": colour,
+                "stroke": colour,
             }
         else:
             elements[valve["id"]] = {
@@ -417,7 +525,71 @@ def predict(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
                 "open": False,
                 "state": "closed",
                 "fill": closed_ink,
+                "stroke": closed_edge,
             }
+    # A pump wears what it is doing (queezz, 2026-09-08, letter
+    # 20260908-3688eabd-587dfe: "why don't we change the TMP on color to its HV
+    # color? Same for rough pumps. Rotaries and Scroll?"). A running turbo takes
+    # the high-vacuum colour of the side it serves — a fact about the rig, not
+    # about today's valves, so a turbo behind a closed gate still says which
+    # chamber it belongs to — a running rotary or scroll takes rough vacuum, and
+    # a stopped one keeps the yellow, which is now what "not pumping" looks
+    # like. Every one of these already had a confirmed on/off recorded in
+    # history like a valve, and the prediction has always read it: a stopped
+    # turbo has never made high vacuum here.
+    idle_ink = drawing.get("pump_idle") or "yellow"
+    for pump in plumbing.get("pumps") or []:
+        if _is(state, pump["id"], "active"):
+            if pump.get("kind") == "turbo":
+                side = volumes.get(pump.get("serves")) or {}
+                role = side.get("high_vacuum") or SEALED
+            else:
+                role = ROUGH
+            elements[pump["id"]] = {
+                "pump": True,
+                "running": True,
+                "state": role,
+                "fill": colors.get(role, idle_ink),
+                "stroke": "#000000",
+            }
+        else:
+            elements[pump["id"]] = {
+                "pump": True,
+                "running": False,
+                "state": "stopped",
+                "fill": idle_ink,
+                "stroke": "#000000",
+            }
+    # The drawn valve the Line configuration governs, painted here rather than
+    # in the page's JavaScript so `/state.svg` and the screen cannot disagree.
+    # Under *Membrane installed* it is a solid plug across the line; under every
+    # other configuration nothing of the app's is mounted there, so it is an
+    # empty dashed outline and the line reads straight through it.
+    linked = linked_valve_status(plumbing, line_mode)
+    if linked and linked["id"] in elements:
+        plug = bool(linked["plug"])
+        elements[linked["id"]] = {
+            "valve": True,
+            "linked": True,
+            "open": linked["status"] == "active",
+            "plug": plug,
+            "state": "closed" if linked["status"] == "inactive" else "open",
+            "fill": closed_ink if plug else "none",
+            "stroke": closed_edge,
+            "dash": "none" if plug else "5 4",
+            "opacity": 1.0 if plug else 0.45,
+        }
+    # A blank flange in place of the probe: the one drawn segment that is not a
+    # vacuum claim at all. It wears the flange tone — neither a state colour nor
+    # the closed grey — because with the bellows disconnected there is no volume
+    # in it to predict (queezz, 2026-09-08, letter 20260908-520505af-9047d4).
+    flange_element = _flange_element(plumbing, line_mode)
+    if flange_element and flange_element in elements:
+        elements[flange_element] = {
+            "flange": True,
+            "state": "blank-flange",
+            "stroke": drawing.get("flange") or "#9aa7b5",
+        }
     air = sorted(
         volumes[name].get("label", name)
         for name, verdict in by_volume.items()
@@ -464,8 +636,6 @@ def _gas_symbols(volumes: dict, connections: dict) -> list[dict]:
     return drawn
 
 
-AIR = "air"
-GAS = "gas"
 IONIZATION = "ionization"
 TURBO = "turbo"
 
@@ -820,7 +990,16 @@ def style_rules(
             declarations.append(f"fill:url(#{gradient}) !important")
         elif _safe_color(item.get("fill")):
             declarations.append(f"fill:{item['fill']} !important")
-        if not item.get("valve"):
+        # The one element with a dashed outline is the Line-configuration valve
+        # when nothing is mounted at its position; the saved render draws it the
+        # same way the page does.
+        if item.get("dash") and all(ch.isdigit() or ch in " ." for ch in str(item["dash"])):
+            declarations.append(f"stroke-dasharray:{item['dash']} !important")
+        elif item.get("dash") == "none":
+            declarations.append("stroke-dasharray:none !important")
+        if isinstance(item.get("opacity"), (int, float)):
+            declarations.append(f"opacity:{item['opacity']} !important")
+        if not (item.get("valve") or item.get("pump")):
             declarations.append("stroke-linecap:round")
             declarations.append("stroke-linejoin:round")
         if declarations:

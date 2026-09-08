@@ -601,10 +601,14 @@ def create_app(test_config: dict | None = None) -> Flask:
         return plumbing_map.predict(plumbing, elements_state, mode or current_line_mode())
 
     def current_line_mode() -> str:
-        """What an operator last said is mounted in the line between the vessels."""
+        """What an operator last said is mounted in the line between the vessels.
+
+        Read through the map's own alias table, so a configuration recorded
+        under an older spelling still names the same mode and an unreadable one
+        falls back to ``unknown`` rather than to a guess.
+        """
         context = _load_json(Path(app.config["OPERATION_CONTEXT_FILE"]), {})
-        mode = context.get("line_mode")
-        return mode if isinstance(mode, str) and mode else "unknown"
+        return plumbing_map.resolve_line_mode(plumbing, context.get("line_mode"))
 
     @app.route("/history/state/<int:idx>")
     def get_history_state(idx):
@@ -650,7 +654,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             if idx is None:
                 return jsonify({"error": "No diagram change at or before that moment"}), 404
             state = state_at_index(events, current_state_flags(), idx)
-            mode = line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment)
+            mode = plumbing_map.resolve_line_mode(
+                plumbing,
+                line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment),
+            )
         svg_text = (Path(app.static_folder) / "diagram.svg").read_text(encoding="utf-8")
         # `?wide=1` matches a browser whose reading-aid switch is on. Off is the
         # default on both sides since 0.15.0, so the two agree without asking.
@@ -757,7 +764,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             if idx is None:
                 return jsonify({"error": "No diagram change at or before that moment"}), 404
             state = state_at_index(events, current_state_flags(), idx)
-            mode = line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment)
+            mode = plumbing_map.resolve_line_mode(
+                plumbing,
+                line_mode_at(Path(app.config["OPERATION_CONTEXT_LOG_FILE"]), moment),
+            )
         return jsonify(plumbing_map.predict(plumbing, state, mode))
 
     @app.route("/press-warnings")
@@ -817,13 +827,17 @@ def create_app(test_config: dict | None = None) -> Flask:
             context_file,
             {"line_mode": "unknown", "updated_at": None, "updated_by": None},
         )
+        context = {
+            **context,
+            "line_mode": plumbing_map.resolve_line_mode(plumbing, context.get("line_mode")),
+        }
         if request.method == "GET":
             return jsonify(context)
         if "username" not in session:
             return jsonify({"error": "Operator identity required"}), 428
         data = request.get_json(silent=True) or {}
         mode = data.get("line_mode")
-        if mode not in {"membrane", "open", "boron"}:
+        if mode not in set(plumbing_map.line_modes(plumbing)):
             return jsonify({"error": "Invalid line configuration"}), 400
         if context.get("line_mode") == mode:
             return jsonify({**context, "prediction": current_prediction(mode)})

@@ -6,19 +6,22 @@
 <div class="page">
     <aside class="rail rail-left" id="guide-controls" aria-label="Diagram controls">
         <button class="drawer-close" type="button">Close</button>
-        <section class="rail-card">
+        {# Both left-rail cards give ground the same way the guide card does:
+           only the part inside `.scrolls` shrinks, so on a short window the
+           controls stay inside the rail's own box instead of painting past its
+           bottom edge, and the rail never becomes a second page scrollbar
+           (measured at 1280x700, 0.16.0). #}
+        <section class="rail-card rail-card--growing rail-card--fit">
             <h2 class="rail-label">Line configuration</h2>
             <p id="line-mode-status" class="state-line" role="status">Unknown</p>
-            <div class="stack" role="group" aria-label="Line configuration annotation">
-                <button type="button" data-line-mode="membrane">Membrane installed</button>
-                <button type="button" data-line-mode="open">Pipe open</button>
-                <button type="button" data-line-mode="boron">Boron deposition</button>
-            </div>
+            <div class="stack" id="line-mode-choices" role="group" aria-label="Line configuration annotation"></div>
             <p id="line-mode-note" class="muted" style="margin-top: 10px;"></p>
+            <button type="button" class="tiny" id="line-mode-more" aria-expanded="false" aria-controls="line-mode-detail">More</button>
+            <div class="scrolls"><div id="line-mode-detail" hidden></div></div>
         </section>
-        <section class="rail-card">
+        <section class="rail-card rail-card--growing rail-card--fit">
             <h2 class="rail-label">Operations</h2>
-            <div id="operation-choices" class="stack"></div>
+            <div class="scrolls"><div id="operation-choices" class="stack"></div></div>
             <button id="clear-guide" type="button" style="margin-top: 8px; width: 100%;" hidden>Clear guide</button>
         </section>
     </aside>
