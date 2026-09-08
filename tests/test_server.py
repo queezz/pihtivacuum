@@ -73,9 +73,9 @@ def identify(client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.18.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.18.0"}
-    assert b"v0.18.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.19.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.19.0"}
+    assert b"v0.19.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -194,7 +194,20 @@ def test_history_is_parsed_once_until_the_log_changes(client, tmp_path):
     assert len(client.get("/history/events").json) == 2
     # The browser rebuilds a moment from the events list and the current state,
     # so the served events carry everything that reconstruction needs.
-    assert set(client.get("/history/events").json[0]) == {"ts", "id", "state", "user"}
+    assert set(client.get("/history/events").json[0]) == {
+        "ts",
+        "id",
+        "state",
+        "user",
+        # One press ordinarily, a whole practised sequence when the event is a
+        # practice save (0.19.0), and the note that says which it was.
+        "changes",
+        "note",
+    }
+    assert client.get("/history/events").json[0]["changes"] == [
+        {"id": "GVU", "state": True}
+    ]
+    assert client.get("/history/events").json[0]["note"] == ""
     assert client.get("/elements-state").json == {"GVU": "inactive"}
 
 
@@ -3219,3 +3232,232 @@ def test_the_readout_answers_in_groups_with_his_own_row_labels(client):
     css = diagram_styles()
     assert ".vacuum-group__head" in css
     assert ".vacuum-group__rows" in css
+
+
+# --- Practice: rehearse the presses, record the procedure once (0.19.0) ------
+#
+# queezz, 2026-09-08 (letters ``20260908-9d38bf34-8415c7`` and
+# ``20260908-e460b66f-616b53``): "I want now a 'practice' before recording
+# history mode somehow. You open the valve, and see where color (vacuum/air)
+# goes. Then you can undo. Also maybe using that we can do a procedure, then
+# save state. That way one state jump, less history spamming. And better
+# operational safety." And: "In the new 'practice' mode we really need to teach
+# to save the state. And maybe have a timer fallback, which saves
+# automatically."
+
+
+def csv_rows(path):
+    import csv as _csv
+
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(_csv.reader(handle))
+
+
+def test_practising_writes_nothing_until_save(client, tmp_path):
+    """The history file is byte-unchanged through a whole practised sequence.
+
+    Every press in practice asks the same two questions a real press asks --
+    what would this join, and what would the drawing look like -- and neither
+    route writes a byte. The state file does not move either.
+    """
+    identify(client)
+    log_file = tmp_path / "logs.csv"
+    state_file = tmp_path / "elements_state.json"
+    client.post("/update", json={"id": "GVU", "status": "active"})
+    log_before = log_file.read_bytes()
+    state_before = state_file.read_bytes()
+
+    practised = dict(client.get("/elements-state").json)
+    for element_id, status in (("TMPD", "inactive"), ("GVD", "active"), ("RoughD", "active")):
+        warned = client.post(
+            "/press-warnings",
+            json={"id": element_id, "status": status, "state": practised},
+        )
+        assert warned.status_code == 200
+        practised[element_id] = status
+        answer = client.post("/practice/prediction", json={"state": practised})
+        assert answer.status_code == 200
+        assert set(answer.json) == {"prediction", "memory"}
+
+    # Nothing has been recorded: not one byte of either file has moved.
+    assert log_file.read_bytes() == log_before
+    assert state_file.read_bytes() == state_before
+    assert client.get("/elements-state").json.get("TMPD") != "inactive"
+
+    # The practised prediction is the real one for that copy: a stopped turbo
+    # with its gate open and the scroll running reads rough vacuum.
+    predicted = client.post("/practice/prediction", json={"state": practised}).json
+    assert predicted["prediction"]["volumes"]["qms-vessel"] == "rough-vacuum"
+
+
+def test_save_writes_exactly_one_event_carrying_the_presses_in_order(client, tmp_path):
+    """One row, one timeline entry, one state jump -- signed by the operator."""
+    identify(client)
+    log_file = tmp_path / "logs.csv"
+    client.post("/update", json={"id": "GVU", "status": "active"})
+    before = len(client.get("/history/events").json)
+
+    presses = [
+        {"id": "TMPD", "status": "inactive"},
+        {"id": "GVD", "status": "active"},
+        {"id": "RoughD", "status": "active"},
+    ]
+    saved = client.post("/practice/save", json={"presses": presses})
+    assert saved.status_code == 200
+    assert saved.json["presses"] == 3
+    assert saved.json["auto"] is False
+    assert saved.json["note"] == "practice sequence, 3 presses"
+
+    events = client.get("/history/events").json
+    assert len(events) == before + 1
+    event = events[-1]
+    assert event["user"] == "operator"
+    assert [(change["id"], change["state"]) for change in event["changes"]] == [
+        ("TMPD", False),
+        ("GVD", True),
+        ("RoughD", True),
+    ]
+    # The final state is the recorded one, and the answer carries the new
+    # prediction so the page redraws from the same walk that made the change.
+    state = client.get("/elements-state").json
+    assert (state["TMPD"], state["GVD"], state["RoughD"]) == ("inactive", "active", "active")
+    assert saved.json["prediction"]["volumes"]["qms-vessel"] == "rough-vacuum"
+    # And exactly one new line in the log, not three.
+    lines = [line for line in log_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len([line for line in lines if "practice sequence" in line]) == 1
+
+
+def test_a_saved_sequence_replays_as_one_jump(client):
+    """Undoing the event undoes every press in it, in reverse."""
+    identify(client)
+    client.post("/update", json={"id": "GVU", "status": "active"})
+    before_state = dict(client.get("/elements-state").json)
+    client.post(
+        "/practice/save",
+        json={
+            "presses": [
+                {"id": "TMPD", "status": "inactive"},
+                {"id": "GVD", "status": "active"},
+            ]
+        },
+    )
+    events = client.get("/history/events").json
+    # The moment before the sequence is the state before every press in it.
+    replayed = client.get("/history/state/{}".format(len(events) - 2)).json["state"]
+    assert replayed["GVU"] is True
+    assert replayed.get("GVD", False) is (before_state.get("GVD") == "active")
+    assert replayed.get("TMPD", False) is (before_state.get("TMPD") == "active")
+    # And the moment of the sequence itself is the state after all of it.
+    after = client.get("/history/state/{}".format(len(events) - 1)).json["state"]
+    assert after["GVD"] is True and after["TMPD"] is False
+
+
+def test_the_timer_saves_the_same_event_and_says_it_did(client):
+    """An auto-save is the same one event, marked so nobody thinks it was pressed."""
+    identify(client)
+    saved = client.post(
+        "/practice/save",
+        json={"presses": [{"id": "GVU", "status": "active"}], "auto": True},
+    )
+    assert saved.status_code == 200
+    assert saved.json["auto"] is True
+    assert saved.json["note"] == "practice sequence, 1 press, saved by the timer"
+    assert client.get("/history/events").json[-1]["note"].endswith("saved by the timer")
+
+
+def test_the_fallback_interval_is_a_setting_within_honest_bounds(tmp_path):
+    """Three minutes by default, and a typo cannot turn the fallback off."""
+    (tmp_path / "operators.json").write_text(
+        json.dumps({"operators": ["operator"]}), encoding="utf-8"
+    )
+    app = make_app(tmp_path)
+    assert app.test_client().get("/practice/settings").json == {"autosave_seconds": 180}
+    for written, expected in ((600, 600), (1, 30), (99999, 1800), ("soon", 180)):
+        (tmp_path / "settings.json").write_text(
+            json.dumps({"PRACTICE_AUTOSAVE_SECONDS": written}), encoding="utf-8"
+        )
+        client = make_app(tmp_path).test_client()
+        assert client.get("/practice/settings").json["autosave_seconds"] == expected
+
+
+def test_practice_refuses_what_it_cannot_record(client):
+    """An unsigned save, an unknown element, the linked valve, an endless list."""
+    assert client.post(
+        "/practice/save", json={"presses": [{"id": "GVU", "status": "active"}]}
+    ).status_code == 428
+    identify(client)
+    assert client.post("/practice/save", json={"presses": []}).status_code == 400
+    assert client.post("/practice/save", json={"presses": "GVU"}).status_code == 400
+    assert client.post(
+        "/practice/save", json={"presses": [{"id": "not-an-element", "status": "active"}]}
+    ).status_code == 400
+    assert client.post(
+        "/practice/save", json={"presses": [{"id": "GVU", "status": "maybe"}]}
+    ).status_code == 400
+    assert client.post(
+        "/practice/save", json={"presses": [{"id": "Membrane", "status": "active"}]}
+    ).status_code == 400
+    assert client.post(
+        "/practice/save", json={"presses": [{"id": "GVU", "status": "active"}] * 201}
+    ).status_code == 400
+    assert client.post("/practice/prediction", json={"state": "open"}).status_code == 400
+    assert client.post(
+        "/press-warnings", json={"id": "GVU", "status": "active", "state": 3}
+    ).status_code == 400
+
+
+def test_an_older_four_column_log_is_widened_once_and_keeps_every_row(tmp_path):
+    """The two new columns arrive without losing a byte of recorded history."""
+    from pihti.server import LEGACY_LOG_FIELDS, LOG_FIELDS, widen_log_header
+
+    log_file = tmp_path / "logs.csv"
+    log_file.write_text(
+        "timestamp,id,status,user\n"
+        "2026-09-01 10:00:00,GVU,active,KAA\n"
+        "2026-09-01 10:00:05,TMPU,inactive,KAA\n",
+        encoding="utf-8",
+    )
+    widen_log_header(log_file)
+    rows = csv_rows(log_file)
+    assert rows[0] == LOG_FIELDS
+    assert [row[:4] for row in rows[1:]] == [
+        ["2026-09-01 10:00:00", "GVU", "active", "KAA"],
+        ["2026-09-01 10:00:05", "TMPU", "inactive", "KAA"],
+    ]
+    # Idempotent, and a log whose header is neither shape is left alone.
+    widen_log_header(log_file)
+    assert csv_rows(log_file)[0] == LOG_FIELDS
+    other = tmp_path / "other.csv"
+    other.write_text("when,what\n1,2\n", encoding="utf-8")
+    widen_log_header(other)
+    assert other.read_text(encoding="utf-8") == "when,what\n1,2\n"
+    assert LEGACY_LOG_FIELDS == ["timestamp", "id", "status", "user"]
+
+
+def test_the_page_teaches_saving_and_says_it_is_practising(client):
+    """The switch, the standing line, a loud Save that is never hidden."""
+    page = client.get("/").data.decode("utf-8")
+    for marker in (
+        'id="practice-toggle"',
+        'id="practice-note"',
+        'id="practice-save"',
+        'id="practice-undo"',
+        'id="practice-discard"',
+        'id="practice-timer"',
+        'id="practice-banner"',
+    ):
+        assert marker in page, marker
+    # The banner stands above the drawing, where the presses are made.
+    assert page.index('id="practice-banner"') < page.index('id="diagram-container"')
+    script = diagram_script()
+    assert '"Nothing is recorded until you press Save."' in script
+    assert "Save ${count} press" in script
+    assert "Saves itself in ${minutes}:${seconds}." in script
+    # The five-second poll never paints the record over a rehearsal, Discard
+    # cancels the timer, and leaving with unsaved practice asks first.
+    assert "if (practiceOn) return;" in script
+    assert 'window.addEventListener("beforeunload"' in script
+    assert "if (!practiceUnsaved() || isInteracting) return;" in script
+    css = diagram_styles()
+    assert ".practice-save {" in css
+    assert ".practice-banner {" in css

@@ -398,6 +398,50 @@ a.button[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 .card-compact { margin: 0; font-size: 0.85rem; color: var(--fg); }
 .card-compact .card-compact__step { display: block; color: var(--muted); }
 
+/* -- practice ---------------------------------------------------------- */
+
+/* The mode that governs what every press on the drawing does, so it stands at
+   the top of the control rail. queezz, 2026-09-08 (letters
+   20260908-9d38bf34-8415c7 and 20260908-e460b66f-616b53): "I want now a
+   'practice' before recording history mode somehow... In the new 'practice'
+   mode we really need to teach to save the state."
+
+   The teaching is one line, and it is the line beside the button: while
+   practising it says nothing is recorded until Save, and Save carries the
+   count of what is waiting. The countdown under it says when the fallback will
+   do it for you. */
+.practice-switch { margin: 0 0 8px; }
+.practice-note { margin: 0 0 10px; font-size: 0.82rem; color: var(--muted); }
+
+/* Save is the loud one and is never hidden: it is the whole point of the
+   mode, and a person who cannot find it loses their sequence. */
+.practice-save {
+  width: 100%;
+  font-weight: 600;
+  border-color: var(--accent2);
+  background: var(--accent2-wash);
+  color: var(--accent2);
+}
+
+.practice-save:disabled { opacity: 0.55; font-weight: 400; }
+
+.practice-row { display: flex; gap: 8px; margin-top: 8px; }
+.practice-row button { flex: 1 1 0; }
+.practice-timer { margin: 8px 0 0; font-size: 0.78rem; }
+
+/* And the drawing says plainly that it is a rehearsal, above the drawing
+   itself where the presses are being made. */
+.practice-banner {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--amber-border);
+  border-radius: 8px;
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
 .stack { display: grid; gap: 8px; }
 
 .stack button { width: 100%; text-align: left; }

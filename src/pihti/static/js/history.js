@@ -50,18 +50,32 @@
      * walked backwards: every change after the moment is undone to the value
      * that element had before it. Same reconstruction as the server's
      * /history/state-at, done here so a click costs no round trip. */
+    /* An event carries one press ordinarily and a whole practised sequence when
+     * it is a practice save (0.19.0), so each one is walked through its own
+     * list of changes — forwards to remember what each element was before, and
+     * backwards to put it back. An older release's events carry no `changes`
+     * at all, and their own id and state stand as the one change they are. */
+    function changesOf(event) {
+        return Array.isArray(event.changes) && event.changes.length
+            ? event.changes
+            : [{id: event.id, state: event.state}];
+    }
+
     function stateAtIndex(idx) {
         const state = {};
         for (const [id, value] of Object.entries(currentState)) state[id] = value === "active";
         const lastById = {};
-        const previous = events.map((event) => {
-            const before = lastById[event.id];
-            lastById[event.id] = event.state;
+        const previous = events.map((event) => changesOf(event).map((change) => {
+            const before = lastById[change.id];
+            lastById[change.id] = change.state;
             return before;
-        });
+        }));
         for (let eventIdx = events.length - 1; eventIdx > idx; eventIdx -= 1) {
-            const event = events[eventIdx];
-            state[event.id] = previous[eventIdx] === undefined ? false : previous[eventIdx];
+            const changes = changesOf(events[eventIdx]);
+            for (let changeIdx = changes.length - 1; changeIdx >= 0; changeIdx -= 1) {
+                const before = previous[eventIdx][changeIdx];
+                state[changes[changeIdx].id] = before === undefined ? false : before;
+            }
         }
         return state;
     }
@@ -124,12 +138,20 @@
             row.className = "tl-row";
             row.dataset.idx = String(idx);
             row.setAttribute("aria-pressed", String(idx === selectedIdx));
+            const changes = changesOf(event);
+            // A practised procedure is one entry, not one per valve: it is
+            // named by how many presses it carries and by every component it
+            // touched, in the order they were pressed (queezz, 2026-09-08:
+            // "one state jump, less history spamming").
+            const grouped = changes.length > 1;
             const component = componentLabel(event.id);
-            row.title = `${event.ts} · ${component.text}${component.retired ? ` (${RETIRED_NOTE})` : ""} · ${event.state ? "active" : "inactive"} · ${event.user || "unknown operator"}`;
+            const names = changes.map((change) => componentLabel(change.id).text).join(", ");
+            const what = grouped ? `${changes.length} presses` : component.text;
+            row.title = `${event.ts} · ${grouped ? `${event.note || "sequence"}: ${names}` : `${component.text}${component.retired ? ` (${RETIRED_NOTE})` : ""} · ${event.state ? "active" : "inactive"}`} · ${event.user || "unknown operator"}`;
             row.innerHTML = `
                 <span class="tl-time">${escapeHtml(timeOf(event.ts))}</span>
-                <span class="tl-id${component.retired ? " tl-id--retired" : ""}">${escapeHtml(component.text)}</span>
-                <span class="pill tl-pill ${event.state ? "active" : ""}">${event.state ? "on" : "off"}</span>`;
+                <span class="tl-id${!grouped && component.retired ? " tl-id--retired" : ""}">${escapeHtml(what)}</span>
+                <span class="pill tl-pill ${grouped ? "" : (event.state ? "active" : "")}">${grouped ? "saved" : (event.state ? "on" : "off")}</span>`;
             row.addEventListener("click", () => selectEvent(idx));
             return row;
         }));
@@ -148,13 +170,20 @@
         const link = document.getElementById("moment-link");
         link.textContent = event.ts;
         link.href = `/history?at=${encodeURIComponent(event.ts)}`;
+        const changes = changesOf(event);
+        const grouped = changes.length > 1;
         const component = componentLabel(event.id);
         const element = document.getElementById("moment-element");
-        element.textContent = component.text;
-        element.classList.toggle("tl-id--retired", component.retired);
-        if (component.retired) element.title = RETIRED_NOTE;
+        // A practised sequence names every component it touched, in order.
+        element.textContent = grouped
+            ? changes.map((change) => componentLabel(change.id).text).join(", ")
+            : component.text;
+        element.classList.toggle("tl-id--retired", !grouped && component.retired);
+        if (!grouped && component.retired) element.title = RETIRED_NOTE;
         else element.removeAttribute("title");
-        document.getElementById("moment-state").textContent = event.state ? "active" : "inactive";
+        document.getElementById("moment-state").textContent = grouped
+            ? (event.note || `${changes.length} presses`)
+            : (event.state ? "active" : "inactive");
         document.getElementById("moment-user").textContent = event.user || "—";
         document.getElementById("moment-image-link").href = `/state.svg?at=${encodeURIComponent(event.ts)}`;
     }

@@ -137,6 +137,34 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   `pointer-events: none` rather than relying on inheritance, so the press
   underneath always lands on the valve. Proving this means pressing a beaconed
   valve in a rendered browser with a guide active, never reading the CSS.
+- **Practice is a local copy of the state, and it records once** (owner,
+  2026-09-08, letters `20260908-9d38bf34-8415c7` and `20260908-e460b66f-616b53`,
+  built in 0.19.0). queezz: *"You open the valve, and see where color
+  (vacuum/air) goes. Then you can undo... That way one state jump, less history
+  spamming. And better operational safety."* While the Practice switch is on,
+  the page's own `vacuumState` **is** the practised copy, so the colours, the
+  marks, the sealed readout, the 0.13.0 press warnings and the guides' beacons
+  all run over it without knowing anything about practice; `POST
+  /practice/prediction` answers about that copy, carrying the volume memory out
+  and back so the recorded memory never moves, and `POST /press-warnings` takes
+  the same copy. **Neither writes a byte.** The five-second poll is skipped
+  while practising, or it would paint the record over the rehearsal. Undo steps
+  back one press; Discard restores the recorded state and cancels the timer.
+  **Save records the whole sequence as one event** — one row in `logs.csv`, one
+  entry on the timeline, one jump on replay — signed by the operator, with every
+  press in order in the log's `changes` column and a `note` saying what it was.
+  Those two columns were added in 0.19.0; an older four-column log is widened
+  once, atomically, keeping every row (`widen_log_header`), and an ordinary
+  press leaves both empty and reads exactly as it always did.
+- **A record nobody pressed Save on says so.** The fallback timer counts down
+  visibly from the last press and saves the sequence by itself as the same one
+  event, whose note ends *"saved by the timer"*. It never fires while a confirm
+  box is open (`isInteracting` is held from before the box appears until after
+  the press lands), Discard cancels it, and the interval is
+  `PRACTICE_AUTOSAVE_SECONDS` in the machine-local settings file — three minutes
+  by default, held between 30 and 1800 seconds so a typo can neither turn the
+  fallback off nor make it fire mid-press. Leaving the page with unsaved
+  practice asks first.
 - **A change costs one request and one redraw.** `/update` and the
   `/operation-context` write both answer with the new prediction, so the page
   repaints from the answer that made the change rather than asking

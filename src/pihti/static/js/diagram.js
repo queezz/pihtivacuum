@@ -30,6 +30,22 @@
      * talking over his drawing. The More switch still offers it. */
     let bandOn = false;
 
+    /* Practice (0.19.0). While it is on, `vacuumState` *is* the practised copy
+     * and nothing reaches the state file or the history until Save; see the
+     * practice section below for the whole of it. Declared up here with the
+     * rest of this page's state because the press handler reads it. */
+    let practiceOn = false;
+    let practicePresses = [];
+    let practiceRecorded = null;
+    let practiceMemory = null;
+    let practiceDeadline = 0;
+    let practiceTick = null;
+    /* The fallback interval, from the machine-local settings file. Three
+     * minutes by default: long enough not to interrupt a procedure, short
+     * enough that a person called away from the rig does not lose it. */
+    let practiceAutosaveSeconds = 180;
+
+
     function normalizedStatus(value) {
         return value === "active" || value === true ? "active" : "inactive";
     }
@@ -66,9 +82,19 @@
      * all, which the box then says: an unchecked press is not a safe one. */
     async function pressWarnings(id, status) {
         try {
-            const response = await fetch(
-                `/press-warnings?id=${encodeURIComponent(id)}&status=${encodeURIComponent(status)}`
-            );
+            // While practising, the question is asked of the practised copy —
+            // seeing the warning is the whole point of rehearsing the press
+            // (queezz, 2026-09-08). The route reads and writes nothing either
+            // way, and answers about the recorded state when none is sent.
+            const response = practiceOn
+                ? await fetch("/press-warnings", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({id, status, state: vacuumState})
+                })
+                : await fetch(
+                    `/press-warnings?id=${encodeURIComponent(id)}&status=${encodeURIComponent(status)}`
+                );
             if (!response.ok) return null;
             const result = await response.json();
             return Array.isArray(result.warnings) ? result.warnings : null;
@@ -124,6 +150,17 @@
             // still asks when there is something to say.
             if ((notice || config.confirmToggle)
                 && !window.confirm(notice ? `${notice}\n\n${question}` : question)) return;
+            // Practising: the press changes the local copy and nothing else.
+            // No state file, no history, no round trip but the one that asks
+            // the same predictor what the copy now looks like.
+            if (practiceOn) {
+                practicePresses.push({id: element.id, status: newStatus});
+                vacuumState = {...vacuumState, [element.id]: newStatus};
+                await refreshPractice();
+                startPracticeTimer();
+                renderPractice();
+                return;
+            }
             const response = await fetch("/update", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -1242,7 +1279,220 @@
         refreshPrediction(moment);
     }
 
+    /* -- practice: rehearse the presses, record the procedure once ---------
+     *
+     * queezz, 2026-09-08 (letters 20260908-9d38bf34-8415c7 and
+     * 20260908-e460b66f-616b53): "I want now a 'practice' before recording
+     * history mode somehow. You open the valve, and see where color
+     * (vacuum/air) goes. Then you can undo. Also maybe using that we can do a
+     * procedure, then save state. That way one state jump, less history
+     * spamming. And better operational safety."
+     *
+     * While it is on, `vacuumState` *is* the practised copy, so every other
+     * thing on this page — the colours, the marks, the sealed readout, the
+     * 0.13.0 warnings, the guides' own beacons — runs over it without knowing
+     * anything about practice. The recorded state is kept aside to go back to.
+     * Nothing reaches the state file or the history until Save. */
+    function practiceUnsaved() {
+        return practiceOn && practicePresses.length > 0;
+    }
+
+    /* The prediction for the practised copy, and the memory it leaves behind.
+     * Both travel to the server and back: the predictor has been state in,
+     * prediction out since 0.17.0 exactly so this could run over a copy, and
+     * the recorded memory never moves while a rehearsal is going on. */
+    async function refreshPractice() {
+        try {
+            const response = await fetch("/practice/prediction", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({state: vacuumState, memory: practiceMemory})
+            });
+            if (!response.ok) return;
+            const result = await response.json();
+            practiceMemory = result.memory || practiceMemory;
+            applyState(vacuumState, undefined, result.prediction);
+        } catch (error) {
+            console.error("The practised state could not be predicted", error);
+        }
+    }
+
+    function renderPractice() {
+        const note = document.getElementById("practice-note");
+        const actions = document.getElementById("practice-actions");
+        const save = document.getElementById("practice-save");
+        const undo = document.getElementById("practice-undo");
+        const banner = document.getElementById("practice-banner");
+        const toggle = document.getElementById("practice-toggle");
+        if (!note || !actions || !save || !undo || !banner || !toggle) return;
+        toggle.checked = practiceOn;
+        actions.hidden = !practiceOn;
+        banner.hidden = !practiceOn;
+        // One line, and it says which mode this is rather than lecturing about
+        // both: while practising it is the standing reminder that nothing is
+        // recorded until Save, which is the sentence queezz asked to be taught.
+        note.textContent = practiceOn
+            ? "Nothing is recorded until you press Save."
+            : "Presses are recorded in history as you make them.";
+        const count = practicePresses.length;
+        // The count rides on the button, so the thing you must press is also
+        // the thing that says how much is waiting.
+        save.textContent = count
+            ? `Save ${count} press${count === 1 ? "" : "es"} to history`
+            : "Save to history";
+        save.disabled = !count;
+        undo.disabled = !count;
+        renderPracticeCountdown();
+    }
+
+    function renderPracticeCountdown() {
+        const line = document.getElementById("practice-timer");
+        if (!line) return;
+        if (!practiceUnsaved() || !practiceDeadline) {
+            line.textContent = "";
+            return;
+        }
+        const left = Math.max(0, Math.round((practiceDeadline - Date.now()) / 1000));
+        const minutes = Math.floor(left / 60);
+        const seconds = String(left % 60).padStart(2, "0");
+        line.textContent = `Saves itself in ${minutes}:${seconds}.`;
+    }
+
+    function stopPracticeTimer() {
+        practiceDeadline = 0;
+        if (practiceTick !== null) {
+            window.clearInterval(practiceTick);
+            practiceTick = null;
+        }
+        renderPracticeCountdown();
+    }
+
+    /* The fallback, counting down from the last press. It never fires while a
+     * confirm box is open — `isInteracting` is held from before the box
+     * appears until after the press lands — so the timer waits its turn rather
+     * than saving a sequence somebody is still deciding about. */
+    function startPracticeTimer() {
+        practiceDeadline = Date.now() + practiceAutosaveSeconds * 1000;
+        if (practiceTick === null) {
+            practiceTick = window.setInterval(() => {
+                renderPracticeCountdown();
+                if (!practiceUnsaved() || isInteracting) return;
+                if (Date.now() >= practiceDeadline) savePractice(true);
+            }, 1000);
+        }
+        renderPracticeCountdown();
+    }
+
+    async function savePractice(auto) {
+        if (!practicePresses.length || isInteracting) return;
+        const presses = practicePresses.slice();
+        isInteracting = true;
+        try {
+            const response = await fetch("/practice/save", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({presses, auto: Boolean(auto)})
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                if (response.status === 428) window.location.assign("/identify");
+                else window.alert(result.error || "The practised sequence could not be recorded.");
+                return;
+            }
+            // Recorded: the copy and the record are the same thing again, and
+            // practice stays on with nothing waiting.
+            practicePresses = [];
+            practiceMemory = null;
+            practiceRecorded = result.state || vacuumState;
+            vacuumState = {...practiceRecorded};
+            stopPracticeTimer();
+            applyState(vacuumState, undefined, result.prediction);
+            renderPractice();
+        } catch (error) {
+            console.error("The practised sequence could not be recorded", error);
+        } finally {
+            isInteracting = false;
+        }
+    }
+
+    async function undoPractice() {
+        if (!practicePresses.length) return;
+        practicePresses.pop();
+        vacuumState = {...practiceRecorded};
+        practicePresses.forEach((press) => { vacuumState[press.id] = press.status; });
+        practiceMemory = null;
+        await refreshPractice();
+        if (practicePresses.length) startPracticeTimer();
+        else stopPracticeTimer();
+        renderPractice();
+    }
+
+    /* Discard puts the recorded state back and cancels the timer with it: a
+     * sequence somebody threw away must not come back a minute later. */
+    async function discardPractice() {
+        practicePresses = [];
+        practiceMemory = null;
+        vacuumState = {...practiceRecorded};
+        stopPracticeTimer();
+        await refreshPractice();
+        renderPractice();
+    }
+
+    async function setPractice(on) {
+        if (!on && practiceUnsaved()) {
+            const count = practicePresses.length;
+            const question = `${count} practised press${count === 1 ? " is" : "es are"} not recorded yet.`
+                + " Leave practice and discard them?";
+            if (!window.confirm(question)) {
+                renderPractice();
+                return;
+            }
+        }
+        practiceOn = on;
+        practicePresses = [];
+        practiceMemory = null;
+        stopPracticeTimer();
+        if (on) {
+            practiceRecorded = {...vacuumState};
+            renderPractice();
+            await refreshPractice();
+        } else {
+            vacuumState = {...(practiceRecorded || vacuumState)};
+            practiceRecorded = null;
+            renderPractice();
+            await fetchAndUpdateStates();
+        }
+    }
+
+    async function setupPractice() {
+        const toggle = document.getElementById("practice-toggle");
+        if (!toggle) return;
+        try {
+            const response = await fetch("/practice/settings");
+            if (response.ok) {
+                const settings = await response.json();
+                if (Number(settings.autosave_seconds) > 0) {
+                    practiceAutosaveSeconds = Number(settings.autosave_seconds);
+                }
+            }
+        } catch (error) { /* the default interval still counts down */ }
+        toggle.addEventListener("change", () => setPractice(toggle.checked));
+        document.getElementById("practice-save")?.addEventListener("click", () => savePractice(false));
+        document.getElementById("practice-undo")?.addEventListener("click", undoPractice);
+        document.getElementById("practice-discard")?.addEventListener("click", discardPractice);
+        // Leaving with unsaved practice asks first, in the browser's own words.
+        window.addEventListener("beforeunload", (event) => {
+            if (!practiceUnsaved()) return;
+            event.preventDefault();
+            event.returnValue = "";
+        });
+        renderPractice();
+    }
+
     async function fetchAndUpdateStates() {
+        // A practised copy is not refreshed from the record: the five-second
+        // poll would paint the recorded state over the rehearsal mid-press.
+        if (practiceOn) return;
         if (isInteracting) return;
         try {
             const response = await fetch("/elements-state");
@@ -1423,6 +1673,7 @@
         const context = await contextResponse.json();
         setupGuideControls();
         setupLineModes(context);
+        await setupPractice();
         await fetchAndUpdateStates();
         attachElementListeners();
         document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));

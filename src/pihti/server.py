@@ -131,14 +131,51 @@ def load_logs_from_csv(file_path: Path) -> list[dict[str, str]]:
         return []
 
 
+#: The history log's columns. The first four are the ones every release since
+#: the beginning has written: one press per row. ``changes`` and ``note`` were
+#: added in 0.19.0 for the practice mode, which records a whole practised
+#: sequence as **one** event rather than one row per valve (queezz, 2026-09-08:
+#: "That way one state jump, less history spamming"). An ordinary press leaves
+#: both empty and reads exactly as it always did.
+LOG_FIELDS = ["timestamp", "id", "status", "user", "changes", "note"]
+LEGACY_LOG_FIELDS = ["timestamp", "id", "status", "user"]
+
+
+def widen_log_header(file_path: Path) -> None:
+    """Give an older four-column log its two new columns, once, atomically.
+
+    A row with six values under a four-column header is a corrupt log, so the
+    header has to move before the first practice sequence is written. Every
+    existing row is preserved exactly and simply gains two empty fields; the
+    rewrite goes to a temporary file beside the log and lands with one
+    ``os.replace``, so an interrupted run leaves the original untouched. A log
+    whose header is neither shape is left completely alone.
+    """
+    if not file_path.is_file():
+        return
+    with file_path.open(newline="", encoding="utf-8") as csvfile:
+        header = next(csv.reader(csvfile), [])
+    if header[: len(LOG_FIELDS)] == LOG_FIELDS or header != LEGACY_LOG_FIELDS:
+        return
+    rows = load_logs_from_csv(file_path)
+    temp = file_path.with_name(file_path.name + ".widening")
+    with temp.open("w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=LOG_FIELDS, restval="")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({name: row.get(name) or "" for name in LOG_FIELDS})
+    os.replace(temp, file_path)
+
+
 def save_log_csv(log_entry: dict[str, str], file_path: Path) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
+    widen_log_header(file_path)
     file_exists = file_path.exists()
     with file_path.open("a", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=["timestamp", "id", "status", "user"])
+        writer = csv.DictWriter(csvfile, fieldnames=LOG_FIELDS, restval="")
         if not file_exists:
             writer.writeheader()
-        writer.writerow(log_entry)
+        writer.writerow({name: log_entry.get(name, "") for name in LOG_FIELDS})
 
 
 _EVENTS_CACHE: dict[Path, tuple[tuple[int, int], list[dict]]] = {}
@@ -164,33 +201,84 @@ def load_history_events(file_path: Path) -> list[dict]:
             timestamp = datetime.strptime(row.get("timestamp", ""), "%Y-%m-%d %H:%M:%S")
         except ValueError:
             timestamp = datetime.min
+        changes = parse_changes(row.get("changes"))
+        if not changes:
+            changes = [
+                {
+                    "id": apply_id_alias(row.get("id", "")),
+                    "state": (row.get("status", "inactive") or "inactive").strip().lower()
+                    == "active",
+                }
+            ]
         events.append(
             {
                 "ts": timestamp,
-                "id": apply_id_alias(row.get("id", "")),
-                "state": (row.get("status", "inactive") or "inactive").strip().lower()
-                == "active",
+                # The last change is the event's own id and status, so anything
+                # reading a single press off an event still reads what it did.
+                "id": changes[-1]["id"],
+                "state": changes[-1]["state"],
                 "user": row.get("user", ""),
+                "changes": changes,
+                "note": (row.get("note") or "").strip(),
             }
         )
     _EVENTS_CACHE[file_path] = (stamp, events)
     return events
 
 
+def parse_changes(raw) -> list[dict]:
+    """The presses one recorded event carries, in order, or an empty list.
+
+    A practice sequence lands as one event with every press inside it (0.19.0),
+    written as JSON in the log's own ``changes`` column. An ordinary press
+    leaves that column empty and this returns nothing, so the row's own
+    ``id``/``status`` stand as the one change they always were. Anything
+    unreadable is treated the same way: a row is never guessed at.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return []
+    try:
+        items = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(items, list):
+        return []
+    changes = []
+    for item in items:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        changes.append(
+            {
+                "id": apply_id_alias(str(item["id"])),
+                "state": str(item.get("status", "inactive")).strip().lower() == "active",
+            }
+        )
+    return changes
+
+
 def state_at_index(events: list[dict], state_now: dict[str, bool], idx: int) -> dict[str, bool]:
-    """Reconstruct absolute element state after event ``idx``."""
+    """Reconstruct absolute element state after event ``idx``.
+
+    An event carries one press ordinarily and a whole practised sequence when
+    it is a practice save, so this walks each event's own list of changes —
+    forwards to remember what each element was before, backwards to put it
+    back. A sequence is undone press by press in reverse, which is what makes
+    a saved procedure one jump on the timeline rather than one per valve.
+    """
     state = dict(state_now)
     last_by_id: dict[str, bool] = {}
-    previous: list[bool | None] = [None] * len(events)
-    for event_idx, event in enumerate(events):
-        element_id = event["id"]
-        previous[event_idx] = last_by_id.get(element_id)
-        last_by_id[element_id] = event["state"]
+    previous: list[list[bool | None]] = []
+    for event in events:
+        row: list[bool | None] = []
+        for change in event["changes"]:
+            row.append(last_by_id.get(change["id"]))
+            last_by_id[change["id"]] = change["state"]
+        previous.append(row)
     for event_idx in range(len(events) - 1, idx, -1):
-        event = events[event_idx]
-        state[event["id"]] = (
-            previous[event_idx] if previous[event_idx] is not None else False
-        )
+        changes = events[event_idx]["changes"]
+        for change_idx in range(len(changes) - 1, -1, -1):
+            before = previous[event_idx][change_idx]
+            state[changes[change_idx]["id"]] = before if before is not None else False
     return state
 
 
@@ -273,7 +361,12 @@ def memory_timeline(
     cursor = 0
     mode = "unknown"
     for event in events:
-        state[event["id"]] = "active" if event["state"] else "inactive"
+        # A practice sequence is one event with several presses in it, so the
+        # whole sequence lands before the memory is asked what it now holds:
+        # one prediction per event, which is the "one state jump" the mode
+        # exists for.
+        for change in event["changes"]:
+            state[change["id"]] = "active" if change["state"] else "inactive"
         while cursor < len(modes) and modes[cursor][0] <= event["ts"]:
             mode = modes[cursor][1]
             cursor += 1
@@ -646,6 +739,13 @@ def create_app(test_config: dict | None = None) -> Flask:
                     "id": event["id"],
                     "state": event["state"],
                     "user": event["user"],
+                    # One press ordinarily; a whole practised sequence when the
+                    # event is a practice save, with the note that says so.
+                    "changes": [
+                        {"id": change["id"], "state": change["state"]}
+                        for change in event["changes"]
+                    ],
+                    "note": event["note"],
                 }
                 for event in events
             ]
@@ -926,7 +1026,160 @@ def create_app(test_config: dict | None = None) -> Flask:
             return jsonify(prediction_at(moment, idx, state))
         return jsonify(current_prediction())
 
-    @app.route("/press-warnings")
+    # -- practice: a local copy of the state, saved as one event ------------
+    #
+    # queezz, 2026-09-08 (letters ``20260908-9d38bf34-8415c7`` and
+    # ``20260908-e460b66f-616b53``): "I want now a 'practice' before recording
+    # history mode somehow. You open the valve, and see where color
+    # (vacuum/air) goes. Then you can undo. Also maybe using that we can do a
+    # procedure, then save state. That way one state jump, less history
+    # spamming. And better operational safety."
+    #
+    # The predictor has been state-in, prediction-out since 0.17.0 precisely so
+    # this could exist: the page keeps its own copy of the valve positions and
+    # of the volume memory, and these two routes answer about *that* copy
+    # without touching the recorded one. Neither writes anything.
+
+    #: A practised sequence is a procedure, not a session's whole afternoon.
+    #: The bound is here so a malformed or hostile body cannot make the server
+    #: walk an unbounded list; four guides' worth of steps is well inside it.
+    MAX_PRACTICE_PRESSES = 200
+
+    #: How long a quiet practice waits before it saves itself. Three minutes:
+    #: long enough that nobody is interrupted mid-procedure — the longest guide
+    #: here is six steps and a slow one is a minute or two — and short enough
+    #: that a person called away from the rig does not lose the sequence. It is
+    #: a setting because a rig is not a stopwatch: ``PRACTICE_AUTOSAVE_SECONDS``
+    #: in the machine-local settings file, held between half a minute and half
+    #: an hour so a typo cannot turn the fallback off or make it fire mid-press.
+    PRACTICE_AUTOSAVE_DEFAULT = 180
+    PRACTICE_AUTOSAVE_MIN = 30
+    PRACTICE_AUTOSAVE_MAX = 1800
+
+    def practice_autosave_seconds() -> int:
+        settings = _load_json(Path(app.config["SETTINGS_FILE"]), {})
+        try:
+            value = int(settings.get("PRACTICE_AUTOSAVE_SECONDS", PRACTICE_AUTOSAVE_DEFAULT))
+        except (TypeError, ValueError):
+            value = PRACTICE_AUTOSAVE_DEFAULT
+        return max(PRACTICE_AUTOSAVE_MIN, min(PRACTICE_AUTOSAVE_MAX, value))
+
+    def practised_state(raw) -> dict[str, str] | None:
+        """A state supplied by the page, read as this diagram's own elements.
+
+        Anything that is not a drawn element is dropped rather than trusted,
+        and every value becomes one of the two words the rest of this server
+        uses. A body that is not an object at all is refused.
+        """
+        if not isinstance(raw, dict):
+            return None
+        return {
+            apply_id_alias(str(key)): "active" if value in ("active", True) else "inactive"
+            for key, value in raw.items()
+            if apply_id_alias(str(key)) in valid_elements
+        }
+
+    @app.route("/practice/settings")
+    def practice_settings():
+        """How long the practice fallback timer waits, in seconds."""
+        return jsonify({"autosave_seconds": practice_autosave_seconds()})
+
+    @app.route("/practice/prediction", methods=["POST"])
+    def practice_prediction():
+        """The prediction for a practised state, and the memory it leaves.
+
+        The same walk ``/predicted-vacuum`` answers with, over the copy the
+        page is holding rather than over the recorded state. The volume memory
+        travels with it — out and back — so a vessel shut *in practice* reads
+        as sealed since that moment without a single byte of the recorded
+        memory moving. Nothing here is written to disk.
+        """
+        data = request.get_json(silent=True) or {}
+        state = practised_state(data.get("state"))
+        if state is None:
+            return jsonify({"error": "state must be an object of element ids"}), 400
+        supplied = data.get("memory")
+        memory = (
+            plumbing_map.read_memory({plumbing_map.MEMORY_KEY: supplied})
+            if isinstance(supplied, dict)
+            else live_memory()
+        )
+        moment = datetime.now()
+        prediction = plumbing_map.predict(
+            plumbing, state, current_line_mode(), memory=memory, now=moment
+        )
+        return jsonify(
+            {
+                "prediction": prediction,
+                "memory": plumbing_map.update_memory(plumbing, memory, prediction, moment),
+            }
+        )
+
+    @app.route("/practice/save", methods=["POST"])
+    @operator_required
+    def practice_save():
+        """Record a whole practised sequence as one signed history event.
+
+        Every press in order, the final state, and the operator who practised
+        it — one row in the log and one entry on the timeline, so a procedure
+        lands as a single jump rather than as one entry per valve. ``auto``
+        says the fallback timer saved it rather than a person, and the note
+        carried in the event says so out loud: a record nobody pressed Save on
+        must not pretend somebody did.
+        """
+        data = request.get_json(silent=True) or {}
+        presses = data.get("presses")
+        auto = bool(data.get("auto"))
+        if not isinstance(presses, list) or not presses:
+            return jsonify({"error": "presses must be a non-empty list"}), 400
+        if len(presses) > MAX_PRACTICE_PRESSES:
+            return jsonify({"error": "Too many presses in one sequence"}), 400
+        changes: list[dict[str, str]] = []
+        for item in presses:
+            element_id = apply_id_alias(str((item or {}).get("id") or ""))
+            status = (item or {}).get("status")
+            if element_id not in valid_elements or status not in {"active", "inactive"}:
+                return jsonify({"error": "Invalid element or status"}), 400
+            if element_id == linked_valve_id:
+                return jsonify(
+                    {"error": f"{element_id} follows the Line configuration and cannot be set directly."}
+                ), 400
+            changes.append({"id": element_id, "status": status})
+
+        touch_operator()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for change in changes:
+            elements_state[change["id"]] = change["status"]
+        remember_now()
+        save_state()
+        count = len(changes)
+        note = f"practice sequence, {count} press{'' if count == 1 else 'es'}"
+        if auto:
+            note += ", saved by the timer"
+        log_entry = {
+            "timestamp": timestamp,
+            "id": changes[-1]["id"],
+            "status": changes[-1]["status"],
+            "user": session["username"],
+            "changes": json.dumps(changes, separators=(",", ":")),
+            "note": note,
+        }
+        logs.append(log_entry)
+        del logs[:-MAX_LOGS]
+        save_log_csv(log_entry, Path(app.config["LOG_FILE"]))
+        return jsonify(
+            {
+                "message": "Practice sequence recorded",
+                "presses": count,
+                "auto": auto,
+                "note": note,
+                "timestamp": timestamp,
+                "state": elements_state,
+                "prediction": current_prediction(),
+            }
+        )
+
+    @app.route("/press-warnings", methods=["GET", "POST"])
     def press_warnings():
         """What one press would newly join to gas or vent air, before it is made.
 
@@ -941,14 +1194,26 @@ def create_app(test_config: dict | None = None) -> Flask:
         interlock: it reads no pressure, refuses no press, and protects no
         hardware.
         """
-        element_id = apply_id_alias(request.args.get("id") or "")
-        status = request.args.get("status")
+        data = request.get_json(silent=True) or {} if request.method == "POST" else {}
+        element_id = apply_id_alias(str(data.get("id") or request.args.get("id") or ""))
+        status = data.get("status") or request.args.get("status")
         if element_id not in valid_elements or status not in {"active", "inactive"}:
             return jsonify({"error": "Invalid element or status"}), 400
+        # A POST may carry the practised state to judge the press against, so a
+        # rehearsal gets the same warnings a real press would — seeing them is
+        # the point of practising (queezz, 2026-09-08). Absent, or on a GET, the
+        # question is asked of the recorded state exactly as before.
+        practised = practised_state(data.get("state")) if data.get("state") is not None else None
+        if data.get("state") is not None and practised is None:
+            return jsonify({"error": "state must be an object of element ids"}), 400
         return jsonify(
             {
                 "warnings": plumbing_map.press_warnings(
-                    plumbing, elements_state, element_id, status, current_line_mode()
+                    plumbing,
+                    practised if practised is not None else elements_state,
+                    element_id,
+                    status,
+                    current_line_mode(),
                 )
             }
         )

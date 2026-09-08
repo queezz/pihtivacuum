@@ -11,6 +11,30 @@
            controls stay inside the rail's own box instead of painting past its
            bottom edge, and the rail never becomes a second page scrollbar
            (measured at 1280x700, 0.16.0). #}
+        {# Practice: a local copy of the state, saved as one event (owner,
+           2026-09-08, letters 20260908-9d38bf34-8415c7 and
+           20260908-e460b66f-616b53). "You open the valve, and see where color
+           (vacuum/air) goes. Then you can undo." It governs what every press
+           on the drawing does, so it stands at the top of the control rail,
+           and the line beside Save says once that nothing is recorded yet. #}
+        <section class="rail-card practice-card" id="practice-card">
+            <h2 class="rail-label">Practice</h2>
+            <p class="band-switch practice-switch">
+                <label>
+                    <input type="checkbox" id="practice-toggle">
+                    Practise without recording
+                </label>
+            </p>
+            <p class="practice-note" id="practice-note">Presses are recorded in history as you make them.</p>
+            <div id="practice-actions" hidden>
+                <button type="button" id="practice-save" class="practice-save">Save to history</button>
+                <div class="practice-row">
+                    <button type="button" id="practice-undo">Undo</button>
+                    <button type="button" id="practice-discard">Discard</button>
+                </div>
+                <p class="practice-timer muted" id="practice-timer" role="status"></p>
+            </div>
+        </section>
         <section class="rail-card rail-card--growing rail-card--fit">
             <h2 class="rail-label">Line configuration</h2>
             <p id="line-mode-status" class="state-line" role="status">Unknown</p>
@@ -31,6 +55,7 @@
             <button type="button" data-drawer="guide-controls" aria-controls="guide-controls" aria-expanded="false">Controls</button>
             <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">State &amp; guide</button>
         </div>
+        <p class="practice-banner" id="practice-banner" role="status" hidden>Practising. This drawing is a copy, not the record.</p>
         <div id="diagram-container" aria-label="PIHTI vacuum system diagram"></div>
         <div id="tooltip"></div>
     </main>
