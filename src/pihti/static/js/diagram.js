@@ -882,10 +882,12 @@
      * straight in and roughing through the bypass first. The gauge is named
      * because the diagram predicts and the gauge measures. */
     function sealedHint(hint) {
-        const parts = [hint.text];
         const gauges = (hint.gauges || []).map((id) => inSentence(displayName(id)));
-        if (gauges.length) parts.push(`On this vessel: the ${joinWords(gauges)}.`);
-        return parts.filter(Boolean).join(" ");
+        // One sentence, naming this vessel's own gauges: two vessels sitting in
+        // the same state print side by side, and the same three sentences twice
+        // is a lecture rather than a readout.
+        const read = gauges.length ? `Read the ${joinWords(gauges)}` : "Read a gauge on it";
+        return `${hint.bake ? "Consider baking. " : ""}${read}; ${hint.advice || ""}.`;
     }
 
     function renderConnections(connections) {

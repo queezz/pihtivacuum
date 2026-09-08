@@ -504,6 +504,15 @@ def _vessel_hint(plumbing: dict, name: str, was: str, days: float, duration: str
     be safe." The gauge is named from the map — the diagram predicts, the gauge
     measures — and the two ways the pump-down guides offer are answered
     separately, because the guide's question is *which way*, not *how bad*.
+
+    It comes back in three pieces rather than one paragraph, because two vessels
+    in the same state print side by side and a repeated lecture is what Fleet's
+    `WEBUI.md` calls a textbook in disguise. ``advice`` is the clause after "read
+    the gauge", ``gauges`` are that vessel's own, and the page joins them into
+    **one** sentence naming the gauges it actually has, so the two lines differ
+    by their own equipment rather than repeating the same three sentences.
+    ``text`` is the same sentence with no gauge named, for any reader that has
+    no names to put in.
     """
     limits = hint_thresholds(plumbing)
     gauges = [
@@ -519,22 +528,17 @@ def _vessel_hint(plumbing: dict, name: str, was: str, days: float, duration: str
     else:
         stale = days > limits["fresh_vacuum_days"]
     if was in (AIR, GAS):
-        text = "Consider baking." if stale else ""
-        text = (text + " Read the gauge before pumping, and rough through the bypass rather"
-                " than opening a turbo straight onto it.").strip()
+        advice = "rough through the bypass rather than opening a turbo straight onto it"
     elif stale:
-        text = (
-            "Read the gauge first, then rough through the bypass to be safe rather than"
-            " opening the turbo straight in."
-        )
+        advice = "then rough through the bypass rather than opening the turbo straight in"
     else:
-        text = (
-            "Read the gauge; opening the turbo directly may be fine, or rough through the"
-            " bypass to be safe."
-        )
+        advice = "opening the turbo directly may be fine, or rough through the bypass to be safe"
+    bake = bool(stale and was in (AIR, GAS))
+    text = f"{'Consider baking. ' if bake else ''}Read the gauge; {advice}."
     return {
         "text": text,
-        "bake": bool(stale and was in (AIR, GAS)),
+        "advice": advice,
+        "bake": bake,
         "gauges": gauges,
         "turbo": turbo["id"] if turbo else None,
         "duration": duration,
