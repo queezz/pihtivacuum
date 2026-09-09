@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.21.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.21.0"}
-    assert b"v0.21.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.22.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.22.0"}
+    assert b"v0.22.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -902,7 +902,7 @@ def test_pipe_colour_is_predicted_from_the_valves_and_says_air_first(client):
     assert vented["elements"]["upstream-tmp-to-rotary-pipe"]["stroke"] == colours["air"]
 
     gas = plumbing_map.predict(
-        plumbing, {"hydrogen-bottle": "active", "gasline-h": "active", "gasline-main": "active"}
+        plumbing, {"hydrogen-bottle": "active", "rect44907-1": "active", "gasline-h": "active", "gasline-main": "active"}
     )
     assert gas["volumes"]["hydrogen-line"] == "gas"
     assert gas["volumes"]["plasma-vessel"] == "gas"
@@ -1004,7 +1004,7 @@ def test_boron_deposition_leaves_the_pipe_a_dead_end_on_the_plasma_side(client):
     # disagreement the way a membrane would show, and never the QMS state.
     qms_pumped_differently = dict(
         both_vcr_open,
-        **{"hydrogen-bottle": "active", "gasline-h": "active", "gasline-main": "active"},
+        **{"hydrogen-bottle": "active", "rect44907-1": "active", "gasline-h": "active", "gasline-main": "active"},
     )
     boron_disagreeing = plumbing_map.predict(plumbing, qms_pumped_differently, "boron")
     assert boron_disagreeing["volumes"]["plasma-vessel"] == "gas"
@@ -3763,14 +3763,14 @@ def test_stopping_oil_rotary_warns_for_vacuum_held_at_its_inlet(client, pump_id)
     memory = plumbing_map.update_memory(mapping, memory, plumbing_map.predict(mapping, state, memory=memory), now)
     state[plumbing_map.MEMORY_KEY] = memory
     result = plumbing_map.predict(mapping, state, now=now)
-    assert [w["id"] for w in result["warnings"]] == [pump_id]
+    assert [w["id"] for w in result["warnings"] if w["kind"] == "oil"] == [pump_id]
     assert plumbing_map.press_warnings(mapping, state, pump_id, "active") == []
-    assert plumbing_map.predict(mapping, dict(state, **{pump_id: "active"}))["warnings"] == []
+    assert not any(w["kind"] == "oil" for w in plumbing_map.predict(mapping, dict(state, **{pump_id: "active"}))["warnings"])
 
 
 def test_oil_warning_needs_vacuum_not_air_unknown_or_dry_scroll(client):
     mapping = client.get("/plumbing").json
-    assert plumbing_map.predict(mapping, {})["warnings"] == []
+    assert not any(w["kind"] == "oil" for w in plumbing_map.predict(mapping, {})["warnings"])
     assert plumbing_map.press_warnings(mapping, {"RoughD": "active"}, "RoughD", "inactive") == []
     state = {"Rough-Bypass": "active", "bypass-pumpline-vent-valve": "active"}
     assert plumbing_map.press_warnings(mapping, state, "Rough-Bypass", "inactive") == []
@@ -3806,7 +3806,7 @@ def test_practice_first_stop_warns_before_sealed_timestamp_exists(client):
         "memory": {"gas-panel-pumpline": {"state": "rough-vacuum", "since": None}},
     })
     assert response.status_code == 200
-    assert [w["id"] for w in response.json["prediction"]["warnings"]] == ["gaspanel-pump"]
+    assert [w["id"] for w in response.json["prediction"]["warnings"] if w["kind"] == "oil"] == ["gaspanel-pump"]
 
 
 @pytest.mark.parametrize("gauge", ["bypass-ionization-gauge", "downstream-ionization-gauge"])
@@ -3815,7 +3815,7 @@ def test_warning_attempt_is_attributed_without_state_history(client, app, gauge,
     mapping = client.get("/plumbing").json
     gauge_volume = next(g["volume"] for g in mapping["gauges"] if g["id"] == gauge)
     state = {gauge: "active"}
-    state.update({"hydrogen-bottle": "active", "gasline-h": "active", "gasline-main": "active"})
+    state.update({"hydrogen-bottle": "active", "rect44907-1": "active", "gasline-h": "active", "gasline-main": "active"})
     if exposure == "air":
         state.update({"gaspanel-valve-vent": "active", "gaspanel-valve-h": "active"})
     if gauge_volume == "qms-vessel":
@@ -3845,7 +3845,7 @@ def test_warning_attempt_is_attributed_without_state_history(client, app, gauge,
 def test_warned_practice_cannot_autosave_and_needs_explicit_review(client, app):
     identify(client)
     presses = [{"id": key, "status": "active"} for key in
-               ["hydrogen-bottle", "gasline-h", "gasline-main", "bypass-ionization-gauge"]]
+               ["gasline-h", "rect44907-1", "hydrogen-bottle", "gasline-main", "bypass-ionization-gauge"]]
     before = Path(app.config["LOG_FILE"]).read_bytes()
     for extra in [{"auto": True}, {}, {"auto": True, "acknowledge_warnings": True}]:
         result = client.post("/practice/save", json={"presses": presses, **extra})
@@ -3853,3 +3853,49 @@ def test_warned_practice_cannot_autosave_and_needs_explicit_review(client, app):
         assert result.json["warnings"][0]["kind"] == "gauge"
         assert Path(app.config["LOG_FILE"]).read_bytes() == before
     assert client.post("/practice/save", json={"presses": presses, "acknowledge_warnings": True}).status_code == 200
+
+
+@pytest.mark.parametrize("gas,mfc,cutoff", [("oxygen", "rect44907", "gasline-o"), ("hydrogen", "rect44907-1", "gasline-h")])
+@pytest.mark.parametrize("controller_on", [False, True])
+@pytest.mark.parametrize("cutoff_open", [False, True])
+def test_mass_flow_controller_splits_flow_and_warns_closed_cutoff(client, gas, mfc, cutoff, controller_on, cutoff_open):
+    mapping = client.get("/plumbing").json
+    state = {gas + "-bottle": "active", "gasline-main": "active",
+             mfc: "active" if controller_on else "inactive",
+             cutoff: "active" if cutoff_open else "inactive"}
+    predicted = plumbing_map.predict(mapping, state, "membrane")
+    assert predicted["elements"][mfc]["open"] is controller_on
+    assert (predicted["volumes"]["plasma-vessel"] == "gas") is (controller_on and cutoff_open)
+    outlet = gas + "-meter-outlet"
+    assert (predicted["volumes"][outlet] == "gas") is controller_on
+    assert predicted["elements"][f"gasline-{gas}-to-cutoff-valve"]["volume"] == outlet
+    warnings = [w for w in predicted["warnings"] if w["kind"] == "mfc-pressure" and w["id"] == cutoff]
+    assert bool(warnings) is (not cutoff_open)
+    if warnings:
+        assert warnings[0]["supply_exposed"] is True
+        assert warnings[0]["level"] == (3 if controller_on else 2)
+    for theme in ["light", "dark"]:
+        themed = plumbing_map.themed_map(mapping, theme)
+        paint = plumbing_map.predict(themed, state)["elements"][mfc]
+        if not controller_on:
+            assert paint["fill"] == themed["drawing"]["valve_closed"]
+            assert paint["stroke"] == themed["drawing"]["valve_closed_edge"]
+        else:
+            assert paint["fill"] == paint["stroke"]
+
+
+def test_mass_flow_warning_distinguishes_unknown_trapped_and_fed(client):
+    mapping = client.get("/plumbing").json
+    state = {}
+    def hydrogen(result):
+        return next(w for w in result["warnings"] if w["id"] == "gasline-h")
+    unknown = hydrogen(plumbing_map.predict(mapping, state))
+    assert unknown["level"] == 1 and not unknown["supply_exposed"] and not unknown["trapped"]
+    memory = {"hydrogen-meter-outlet": {"state": "gas", "since": "2026-09-10T00:00:00"}}
+    trapped = hydrogen(plumbing_map.predict(mapping, state, memory=memory))
+    assert trapped["trapped"] and not trapped["supply_exposed"]
+    warnings = plumbing_map.press_warnings(mapping, state, "hydrogen-bottle", "active")
+    assert any(w["id"] == "gasline-h" and w["level"] == 2 for w in warnings)
+    # Turning on the controller can actively feed the shut section, a worsening.
+    warnings = plumbing_map.press_warnings(mapping, {"hydrogen-bottle": "active"}, "rect44907-1", "active")
+    assert any(w["id"] == "gasline-h" and w["level"] == 3 for w in warnings)

@@ -1190,9 +1190,36 @@ def oil_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memo
     return found
 
 
+def mass_flow_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict) -> list[dict]:
+    """A controller's off annotation is not evidence of pressure-tight isolation."""
+    def contents(volume):
+        verdict = verdicts.get(volume, ISOLATED)
+        if verdict == ISOLATED:
+            return (sealed.get(volume) or {}).get("was", (memory.get(volume) or {}).get("state", ISOLATED))
+        return verdict
+
+    found = []
+    for controller in plumbing.get("valves", []):
+        if controller.get("kind") != "mass-flow-controller":
+            continue
+        cutoff = controller["cutoff"]
+        if _is(state, cutoff, "active"):
+            continue
+        supply, outlet = controller["joins"]
+        supplied = contents(supply) in {GAS, AIR}
+        trapped = contents(outlet) in {GAS, AIR}
+        running = _is(state, controller["id"], "active")
+        found.append({"kind": "mfc-pressure", "id": cutoff,
+                      "controller": controller["id"], "volume": outlet,
+                      "supply_exposed": supplied, "trapped": trapped, "controller_on": running,
+                      "state": contents(outlet), "level": (3 if running else 2) if supplied else 1})
+    return found
+
+
 def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict) -> list[dict]:
     """Standing advisories, shared by the drawing and press comparisons."""
     found = oil_warnings(plumbing, state, verdicts, sealed, memory)
+    found.extend(mass_flow_warnings(plumbing, state, verdicts, sealed, memory))
     for kind, items, wanted in [("gauge", plumbing.get("gauges", []), IONIZATION),
                                 ("turbo", plumbing.get("pumps", []), TURBO)]:
         for item in items:

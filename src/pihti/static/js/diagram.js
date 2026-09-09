@@ -136,6 +136,14 @@
         if (oil.length) sentences.push(`Oil leak into pipes — risk: ${joinWords(
             oil.map((item) => inSentence(displayName(item.id)))
         )} stopped with vacuum at the inlet. Predicted from diagram state; check the pump and inlet isolation.`);
+        const controllers = warnings.filter((item) => item.kind === "mfc-pressure");
+        for (const item of controllers) {
+            sentences.push(`Possible trapped pressure: ${displayName(item.controller)} to ${displayName(item.id)} (closed). `
+                + (item.supply_exposed
+                    ? item.controller_on ? "Gas/air supply can feed this section." : "Gas/air supply may keep feeding a leak."
+                    : item.trapped ? "Gas or air was present here." : "Pressure in this small section is unknown."));
+        }
+        if (controllers.length) sentences.push("Off controllers may leak. Check pressure before opening a cutoff; this diagram does not measure it.");
         return sentences.join("\n\n");
     }
 
@@ -853,7 +861,7 @@
             oilNotice.hidden = !warnings.length;
             oilNotice.textContent = warningText(warnings);
         }
-        const affected = new Set((prediction.warnings || []).map((item) => item.id));
+        const affected = new Set((prediction.warnings || []).flatMap((item) => item.controller ? [item.id, item.controller] : [item.id]));
         document.querySelectorAll("#diagram-container .equipment-warning").forEach((item) => {
             if (!affected.has(item.id)) item.classList.remove("equipment-warning");
         });

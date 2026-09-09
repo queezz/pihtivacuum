@@ -228,8 +228,7 @@
             "group": "pipes-gasline-oxygen",
             "elements": [
                 "gasline-oxygen",
-                "gasline-oxygen-1",
-                "gasline-oxygen-to-cutoff-valve"
+                "gasline-oxygen-1"
             ]
         },
         "hydrogen-line": {
@@ -237,9 +236,18 @@
             "group": "pipes-gasline-hydrogen",
             "elements": [
                 "gasline-hydrogen",
-                "gasline-hydrogen-1",
-                "gasline-hydrogen-to-cutoff-valve"
+                "gasline-hydrogen-1"
             ]
+        },
+        "oxygen-meter-outlet": {
+            "label": "Oxygen controller to cutoff",
+            "group": "pipes-gasline-oxygen",
+            "elements": ["gasline-oxygen-to-cutoff-valve"]
+        },
+        "hydrogen-meter-outlet": {
+            "label": "Hydrogen controller to cutoff",
+            "group": "pipes-gasline-hydrogen",
+            "elements": ["gasline-hydrogen-to-cutoff-valve"]
         },
         "gas-panel-manifold": {
             "label": "Gas panel manifold",
@@ -274,7 +282,8 @@
         }
     },
     "slow_pumping": {
-        "valves": ["gasline-main", "flow-calibration-valve"],
+        "mass_flow_note": "The two mass-flow controllers are on/off valves for nominal connectivity only, never pressure-tight isolation claims. Each named to-cutoff segment is a separate outlet volume. A closed cutoff warns of possible trapped pressure; gas/air on the supply side raises the warning, and an on controller raises it again. No pressure magnitude or leak rate is inferred. The existing SVG rectangle ids and gas-line filing groups stay unchanged.",
+    "valves": ["gasline-main", "flow-calibration-valve"],
         "label": "slow through long ¼-inch gas lines",
         "note": "Owner observation 2026-09-10: pumping a vessel through metres of quarter-inch gas tubing is very slow. These are the gas-line entry valves to the vessel plumbing. Qualify a pump only if no open route avoids these entries. This is a route limitation, not a pressure or pumping-time estimate."
     },
@@ -292,8 +301,10 @@
         {"id": "flow-calibration-valve", "joins": ["probe-line", "argon-line"]},
         {"id": "gasline-main", "joins": ["gas-manifold", "plasma-vessel"]},
         {"id": "gasline-ar", "joins": ["gas-manifold", "argon-line"]},
-        {"id": "gasline-o", "joins": ["gas-manifold", "oxygen-line"]},
-        {"id": "gasline-h", "joins": ["gas-manifold", "hydrogen-line"]},
+        {"id": "gasline-o", "joins": ["gas-manifold", "oxygen-meter-outlet"]},
+        {"id": "rect44907", "kind": "mass-flow-controller", "joins": ["oxygen-line", "oxygen-meter-outlet"], "cutoff": "gasline-o"},
+        {"id": "gasline-h", "joins": ["gas-manifold", "hydrogen-meter-outlet"]},
+        {"id": "rect44907-1", "kind": "mass-flow-controller", "joins": ["hydrogen-line", "hydrogen-meter-outlet"], "cutoff": "gasline-h"},
         {"id": "gaspanel-valve-ar", "joins": ["gas-panel-manifold", "argon-line"]},
         {"id": "gaspanel-valve-o", "joins": ["gas-panel-manifold", "oxygen-line"]},
         {"id": "gaspanel-valve-h", "joins": ["gas-panel-manifold", "hydrogen-line"]},

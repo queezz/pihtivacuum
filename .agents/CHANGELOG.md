@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.0
+
+- Make oxygen and hydrogen mass-flow controllers ordinary on/off controls
+  with valve painting and separate controller-to-cutoff volumes.
+- Warn and pulse at closed cutoffs for possible trapped pressure, including
+  with an off controller. Distinguish unknown pressure, remembered gas/air,
+  possible supply leakage and an on controller feeding the section.
+- Worsening warnings use Practice/Undo and the separate attempt audit.
+  Preserve the authored SVG geometry and ids.
+
 ## 0.21.0
 
 - Pulse affected equipment and show standing gas/air ion-gauge, turbo-air and

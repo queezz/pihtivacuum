@@ -304,3 +304,23 @@ affected equipment and diagram context. It survives Undo/Discard; no attempt
 is added to the state timeline. Read-only preflight and prediction never audit.
 History offers the audit download. An explicitly reviewed save still records
 one state-history event and says warnings were reviewed.
+
+## Mass-flow controllers (owner request 2026-09-10; 0.22.0)
+
+Oxygen and hydrogen MFCs track on/off only and behave as valves for nominal
+connectivity and paint. Keep the owner's existing rectangle ids, `rect44907`
+and `rect44907-1`; labels provide the equipment names. Each existing
+`gasline-*-to-cutoff-valve` path now has its own outlet volume. Both supply and
+outlet still live in the drawing's existing gas-line filing group; SVG geometry
+and ids are unchanged. Off is not a claim of leak-tight isolation.
+
+A closed cutoff carries a possible-trapped-pressure advisory even when the MFC
+is off. This is the conservative interpretation of the owner's request that
+'all of this is a warning when the cutoff valve is closed'; an optional scope
+question received no reply before implementation. Unknown/small volume is not
+called safe. Supply-side gas/air, including remembered gas/air, raises the
+warning; an on controller feeding that section raises it again. No magnitude
+of pressure or leak rate is calculated. New/worsening warnings use the existing
+Practice deferral and attempt audit. Pulsing names both MFC and cutoff. Opening
+the cutoff removes this closed-section advisory; ordinary exposure warnings
+still come from the nominal open paths.

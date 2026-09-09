@@ -1,5 +1,17 @@
 [
     {
+        "id": "rect44907",
+        "label": "Oxygen mass-flow controller",
+        "colors": {"active": "#9bf08d", "inactive": "gray"},
+        "confirmToggle": true
+    },
+    {
+        "id": "rect44907-1",
+        "label": "Hydrogen mass-flow controller",
+        "colors": {"active": "#9bf08d", "inactive": "gray"},
+        "confirmToggle": true
+    },
+    {
         "id": "GVU",
         "label": "Plasma gate valve (GVU)",
         "colors": {
@@ -126,7 +138,7 @@
     },
     {
         "id": "gasline-h",
-        "label": "Hydrogen gas line",
+        "label": "Hydrogen gas cutoff valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
@@ -135,7 +147,7 @@
     },
     {
         "id": "gasline-o",
-        "label": "Oxygen gas line",
+        "label": "Oxygen gas cutoff valve",
         "colors": {
             "active": "#9bf08d",
             "inactive": "gray"
