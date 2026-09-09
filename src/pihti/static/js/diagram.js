@@ -133,12 +133,12 @@
             )}, ${turbos.length > 1 ? "which are" : "which is"} marked running.`);
         }
         const oil = warnings.filter((item) => item.kind === "oil");
-        if (oil.length) sentences.push(`Oil leak into pipes — risk: ${joinWords(
+        if (oil.length) sentences.push(`Oil backflow reminder: ${joinWords(
             oil.map((item) => inSentence(displayName(item.id)))
-        )} stopped with vacuum at the inlet. Predicted from diagram state; check the pump and inlet isolation.`);
+        )} stopped with vacuum at the inlet; the risk remains until vented.`);
         const controllers = warnings.filter((item) => item.kind === "mfc-pressure");
         for (const item of controllers) {
-            sentences.push(`Possible trapped pressure: ${displayName(item.controller)} to ${displayName(item.id)} (closed). `
+            sentences.push(`Before opening ${displayName(item.id)}: pressure may be trapped after ${displayName(item.controller)}. `
                 + (item.supply_exposed
                     ? item.controller_on ? "Gas/air supply can feed this section." : "Gas/air supply may keep feeding a leak."
                     : item.trapped ? "Gas or air was present here." : "Pressure in this small section is unknown."));
@@ -163,7 +163,7 @@
                 practiceWarningHold = true;
                 stopPracticeTimer();
                 window.alert("This press could not be checked. It will stay in Practice; review before operating hardware.");
-            } else if (warnings.length) {
+            } else if (warnings.some((item) => !item.advisory)) {
                 const response = await fetch("/warning-attempt", {
                     method: "POST", headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({id: element.id, status: newStatus, state: vacuumState, memory: practiceMemory})
@@ -176,7 +176,12 @@
                 if (!practiceOn) await setPractice(true);
                 practiceWarningHold = true;
                 stopPracticeTimer();
-            } else if (config.confirmToggle && !window.confirm(`Mark ${displayName(element.id)} ${newStatus}?`)) return;
+            } else {
+                const cutoffNotice = warningText(warnings.filter((item) => item.kind === "mfc-pressure"));
+                const question = `Mark ${displayName(element.id)} ${newStatus}?`;
+                if ((cutoffNotice || config.confirmToggle)
+                    && !window.confirm(cutoffNotice ? `${cutoffNotice}\n\n${question}` : question)) return;
+            }
             // Practising: the press changes the local copy and nothing else.
             // No state file, no history, no round trip but the one that asks
             // the same predictor what the copy now looks like.
@@ -861,7 +866,15 @@
             oilNotice.hidden = !warnings.length;
             oilNotice.textContent = warningText(warnings);
         }
-        const affected = new Set((prediction.warnings || []).flatMap((item) => item.controller ? [item.id, item.controller] : [item.id]));
+        const urgentWarnings = (prediction.warnings || []).filter((item) => !item.advisory);
+        const advisoryNotice = document.getElementById("advisory-note");
+        if (advisoryNotice) {
+            const reminders = (prediction.warnings || []).filter((item) => item.advisory);
+            advisoryNotice.hidden = !reminders.length;
+            advisoryNotice.textContent = warningText(reminders);
+        }
+        if (oilNotice) oilNotice.classList.toggle("quiet-advisory", !(prediction.warnings || []).some((item) => !item.advisory));
+        const affected = new Set(urgentWarnings.flatMap((item) => item.controller ? [item.id, item.controller] : [item.id]));
         document.querySelectorAll("#diagram-container .equipment-warning").forEach((item) => {
             if (!affected.has(item.id)) item.classList.remove("equipment-warning");
         });
@@ -869,7 +882,7 @@
         const warningBanner = document.getElementById("warning-banner");
         if (warningBanner) {
             warningBanner.hidden = !affected.size;
-            warningBanner.textContent = warningText(prediction.warnings || [])
+            warningBanner.textContent = warningText(urgentWarnings)
                 + (practiceOn ? " In Practice — use Undo to reverse the press before operating hardware." : " Check the diagram before operating hardware.");
         }
         // A guide step may be satisfied by the prediction rather than by a valve

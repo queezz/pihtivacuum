@@ -1186,7 +1186,7 @@ def oil_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memo
         shown = held.get("was") if held else verdict
         if shown in vacuum:
             found.append({"kind": "oil", "id": pump["id"], "volume": volume,
-                          "state": shown, "sealed": bool(held), "level": 1})
+                          "state": shown, "sealed": bool(held), "level": 1, "advisory": True})
     return found
 
 
@@ -1210,7 +1210,7 @@ def mass_flow_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict
         trapped = contents(outlet) in {GAS, AIR}
         running = _is(state, controller["id"], "active")
         found.append({"kind": "mfc-pressure", "id": cutoff,
-                      "controller": controller["id"], "volume": outlet,
+                      "controller": controller["id"], "volume": outlet, "advisory": True,
                       "supply_exposed": supplied, "trapped": trapped, "controller_on": running,
                       "state": contents(outlet), "level": (3 if running else 2) if supplied else 1})
     return found
@@ -1219,7 +1219,6 @@ def mass_flow_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict
 def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict) -> list[dict]:
     """Standing advisories, shared by the drawing and press comparisons."""
     found = oil_warnings(plumbing, state, verdicts, sealed, memory)
-    found.extend(mass_flow_warnings(plumbing, state, verdicts, sealed, memory))
     for kind, items, wanted in [("gauge", plumbing.get("gauges", []), IONIZATION),
                                 ("turbo", plumbing.get("pumps", []), TURBO)]:
         for item in items:
@@ -1288,11 +1287,18 @@ def press_warnings(
     memory = update_memory(plumbing, read_memory(state), predict(plumbing, state, line_mode), now)
     after_prediction = predict(plumbing, after_state, line_mode, memory=memory, now=now)
     after_state[MEMORY_KEY] = update_memory(plumbing, memory, after_prediction, now)
-    return [
+    warnings = [
         item
         for key, item in exposures(plumbing, after_state, line_mode).items()
         if item["level"] > before.get(key, {}).get("level", 0)
     ]
+    # MFC pressure is relevant when opening its cutoff, not while parked.
+    if status == "active" and not _is(state, element_id, "active"):
+        prior = predict(plumbing, state, line_mode, memory=memory, now=now)
+        warnings.extend(item for item in mass_flow_warnings(
+            plumbing, state, prior["volumes"], prior["sealed"], memory
+        ) if item["id"] == element_id)
+    return warnings
 
 
 def _line(

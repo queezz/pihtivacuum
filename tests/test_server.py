@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.23.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.23.0"}
-    assert b"v0.23.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.23.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.23.1"}
+    assert b"v0.23.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -3789,13 +3789,14 @@ def test_first_stop_of_legacy_rotary_keeps_oil_warning_after_update(tmp_path):
     client = app.test_client()
     identify(client)
     result = client.post("/update", json={"id": "Rough-Bypass", "status": "inactive"})
-    assert result.status_code == 409
-    assert result.json["requires_practice"] is True
-    assert [w["id"] for w in result.json["warnings"]] == ["Rough-Bypass"]
-    assert client.get("/state").json["Rough-Bypass"] == "active"
-    saved = client.post("/practice/save", json={"presses": [{"id": "Rough-Bypass", "status": "inactive"}], "acknowledge_warnings": True})
-    assert saved.status_code == 200
+    assert result.status_code == 200
+    assert client.get("/state").json["Rough-Bypass"] == "inactive"
+    assert result.json["prediction"]["warnings"][0]["advisory"] is True
     assert client.get("/predicted-vacuum").json["warnings"][0]["sealed"] is True
+    assert not Path(app.config["LOG_FILE"]).with_name("warning_attempts.jsonl").exists()
+    vent = client.post("/update", json={"id": "bypass-pumpline-vent-valve", "status": "active"})
+    assert vent.status_code == 200
+    assert not any(w["kind"] == "oil" for w in vent.json["prediction"]["warnings"])
 
 
 
@@ -3869,7 +3870,8 @@ def test_mass_flow_controller_splits_flow_and_warns_closed_cutoff(client, gas, m
     outlet = gas + "-meter-outlet"
     assert (predicted["volumes"][outlet] == "gas") is controller_on
     assert predicted["elements"][f"gasline-{gas}-to-cutoff-valve"]["volume"] == outlet
-    warnings = [w for w in predicted["warnings"] if w["kind"] == "mfc-pressure" and w["id"] == cutoff]
+    assert not any(w["kind"] == "mfc-pressure" for w in predicted["warnings"])
+    warnings = [w for w in plumbing_map.press_warnings(mapping, state, cutoff, "active") if w["kind"] == "mfc-pressure"]
     assert bool(warnings) is (not cutoff_open)
     if warnings:
         assert warnings[0]["supply_exposed"] is True
@@ -3887,15 +3889,23 @@ def test_mass_flow_controller_splits_flow_and_warns_closed_cutoff(client, gas, m
 def test_mass_flow_warning_distinguishes_unknown_trapped_and_fed(client):
     mapping = client.get("/plumbing").json
     state = {}
-    def hydrogen(result):
-        return next(w for w in result["warnings"] if w["id"] == "gasline-h")
-    unknown = hydrogen(plumbing_map.predict(mapping, state))
-    assert unknown["level"] == 1 and not unknown["supply_exposed"] and not unknown["trapped"]
+    def hydrogen(state):
+        return next(w for w in plumbing_map.press_warnings(mapping, state, "gasline-h", "active") if w["kind"] == "mfc-pressure")
+    assert not plumbing_map.predict(mapping, {})["warnings"]
+    unknown = hydrogen(state)
+    assert unknown["level"] == 1 and unknown["advisory"] and not unknown["trapped"]
     memory = {"hydrogen-meter-outlet": {"state": "gas", "since": "2026-09-10T00:00:00"}}
-    trapped = hydrogen(plumbing_map.predict(mapping, state, memory=memory))
+    trapped = hydrogen({plumbing_map.MEMORY_KEY: memory})
     assert trapped["trapped"] and not trapped["supply_exposed"]
-    warnings = plumbing_map.press_warnings(mapping, state, "hydrogen-bottle", "active")
-    assert any(w["id"] == "gasline-h" and w["level"] == 2 for w in warnings)
-    # Turning on the controller can actively feed the shut section, a worsening.
-    warnings = plumbing_map.press_warnings(mapping, {"hydrogen-bottle": "active"}, "rect44907-1", "active")
-    assert any(w["id"] == "gasline-h" and w["level"] == 3 for w in warnings)
+    assert hydrogen({"hydrogen-bottle": "active"})["level"] == 2
+    assert hydrogen({"hydrogen-bottle": "active", "rect44907-1": "active"})["level"] == 3
+    assert not plumbing_map.press_warnings(mapping, {}, "hydrogen-bottle", "active")
+
+
+def test_advisories_do_not_block_practice_autosave_or_record_mistakes(client, app):
+    identify(client)
+    assert client.post("/update", json={"id": "Rough-Bypass", "status": "active"}).status_code == 200
+    assert client.post("/practice/save", json={"presses": [{"id": "Rough-Bypass", "status": "inactive"}], "auto": True}).status_code == 200
+    assert client.post("/warning-attempt", json={"id": "gasline-h", "status": "active"}).json["warnings"] == []
+    assert client.post("/update", json={"id": "gasline-h", "status": "active"}).status_code == 200
+    assert not Path(app.config["LOG_FILE"]).with_name("warning_attempts.jsonl").exists()

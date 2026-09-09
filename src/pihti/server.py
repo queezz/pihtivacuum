@@ -961,6 +961,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
 
         warnings = plumbing_map.press_warnings(plumbing, elements_state, element_id, status, current_line_mode())
+        warnings = [item for item in warnings if not item.get("advisory")]
         if warnings:
             record_warning_attempt(element_id, status, elements_state, warnings)
             return jsonify({"requires_practice": True, "warnings": warnings,
@@ -1175,6 +1176,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                                                 plumbing_map.predict(plumbing, rehearsed, current_line_mode()), datetime.now())
             rehearsed[change["id"]] = change["status"]
             rehearsed[plumbing_map.MEMORY_KEY] = memory
+        warnings = [item for item in warnings if not item.get("advisory")]
         if warnings and (auto or data.get("acknowledge_warnings") is not True):
             return jsonify({"warnings": warnings, "error": "Warnings require an explicit review before saving."}), 409
 
@@ -1236,6 +1238,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         if isinstance(data.get("memory"), dict):
             state[plumbing_map.MEMORY_KEY] = plumbing_map.read_memory({plumbing_map.MEMORY_KEY: data["memory"]})
         warnings = plumbing_map.press_warnings(plumbing, state, element_id, status, current_line_mode())
+        warnings = [item for item in warnings if not item.get("advisory")]
         if warnings:
             record_warning_attempt(element_id, status, state, warnings)
         return jsonify({"warnings": warnings})

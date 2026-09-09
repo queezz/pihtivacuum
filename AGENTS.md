@@ -336,3 +336,14 @@ its timestamp link expands its group and reveals it inside the timeline's own
 scroller. Never rewrite logs, collapse state reconstruction, or alter calendar
 counts/exports to implement presentation grouping. Run `node --test
 tests/history-groups.test.cjs` as well as pytest when changing the grouping rule.
+
+## Quiet advisories (owner correction 2026-09-10; 0.23.1)
+
+Supersedes loud oil/MFC behavior above: parked MFCs are 'too loud'; pressure is
+relevant when opening cutoff valves. Stop pump then vent is normal operation.
+MFC pressure now appears only in the cutoff-opening confirmation. Oil vacuum
+remains as `advisory: true`, shown muted below the live drawing and quietly in
+History, without pulse; venting clears it. Neither advisory forces Practice,
+holds autosave, requires special save review or enters the mistake audit.
+Urgent active-ion-gauge/running-turbo exposures retain their previous behavior,
+including when they coincide with an advisory. Explicit Practice still works.

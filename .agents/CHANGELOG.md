@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.1
+
+- Move MFC reminders to cutoff-opening confirmations; no idle banner or pulse.
+- Show stopped-rotary oil risk as a muted reminder until vented. Normal stop
+  then vent records without automatic Practice, timer hold or mistake audit.
+- Preserve urgent ion-gauge and running-turbo exposure warnings.
+
 ## 0.23.0
 
 - Group nearby same-operator history events into expandable sequences. A gap

@@ -1058,3 +1058,5 @@ button.tiny {
 .tl-group-select .muted { font-size: .75rem; }
 .tl-group-toggle { flex: 0 0 44px; min-height: 44px; padding: 4px; border: 0; background: none; }
 .tl-group-events { padding: 3px 0 3px 5px; border-top: 1px solid var(--line); }
+
+.quiet-advisory { color: var(--muted); font-size: .8rem; line-height: 1.4; border: 0; padding: 0; margin: 8px 0; }
