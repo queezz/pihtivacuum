@@ -1047,3 +1047,14 @@ button.tiny {
 @media (prefers-reduced-motion: reduce) {
     #diagram-container .equipment-warning { animation-duration: 3s; }
 }
+
+/* Time groups keep every original event reachable, in the rail's own scroller. */
+.tl-help { font-size: .78rem; margin: 0 0 8px; }
+.tl-group { border: 1px solid var(--line); border-radius: 6px; margin: 3px 0; }
+.tl-group[data-selected="true"] { border-color: var(--accent); }
+.tl-group-header { display: flex; align-items: stretch; }
+.tl-group-select { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; text-align: left; border: 0; background: none; padding: 8px; }
+.tl-group-select[aria-pressed="true"] { background: var(--accent-wash); }
+.tl-group-select .muted { font-size: .75rem; }
+.tl-group-toggle { flex: 0 0 44px; min-height: 44px; padding: 4px; border: 0; background: none; }
+.tl-group-events { padding: 3px 0 3px 5px; border-top: 1px solid var(--line); }

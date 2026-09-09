@@ -2,10 +2,28 @@
  * in the main column replays the operator-entered state at that moment.
  * The address bar carries the selection (?day=… or ?at=…) so a moment can be
  * linked to and survives reload. */
+/* Presentation only: keep the original event indices and recorded states. */
+function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
+    const groups = [];
+    const isSequence = (event) => (event.changes || []).length > 1 || (event.note || "").startsWith("practice sequence");
+    for (const row of rows) {
+        const group = groups[groups.length - 1];
+        const previous = group?.[group.length - 1];
+        const gap = previous ? (Date.parse(row.event.ts.replace(" ", "T")) - Date.parse(previous.event.ts.replace(" ", "T"))) / 1000 : NaN;
+        if (previous && row.event.user && row.event.user === previous.event.user
+            && row.event.ts.slice(0, 10) === previous.event.ts.slice(0, 10)
+            && gap >= 0 && gap <= gapSeconds
+            && !isSequence(row.event) && !isSequence(previous.event)) group.push(row);
+        else groups.push([row]);
+    }
+    return groups;
+}
+
 (function () {
     "use strict";
 
     let events = [];
+    const expandedGroups = new Set();
     let currentState = {};
     let dailyCounts = {};
     let selectedIdx = null;
@@ -128,11 +146,10 @@
         if (!list || !empty) return;
         const rows = events
             .map((event, idx) => ({event, idx}))
-            .filter(({event}) => dateOf(event.ts) === selectedDate)
-            .reverse();
+            .filter(({event}) => dateOf(event.ts) === selectedDate);
         if (label) label.textContent = selectedDate ? `Timeline · ${selectedDate}` : "Timeline";
         empty.hidden = rows.length > 0;
-        list.replaceChildren(...rows.map(({event, idx}) => {
+        function eventRow({event, idx}) {
             const row = document.createElement("button");
             row.type = "button";
             row.className = "tl-row";
@@ -154,7 +171,58 @@
                 <span class="pill tl-pill ${grouped ? "" : (event.state ? "active" : "")}">${grouped ? "saved" : (event.state ? "on" : "off")}</span>`;
             row.addEventListener("click", () => selectEvent(idx));
             return row;
+        }
+        list.replaceChildren(...pihtiGroupHistoryEvents(rows).reverse().map((group) => {
+            if (group.length === 1) return eventRow(group[0]);
+            const first = group[0], last = group[group.length - 1];
+            const key = String(first.idx);
+            const container = document.createElement("div");
+            container.className = "tl-group";
+            container.dataset.selected = String(group.some(({idx}) => idx === selectedIdx));
+            const header = document.createElement("div");
+            header.className = "tl-group-header";
+            const select = document.createElement("button");
+            select.type = "button";
+            select.className = "tl-group-select";
+            select.setAttribute("aria-pressed", String(last.idx === selectedIdx));
+            const range = `${timeOf(first.event.ts)}–${timeOf(last.event.ts)}`;
+            select.title = `${group.length} changes by ${last.event.user}. Show the final state at ${last.event.ts}.`;
+            select.innerHTML = `<span class="tl-time">${escapeHtml(range)}</span><span class="tl-id">${group.length} changes · ${escapeHtml(last.event.user)}</span><span class="muted">Show final state</span>`;
+            select.addEventListener("click", () => selectEvent(last.idx));
+            const toggle = document.createElement("button");
+            toggle.type = "button";
+            toggle.className = "tl-group-toggle";
+            const children = document.createElement("div");
+            children.id = `history-group-${first.idx}`;
+            children.className = "tl-group-events";
+            children.hidden = !expandedGroups.has(key);
+            children.replaceChildren(...group.slice().reverse().map(eventRow));
+            toggle.setAttribute("aria-controls", children.id);
+            function reflectExpansion() {
+                toggle.setAttribute("aria-expanded", String(!children.hidden));
+                toggle.setAttribute("aria-label", `${children.hidden ? "Expand" : "Collapse"} ${group.length} changes at ${range}`);
+                toggle.textContent = children.hidden ? "+" : "−";
+            }
+            reflectExpansion();
+            toggle.addEventListener("click", () => {
+                children.hidden = !children.hidden;
+                if (children.hidden) expandedGroups.delete(key);
+                else expandedGroups.add(key);
+                reflectExpansion();
+            });
+            header.append(select, toggle);
+            container.append(header, children);
+            return container;
         }));
+        // Reveal the selection inside the timeline, without scrolling the page.
+        const chosen = list.querySelector('.tl-group-select[aria-pressed="true"]')
+            || list.querySelector('.tl-row[aria-pressed="true"]');
+        const scroller = list.closest(".scrolls");
+        if (chosen && scroller) {
+            const target = chosen.getBoundingClientRect(), bounds = scroller.getBoundingClientRect();
+            if (target.bottom > bounds.bottom) scroller.scrollTop += target.bottom - bounds.bottom;
+            else if (target.top < bounds.top) scroller.scrollTop += target.top - bounds.top;
+        }
     }
 
     function renderMoment() {
@@ -209,6 +277,9 @@
     function selectEvent(idx) {
         if (idx < 0 || idx >= events.length) return;
         selectedIdx = idx;
+        const group = pihtiGroupHistoryEvents(events.map((event, eventIdx) => ({event, idx: eventIdx})))
+            .find((items) => items.some((item) => item.idx === idx));
+        if (group && group[group.length - 1].idx !== idx) expandedGroups.add(String(group[0].idx));
         selectedDate = dateOf(events[idx].ts);
         currentMonth = monthOf(selectedDate);
         renderCalendar();

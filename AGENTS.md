@@ -324,3 +324,15 @@ of pressure or leak rate is calculated. New/worsening warnings use the existing
 Practice deferral and attempt audit. Pulsing names both MFC and cutoff. Opening
 the cutoff removes this closed-section advisory; ordinary exposure warnings
 still come from the nominal open paths.
+
+## History time groups (owner request 2026-09-10; 0.23.0)
+
+History groups nearby events for browsing only. Adjacent events join when they
+have the same known operator and date and are at most 60 seconds apart. Unknown
+operators, invalid timestamps and saved Practice sequences remain separate.
+The group header selects its final recorded state; its separate expand button
+reveals every original event, newest first. Selecting an inner event or loading
+its timestamp link expands its group and reveals it inside the timeline's own
+scroller. Never rewrite logs, collapse state reconstruction, or alter calendar
+counts/exports to implement presentation grouping. Run `node --test
+tests/history-groups.test.cjs` as well as pytest when changing the grouping rule.

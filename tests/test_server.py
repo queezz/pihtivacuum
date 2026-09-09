@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.22.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.22.0"}
-    assert b"v0.22.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.23.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.23.0"}
+    assert b"v0.23.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):

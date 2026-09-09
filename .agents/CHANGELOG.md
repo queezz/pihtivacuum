@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.0
+
+- Group nearby same-operator history events into expandable sequences. A gap
+  over one minute, a new day or operator, or a Practice save starts a new entry.
+- Select the final state from the group header; expand to select original
+  events. Inner-event links expand their group and reveal the selection.
+- Keep recorded events, calendar counts and exports unchanged.
+
 ## 0.22.0
 
 - Make oxygen and hydrogen mass-flow controllers ordinary on/off controls
