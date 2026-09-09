@@ -940,7 +940,7 @@
         }
         if ((item.pumps || []).length) {
             rows.push(["Pumped by", joinWords(item.pumps.map(
-                (pump) => inSentence(displayName(pump.id))
+                (pump) => inSentence(displayName(pump.id)) + (pump.route_hint ? ` (${pump.route_hint})` : "")
             ))]);
         }
         return rows;
@@ -1013,6 +1013,11 @@
         return (states[id]?.label || id).split(",")[0].toLowerCase();
     }
 
+    function connectionStateWord(item) {
+        const word = stateWord(item.state);
+        return item.slow_route_only ? `${word} · slow route` : word;
+    }
+
     function stateColour(id) {
         const states = Object.fromEntries((plumbing?.states || []).map((state) => [state.id, state]));
         return states[id]?.color || "#000000";
@@ -1066,7 +1071,7 @@
                 // Its own colour, hatched, is on the swatch beside it.
                 word.append("sealed, ", ...sealedPhrase(held));
             } else {
-                word.textContent = stateWord(item.state);
+                word.textContent = connectionStateWord(item);
             }
             head.append(stateSwatch(item), name, word);
             group.append(head);
@@ -1113,7 +1118,7 @@
             name.textContent = item.label;
             const word = document.createElement("span");
             word.className = "vacuum-group__state";
-            word.textContent = item.sealed ? "sealed" : stateWord(item.state);
+            word.textContent = item.sealed ? "sealed" : connectionStateWord(item);
             row.append(stateSwatch(item), name, word);
             return row;
         }));

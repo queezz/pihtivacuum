@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.8
+
+- Qualify pumping that can reach a vessel only through the long quarter-inch
+  gas lines as a slow route. Name the limitation beside the affected pump,
+  and keep it in the compact headline when all pumping routes are slow.
+- Recognize alternative direct routes; preserve connectivity and colours.
+
 ## 0.20.7
 
 - Derive the main high-vacuum colour from reachable turbo sides too:

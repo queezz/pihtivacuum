@@ -275,6 +275,20 @@ def _connections(
         for component in _components(names, plumbed)
         for name in component
     }
+    # Remove the authored narrow gas-line entries only for this route check.
+    # The real connectivity and its colour remain unchanged. An alternative
+    # unrestricted path means a pump is not limited to the slow route.
+    slow = plumbing.get("slow_pumping") or {}
+    restricted = {
+        frozenset(valve.get("joins") or ())
+        for valve in plumbing.get("valves") or []
+        if valve["id"] in (slow.get("valves") or [])
+    }
+    direct = {
+        name: component
+        for component in _components(names, [edge for edge in plumbed if frozenset(edge) not in restricted])
+        for name in component
+    }
     vessels = [name for name, volume in volumes.items() if volume.get("vessel")]
     answers = {}
     for name in vessels:
@@ -305,6 +319,12 @@ def _connections(
                 if pump["volume"] in space and _is(state, pump["id"], "active")
             ],
         }
+        pump_volumes = {pump["id"]: pump["volume"] for pump in plumbing.get("pumps") or []}
+        for pump in answers[name]["pumps"]:
+            if pump_volumes[pump["id"]] not in direct.get(name, {name}):
+                pump["route_hint"] = slow.get("label", "slow gas-line route")
+        pumps = answers[name]["pumps"]
+        answers[name]["slow_route_only"] = bool(pumps) and all(pump.get("route_hint") for pump in pumps)
     return answers
 
 

@@ -187,6 +187,16 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   second round trip to find out what just happened is the defect.
 - **A volume's body is one colour; equipment keeps its outline.** The two vessels, the two bypass tees and the cross take the state colour as fill *and* stroke (owner decision 2026-09-08: "All one color... Color speaks vacuum. Black border speaks... shapes?"). Valves, pumps and gauges keep the black queezz drew. Both halves come from `predict()`, so `/state.svg` and the page cannot disagree.
 
+## Slow gas-line pumping (owner observation, 2026-09-10; 0.20.8)
+
+Pumping a vessel through metres of quarter-inch gas tubing is a real but very
+slow route. `slow_pumping` in `plumbing.json` names the gas-line entry valves
+and the short readout wording. A pump gets that qualifier only if every open
+route to the vessel crosses those entries; an alternative direct route wins.
+When all reachable pumps are so limited, the expanded and compact vessel
+readouts say "slow route". This does not change state colours, connectivity,
+guides or predicted mixtures and estimates neither pressure nor pumping time.
+
 ## Web UI invariants
 
 - Every page uses the one `.page` grid: left rail for controls, main column for content, right rail for context. Rail widths and the sticky offset (`--bar` + `--content-gap`) are shared, so rails stand at the same address on every tab and never move on scroll.

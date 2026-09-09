@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.7"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.7"}
-    assert b"v0.20.7" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.8"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.8"}
+    assert b"v0.20.8" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -3697,3 +3697,51 @@ def test_joined_vessels_only_mix_reachable_pumping_sides(client, theme, route, d
         assert "fill:url(#pihti-mix-" not in rendered
     else:
         assert "fill:url(#pihti-mix-" in rendered
+
+
+@pytest.mark.parametrize("gas_route", ["main", "calibration"])
+@pytest.mark.parametrize("bypass", [False, True])
+def test_slow_gas_roughing_hint_depends_on_available_routes(client, gas_route, bypass):
+    mapping = client.get("/plumbing").json
+    state = {"gaspanel-pump": "active", "gaspanel-valve-pump": "active", "gaspanel-valve-ar": "active"}
+    if gas_route == "main":
+        state.update({"gasline-ar": "active", "gasline-main": "active"})
+    else:
+        state.update({"flow-calibration-valve": "active", "bypass-l1": "active", "GVBU": "active"})
+    # Join QMS too: limitations propagate through actual vessel connectivity.
+    state.update({"GVBU": "active", "bypass-l1": "active", "GVBD": "active"})
+    if bypass:
+        state.update({"Rough-Bypass": "active", "bypass-l2": "active"})
+    result = plumbing_map.predict(mapping, state, "membrane")
+    for name in ["plasma-vessel", "qms-vessel"]:
+        item = result["connections"][name]
+        assert item["state"] == "rough-vacuum"
+        assert item["slow_route_only"] is (not bypass)
+        pumps = {pump["id"]: pump for pump in item["pumps"]}
+        assert pumps["gaspanel-pump"]["route_hint"] == mapping["slow_pumping"]["label"]
+        if bypass:
+            assert "route_hint" not in pumps["Rough-Bypass"]
+    # Hints must never change connectivity, colours, mixtures or gas symbols.
+    without = dict(mapping, slow_pumping={})
+    plain = plumbing_map.predict(without, state, "membrane")
+    for key in ["volumes", "elements", "mixes", "gases", "gas_symbols"]:
+        assert result[key] == plain[key]
+    # A shut route means no pump connection and no slow-pumping claim.
+    state["gaspanel-valve-pump"] = "inactive"
+    closed = plumbing_map.predict(mapping, state, "membrane")["connections"]["plasma-vessel"]
+    assert all(pump["id"] != "gaspanel-pump" for pump in closed["pumps"])
+    assert closed["slow_route_only"] is False
+
+
+def test_pump_with_an_alternative_wide_route_is_not_labelled_slow(client):
+    mapping = client.get("/plumbing").json
+    # Bypass pump reaches the plasma vessel via the gas line until GVBU opens.
+    state = {"Rough-Bypass": "active", "bypass-l2": "active", "bypass-l1": "active",
+             "flow-calibration-valve": "active", "gasline-ar": "active", "gasline-main": "active"}
+    slow = plumbing_map.predict(mapping, state, "membrane")["connections"]["plasma-vessel"]
+    assert slow["slow_route_only"] is True
+    assert slow["pumps"][0]["route_hint"]
+    state["GVBU"] = "active"
+    direct = plumbing_map.predict(mapping, state, "membrane")["connections"]["plasma-vessel"]
+    assert direct["slow_route_only"] is False
+    assert "route_hint" not in direct["pumps"][0]

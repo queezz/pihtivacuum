@@ -273,6 +273,11 @@
             ]
         }
     },
+    "slow_pumping": {
+        "valves": ["gasline-main", "flow-calibration-valve"],
+        "label": "slow through long ¼-inch gas lines",
+        "note": "Owner observation 2026-09-10: pumping a vessel through metres of quarter-inch gas tubing is very slow. These are the gas-line entry valves to the vessel plumbing. Qualify a pump only if no open route avoids these entries. This is a route limitation, not a pressure or pumping-time estimate."
+    },
     "valves": [
         {"id": "GVU", "joins": ["plasma-vessel", "plasma-turbo-line"]},
         {"id": "GVD", "joins": ["qms-vessel", "qms-turbo-line"]},
