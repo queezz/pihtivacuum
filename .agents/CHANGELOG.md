@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.6
+
+- Require both turbo pumping sides to reach a joined volume before showing
+  a two-sided high-vacuum gradient. A turbo behind closed GVD no longer
+  adds a false contribution. Genuine rough-pump and air/gas mixes remain.
+
 ## 0.20.5
 
 - Colour all five gas bottle stems with their connected line prediction,

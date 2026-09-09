@@ -106,6 +106,13 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   red with an amber tone. One second tone only, chosen in a written order: a gas
   under vent air, then the best pump that is not already the dominant reading,
   then the other vessel when the two chambers are joined.
+  **Corrected 2026-09-10 (owner live review, 0.20.6):** joining the two
+  vessels alone does not activate a mixed-pumping gradient. Both running
+  turbo sides must actually reach the connected volume. A downstream turbo
+  behind closed GVD contributes nothing to the joined vessels' gradient;
+  opening GVD admits it and closing GVD removes it again. Genuine reachable
+  rough-pump contributions and air/gas mixtures retain their existing rules.
+  This supersedes the earlier chamber-join-only trigger above.
   A pipe still wears one colour and only one, because an SVG
   gradient is painted across a bounding box rather than along a path and would
   streak the wrong way on a bend (queezz: *"we have shapes in all important

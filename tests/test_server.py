@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.5"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.5"}
-    assert b"v0.20.5" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.6"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.6"}
+    assert b"v0.20.6" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -927,12 +927,11 @@ def test_the_line_between_the_vessels_follows_the_line_configuration(client):
     }
 
     connected = plumbing_map.predict(plumbing, both_vcr_open, "open")
-    # One space reaching both vessels: it wears the plasma side's colour, and
-    # only the drawn shapes carry the QMS side's as their contribution.
+    # One turbo reaches both vessels: one HV colour, no second pump claimed.
     assert connected["volumes"]["qms-vessel"] == "upstream-high-vacuum"
     assert connected["volumes"]["vessel-crossover"] == "upstream-high-vacuum"
-    assert connected["mixes"]["qms-vessel"] == "downstream-high-vacuum"
-    assert connected["elements"]["qms-vacuum"]["mix"] == colours["downstream-high-vacuum"]
+    assert "qms-vessel" not in connected["mixes"]
+    assert "mix" not in connected["elements"]["qms-vacuum"]
     # A pipe wears one colour and never the contribution.
     assert "mix" not in connected["elements"]["upstream-to-downstream-narrow-pipe"]
 
@@ -3664,3 +3663,32 @@ def test_bottle_stems_follow_connected_lines_without_repainting_symbols(client, 
         assert f'#{source["stem"]}{{stroke:{item["stroke"]} !important' in rendered
         if not source.get("valve"):
             assert source["id"] not in prediction["elements"]
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("route", ["crossover", "bypass"])
+@pytest.mark.parametrize("downstream", ["shut", "open", "stopped"])
+def test_joined_vessels_only_mix_reachable_pumping_sides(client, theme, route, downstream):
+    mapping = plumbing_map.themed_map(client.get("/plumbing").json, theme)
+    state = {"TMPU": "active", "GVU": "active", "TMPD": "active", "RoughD": "active"}
+    if route == "crossover":
+        state.update({"bypass-vcr-u": "active", "bypass-vcr-d": "active"})
+        mode = "open"
+    else:
+        state.update({"GVBU": "active", "bypass-l1": "active", "GVBD": "active"})
+        mode = "membrane"
+    if downstream != "shut":
+        state["GVD"] = "active"
+    if downstream == "stopped":
+        state["TMPD"] = "inactive"
+    prediction = plumbing_map.predict(mapping, state, mode)
+    expected = {"open": "downstream-high-vacuum", "stopped": "rough-vacuum"}.get(downstream)
+    for volume, body in [("plasma-vessel", "plasma-vacuum"), ("qms-vessel", "qms-vacuum")]:
+        assert prediction["volumes"][volume] == "upstream-high-vacuum"
+        assert prediction["mixes"].get(volume) == expected
+        assert prediction["elements"][body].get("mix_state") == expected
+    rendered = plumbing_map.style_rules(mapping, state, mode)
+    if downstream == "shut":
+        assert "fill:url(#pihti-mix-" not in rendered
+    else:
+        assert "fill:url(#pihti-mix-" in rendered

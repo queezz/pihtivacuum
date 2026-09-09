@@ -363,8 +363,8 @@ def _verdict(
     turbos = [pump for pump in running if pump.get("kind") == "turbo"]
     roughs = [pump for pump in running if pump.get("kind") != "turbo"]
     # The vessels this space reaches, best-ranked first. Two of them means the
-    # two chambers are joined, and the joined space wears the first one's colour
-    # with the second one's as the contribution — "both vessels' colours meeting".
+    # two chambers are joined. A second HV tone additionally requires pumps
+    # from both sides to reach this component; a shut gate excludes its turbo.
     vessels = sorted(
         (name for name in component if volumes.get(name, {}).get("vessel")),
         key=lambda name: volumes[name].get("rank", 99),
@@ -397,14 +397,18 @@ def _verdict(
 
     # What else reaches this space, in the order the second tone is chosen:
     # a gas under vent air, then the best pump that is not already the
-    # dominant reading, then the other vessel when the two chambers are joined.
+    # dominant reading. Two HV tones require both pumping sides to reach it.
     candidates: list[str | None] = []
     if dominant == AIR and gases:
         candidates.append(GAS)
     if dominant in (AIR, GAS):
         candidates.append(turbo_state or (ROUGH if roughs else None))
     else:
-        if turbo_state and len(vessels) > 1:
+        reachable_sides = {
+            volumes.get(pump.get("serves"), {}).get("high_vacuum")
+            for pump in turbos
+        } - {None}
+        if turbo_state and len(vessels) > 1 and len(reachable_sides) > 1:
             candidates.append(volumes[vessels[1]].get("high_vacuum"))
         if turbo_state and roughs:
             candidates.append(ROUGH)
