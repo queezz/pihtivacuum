@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.4"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.4"}
-    assert b"v0.20.4" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.5"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.5"}
+    assert b"v0.20.5" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -3638,3 +3638,29 @@ def test_nitrogen_source_handle_uses_shared_valve_paint(client, theme, opened, v
     assert "gaspanel-valve-n" not in mapping["dark_theme"]["surfaces"]
     rendered = plumbing_map.style_rules(mapping, state, "membrane")
     assert f'#gaspanel-valve-n{{stroke:{valve["stroke"]} !important;fill:{valve["fill"]} !important}}' in rendered
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("opened", [False, True])
+def test_bottle_stems_follow_connected_lines_without_repainting_symbols(client, theme, opened):
+    mapping = plumbing_map.themed_map(client.get("/plumbing").json, theme)
+    root = ET.parse(PROJECT_ROOT / "src/pihti/static/diagram.svg").getroot()
+    by_id = {e.get("id"): e for e in root.iter() if e.get("id")}
+    parents = {child: parent for parent in root.iter() for child in parent}
+    sources = mapping["gas_sources"]
+    state = {source["id"]: "active" for source in sources} if opened else {}
+    prediction = plumbing_map.predict(mapping, state, "membrane")
+    rendered = plumbing_map.style_rules(mapping, state, "membrane")
+    for source in sources:
+        stem = by_id[source["stem"]]
+        symbol = by_id["nitrogen-bottle" if source.get("valve") else source["id"]]
+        siblings = list(parents[symbol])
+        assert parents[stem] is parents[symbol]
+        assert siblings.index(stem) == siblings.index(symbol) - 1
+        item = prediction["elements"][source["stem"]]
+        pipe_id = mapping["volumes"][source["volume"]]["elements"][0]
+        assert item["stroke"] == prediction["elements"][pipe_id]["stroke"]
+        assert item["stroke"] != "#000000"
+        assert f'#{source["stem"]}{{stroke:{item["stroke"]} !important' in rendered
+        if not source.get("valve"):
+            assert source["id"] not in prediction["elements"]

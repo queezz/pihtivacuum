@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.5
+
+- Colour all five gas bottle stems with their connected line prediction,
+  including dark and sealed tones, on Vacuum, History and exported SVGs.
+  Preserve the bottles' own operational colours.
+
 ## 0.20.4
 
 - Paint the nitrogen source handle using the shared valve logic: open fill

@@ -831,9 +831,12 @@ def predict(
     # A gauge's stem is the short line from its symbol to what it reads, and it
     # belongs to that volume as much as any pipe does (queezz, 2026-09-08:
     # "all gauges stems don't have colors... If we can work with that, fine").
-    for gauge in plumbing.get("gauges") or []:
-        stem = gauge.get("stem")
-        volume_name = gauge.get("volume")
+    # Bottle stems follow their connected line too (owner, 2026-09-10).
+    # The explicit stem IDs preserve symbol colours and drawing groups.
+    stemmed = list(plumbing.get("gauges") or []) + list(plumbing.get("gas_sources") or [])
+    for component in stemmed:
+        stem = component.get("stem")
+        volume_name = component.get("volume")
         if not stem or volume_name not in volumes:
             continue
         verdict = by_volume.get(volume_name, ISOLATED)
