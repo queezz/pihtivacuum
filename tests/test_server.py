@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.6"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.6"}
-    assert b"v0.20.6" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.7"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.7"}
+    assert b"v0.20.7" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -3668,7 +3668,8 @@ def test_bottle_stems_follow_connected_lines_without_repainting_symbols(client, 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 @pytest.mark.parametrize("route", ["crossover", "bypass"])
 @pytest.mark.parametrize("downstream", ["shut", "open", "stopped"])
-def test_joined_vessels_only_mix_reachable_pumping_sides(client, theme, route, downstream):
+@pytest.mark.parametrize("flipped", [False, True])
+def test_joined_vessels_only_mix_reachable_pumping_sides(client, theme, route, downstream, flipped):
     mapping = plumbing_map.themed_map(client.get("/plumbing").json, theme)
     state = {"TMPU": "active", "GVU": "active", "TMPD": "active", "RoughD": "active"}
     if route == "crossover":
@@ -3681,10 +3682,14 @@ def test_joined_vessels_only_mix_reachable_pumping_sides(client, theme, route, d
         state["GVD"] = "active"
     if downstream == "stopped":
         state["TMPD"] = "inactive"
+    if flipped:
+        swap = {"TMPU": "TMPD", "TMPD": "TMPU", "GVU": "GVD", "GVD": "GVU", "RoughD": "RoughU"}
+        state = {swap.get(key, key): value for key, value in state.items()}
     prediction = plumbing_map.predict(mapping, state, mode)
+    dominant = "downstream-high-vacuum" if flipped and downstream != "open" else "upstream-high-vacuum"
     expected = {"open": "downstream-high-vacuum", "stopped": "rough-vacuum"}.get(downstream)
     for volume, body in [("plasma-vessel", "plasma-vacuum"), ("qms-vessel", "qms-vacuum")]:
-        assert prediction["volumes"][volume] == "upstream-high-vacuum"
+        assert prediction["volumes"][volume] == dominant
         assert prediction["mixes"].get(volume) == expected
         assert prediction["elements"][body].get("mix_state") == expected
     rendered = plumbing_map.style_rules(mapping, state, mode)

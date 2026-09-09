@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.7
+
+- Derive the main high-vacuum colour from reachable turbo sides too:
+  joined vessels pumped only by TMPD are solid green with GVU closed;
+  TMPU alone gives solid blue. Both reaching produces the gradient.
+- Test both mirrored gate configurations and stopped-turbo passages.
+
 ## 0.20.6
 
 - Require both turbo pumping sides to reach a joined volume before showing

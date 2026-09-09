@@ -1,3 +1,3 @@
 """PIHTI vacuum diagnostics Flask application."""
 
-__version__ = "0.20.6"
+__version__ = "0.20.7"

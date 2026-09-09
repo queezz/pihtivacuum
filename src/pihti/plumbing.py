@@ -323,8 +323,8 @@ def _verdict(
     second ("we have shapes in all important places. plasma-vacuum, bypass
     connector, and qms-vacuum").
 
-    High vacuum takes its colour **from the vessel it is joined to**, and where
-    no vessel is joined, from the vessel the running turbo *serves*.
+    High vacuum takes its colour from the side the reachable running turbo
+    serves. A joined vessel does not supply a pumping colour on its own.
 
     **Corrected 2026-09-08** (owner, letter ``20260908-fe94c769-493d71``): the
     stub between a closed gate and its own turbo used to be a seventh state,
@@ -362,27 +362,16 @@ def _verdict(
     ]
     turbos = [pump for pump in running if pump.get("kind") == "turbo"]
     roughs = [pump for pump in running if pump.get("kind") != "turbo"]
-    # The vessels this space reaches, best-ranked first. Two of them means the
-    # two chambers are joined. A second HV tone additionally requires pumps
-    # from both sides to reach this component; a shut gate excludes its turbo.
-    vessels = sorted(
-        (name for name in component if volumes.get(name, {}).get("vessel")),
-        key=lambda name: volumes[name].get("rank", 99),
+    # Both the main HV colour and its contribution come from reachable
+    # running turbo sides, never from the names of the joined chambers.
+    served = sorted(
+        (volumes.get(pump.get("serves")) or {} for pump in turbos),
+        key=lambda side: side.get("rank", 99),
     )
-    turbo_state = None
-    if turbos and vessels:
-        turbo_state = volumes[vessels[0]].get("high_vacuum") or ISOLATED
-    elif turbos:
-        # No vessel in this space: the turbo still says which side it is, from
-        # the vessel it serves — a fact about the rig, not about today's valves.
-        served = sorted(
-            (volumes.get(pump.get("serves")) or {} for pump in turbos),
-            key=lambda side: side.get("rank", 99),
-        )
-        turbo_state = next(
-            (side.get("high_vacuum") for side in served if side.get("high_vacuum")),
-            ISOLATED,
-        )
+    turbo_sides = list(dict.fromkeys(
+        side["high_vacuum"] for side in served if side.get("high_vacuum")
+    ))
+    turbo_state = (turbo_sides[0] if turbo_sides else ISOLATED) if turbos else None
 
     if open_air:
         dominant = AIR
@@ -404,12 +393,8 @@ def _verdict(
     if dominant in (AIR, GAS):
         candidates.append(turbo_state or (ROUGH if roughs else None))
     else:
-        reachable_sides = {
-            volumes.get(pump.get("serves"), {}).get("high_vacuum")
-            for pump in turbos
-        } - {None}
-        if turbo_state and len(vessels) > 1 and len(reachable_sides) > 1:
-            candidates.append(volumes[vessels[1]].get("high_vacuum"))
+        if len(turbo_sides) > 1:
+            candidates.append(turbo_sides[1])
         if turbo_state and roughs:
             candidates.append(ROUGH)
     mix = next((name for name in candidates if name and name != dominant), None)

@@ -113,6 +113,12 @@ The server binds to `0.0.0.0:5000` by default: it answers on the LAN because it 
   opening GVD admits it and closing GVD removes it again. Genuine reachable
   rough-pump contributions and air/gas mixtures retain their existing rules.
   This supersedes the earlier chamber-join-only trigger above.
+  **Completed 2026-09-10 (owner mirrored GVU case, 0.20.7):** the dominant
+  high-vacuum colour follows the reachable running turbo's served side too.
+  TMPD alone reaching joined vessels makes them green, TMPU alone makes them
+  blue, and both reaching makes the two-tone fill. A vessel's rank only
+  orders multiple reachable pumping colours; it cannot introduce a colour
+  from a blocked pump. This replaces the vessel-membership colour rule above.
   A pipe still wears one colour and only one, because an SVG
   gradient is painted across a bounding box rather than along a path and would
   streak the wrong way on a bend (queezz: *"we have shapes in all important
