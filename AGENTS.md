@@ -286,3 +286,21 @@ found the black borders unsuitable. The empty membrane marker keeps its dashed
 outline but uses that visible light rim at 90% opacity. Light mode keeps the
 previous inks. Stopped pumps remain grey. Sealed tones fade toward the selected
 ground. Theme and thickness travel into historical SVG image links.
+
+## Warning attempts (owner request 2026-09-10; 0.21.0)
+
+Use the diagram before operating valves, gauges or pumps. Gas or air reaching
+an active ionization gauge, air at a running turbo and vacuum at a stopped oil
+rotary are standing advisories. The affected equipment pulses with opacity
+(including reduced motion), and the warning stands above the live drawing so
+phone users can see it without opening a drawer. History keeps its own warning.
+A newly warned press automatically enters Practice, can be undone, and pauses
+that rehearsal's fallback timer. Direct `/update` returns a Practice deferral;
+`/practice/save` requires explicit warning acknowledgement and rejects automatic
+saving of warned sequences. These are diagram recording rules, not interlocks.
+The separate gitignored `warning_attempts.jsonl` beside the state-history log
+records the selected operator, timezone-aware timestamp, attempted id/status,
+affected equipment and diagram context. It survives Undo/Discard; no attempt
+is added to the state timeline. Read-only preflight and prediction never audit.
+History offers the audit download. An explicitly reviewed save still records
+one state-history event and says warnings were reviewed.

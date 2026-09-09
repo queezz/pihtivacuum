@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.0
+
+- Pulse affected equipment and show standing gas/air ion-gauge, turbo-air and
+  stopped-oil-rotary advisories above the drawing. Keep historical warnings.
+- Divert warned presses into Practice with Undo and automatic saving paused.
+  Direct updates defer to Practice; warned sequences need explicit save review.
+- Record operator, time, intended press, warnings and context separately in
+  ignored warning_attempts.jsonl; offer its download in History.
+- Teach diagram first, hardware second beside Practice.
+
 ## 0.20.9
 
 - Warn of oil leaking into pipes when an oil rotary is stopped with

@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.9"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.9"}
-    assert b"v0.20.9" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.21.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.21.0"}
+    assert b"v0.21.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -3605,7 +3605,7 @@ def test_the_page_teaches_saving_and_says_it_is_practising(client):
     # The banner stands above the drawing, where the presses are made.
     assert page.index('id="practice-banner"') < page.index('id="diagram-container"')
     script = diagram_script()
-    assert '"Nothing is recorded until you press Save."' in script
+    assert '"State history waits for Save. Warning attempts are recorded separately."' in script
     assert "Save ${count} press" in script
     assert "Saves itself in ${minutes}:${seconds}." in script
     # The five-second poll never paints the record over a rehearsal, Discard
@@ -3789,8 +3789,12 @@ def test_first_stop_of_legacy_rotary_keeps_oil_warning_after_update(tmp_path):
     client = app.test_client()
     identify(client)
     result = client.post("/update", json={"id": "Rough-Bypass", "status": "inactive"})
-    assert result.status_code == 200
-    assert [w["id"] for w in result.json["prediction"]["warnings"]] == ["Rough-Bypass"]
+    assert result.status_code == 409
+    assert result.json["requires_practice"] is True
+    assert [w["id"] for w in result.json["warnings"]] == ["Rough-Bypass"]
+    assert client.get("/state").json["Rough-Bypass"] == "active"
+    saved = client.post("/practice/save", json={"presses": [{"id": "Rough-Bypass", "status": "inactive"}], "acknowledge_warnings": True})
+    assert saved.status_code == 200
     assert client.get("/predicted-vacuum").json["warnings"][0]["sealed"] is True
 
 
@@ -3803,3 +3807,49 @@ def test_practice_first_stop_warns_before_sealed_timestamp_exists(client):
     })
     assert response.status_code == 200
     assert [w["id"] for w in response.json["prediction"]["warnings"]] == ["gaspanel-pump"]
+
+
+@pytest.mark.parametrize("gauge", ["bypass-ionization-gauge", "downstream-ionization-gauge"])
+@pytest.mark.parametrize("exposure", ["gas", "air"])
+def test_warning_attempt_is_attributed_without_state_history(client, app, gauge, exposure):
+    mapping = client.get("/plumbing").json
+    gauge_volume = next(g["volume"] for g in mapping["gauges"] if g["id"] == gauge)
+    state = {gauge: "active"}
+    state.update({"hydrogen-bottle": "active", "gasline-h": "active", "gasline-main": "active"})
+    if exposure == "air":
+        state.update({"gaspanel-valve-vent": "active", "gaspanel-valve-h": "active"})
+    if gauge_volume == "qms-vessel":
+        state.update({"GVBU": "active", "bypass-l1": "active", "GVBD": "active"})
+    state[gauge] = "inactive"
+    before = Path(app.config["STATE_FILE"]).read_bytes()
+    history = Path(app.config["LOG_FILE"]).read_bytes()
+    payload = {"state": state, "id": gauge, "status": "active"}
+    assert client.post("/warning-attempt", json=payload).status_code == 428
+    identify(client)
+    checked = client.post("/press-warnings", json=payload)
+    assert not Path(app.config["LOG_FILE"]).with_name("warning_attempts.jsonl").exists()
+    attempt = client.post("/warning-attempt", json=payload)
+    assert attempt.status_code == 200
+    assert attempt.json["warnings"] == checked.json["warnings"]
+    assert any(w["id"] == gauge and w["state"] == exposure for w in attempt.json["warnings"])
+    preview = client.post("/practice/prediction", json={"state": dict(state, **{gauge: "active"})}).json
+    assert any(w["id"] == gauge and w["state"] == exposure for w in preview["prediction"]["warnings"])
+    audit = [json.loads(row) for row in client.get("/download-warning-attempts").data.decode().splitlines()]
+    assert len(audit) == 1
+    assert audit[0]["user"] == "operator" and audit[0]["id"] == gauge
+    assert datetime.fromisoformat(audit[0]["timestamp"]).tzinfo is not None
+    assert Path(app.config["STATE_FILE"]).read_bytes() == before
+    assert Path(app.config["LOG_FILE"]).read_bytes() == history
+
+
+def test_warned_practice_cannot_autosave_and_needs_explicit_review(client, app):
+    identify(client)
+    presses = [{"id": key, "status": "active"} for key in
+               ["hydrogen-bottle", "gasline-h", "gasline-main", "bypass-ionization-gauge"]]
+    before = Path(app.config["LOG_FILE"]).read_bytes()
+    for extra in [{"auto": True}, {}, {"auto": True, "acknowledge_warnings": True}]:
+        result = client.post("/practice/save", json={"presses": presses, **extra})
+        assert result.status_code == 409
+        assert result.json["warnings"][0]["kind"] == "gauge"
+        assert Path(app.config["LOG_FILE"]).read_bytes() == before
+    assert client.post("/practice/save", json={"presses": presses, "acknowledge_warnings": True}).status_code == 200

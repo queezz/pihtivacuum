@@ -960,6 +960,12 @@ def create_app(test_config: dict | None = None) -> Flask:
                 }
             )
 
+        warnings = plumbing_map.press_warnings(plumbing, elements_state, element_id, status, current_line_mode())
+        if warnings:
+            record_warning_attempt(element_id, status, elements_state, warnings)
+            return jsonify({"requires_practice": True, "warnings": warnings,
+                            "error": "Try this change in Practice and review the warning first."}), 409
+
         touch_operator()
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1161,16 +1167,30 @@ def create_app(test_config: dict | None = None) -> Flask:
                 ), 400
             changes.append({"id": element_id, "status": status})
 
+        rehearsed = dict(elements_state)
+        warnings = []
+        for change in changes:
+            warnings.extend(plumbing_map.press_warnings(plumbing, rehearsed, change["id"], change["status"], current_line_mode()))
+            memory = plumbing_map.update_memory(plumbing, plumbing_map.read_memory(rehearsed),
+                                                plumbing_map.predict(plumbing, rehearsed, current_line_mode()), datetime.now())
+            rehearsed[change["id"]] = change["status"]
+            rehearsed[plumbing_map.MEMORY_KEY] = memory
+        if warnings and (auto or data.get("acknowledge_warnings") is not True):
+            return jsonify({"warnings": warnings, "error": "Warnings require an explicit review before saving."}), 409
+
         touch_operator()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        remember_now()
         for change in changes:
             elements_state[change["id"]] = change["status"]
-        remember_now()
+            remember_now()
         save_state()
         count = len(changes)
         note = f"practice sequence, {count} press{'' if count == 1 else 'es'}"
         if auto:
             note += ", saved by the timer"
+        if warnings:
+            note += ", warnings reviewed"
         log_entry = {
             "timestamp": timestamp,
             "id": changes[-1]["id"],
@@ -1193,6 +1213,39 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "prediction": current_prediction(),
             }
         )
+
+    def record_warning_attempt(element_id, status, state, warnings):
+        # Separate from state history: an intention is not a hardware action.
+        path = Path(app.config["LOG_FILE"]).with_name("warning_attempts.jsonl")
+        entry = {"timestamp": datetime.now().astimezone().isoformat(),
+                 "user": session["username"], "id": element_id, "status": status,
+                 "warnings": warnings, "state": state, "line_mode": current_line_mode()}
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    @app.route("/warning-attempt", methods=["POST"])
+    @operator_required
+    def warning_attempt():
+        data = request.get_json(silent=True) or {}
+        element_id, status = data.get("id"), data.get("status")
+        if element_id not in valid_elements or status not in {"active", "inactive"} or element_id == linked_valve_id:
+            return jsonify({"error": "Invalid element or status"}), 400
+        state = practised_state(data.get("state")) if "state" in data else dict(elements_state)
+        if state is None:
+            return jsonify({"error": "state must be an object of element ids"}), 400
+        if isinstance(data.get("memory"), dict):
+            state[plumbing_map.MEMORY_KEY] = plumbing_map.read_memory({plumbing_map.MEMORY_KEY: data["memory"]})
+        warnings = plumbing_map.press_warnings(plumbing, state, element_id, status, current_line_mode())
+        if warnings:
+            record_warning_attempt(element_id, status, state, warnings)
+        return jsonify({"warnings": warnings})
+
+    @app.route("/download-warning-attempts")
+    def download_warning_attempts():
+        path = Path(app.config["LOG_FILE"]).with_name("warning_attempts.jsonl")
+        if not path.exists():
+            return Response("", mimetype="application/x-ndjson", headers={"Content-Disposition": "attachment; filename=warning_attempts.jsonl"})
+        return send_file(path, as_attachment=True)
 
     @app.route("/press-warnings", methods=["GET", "POST"])
     def press_warnings():
@@ -1221,6 +1274,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         practised = practised_state(data.get("state")) if data.get("state") is not None else None
         if data.get("state") is not None and practised is None:
             return jsonify({"error": "state must be an object of element ids"}), 400
+        if practised is not None and isinstance(data.get("memory"), dict):
+            practised[plumbing_map.MEMORY_KEY] = plumbing_map.read_memory({plumbing_map.MEMORY_KEY: data["memory"]})
         return jsonify(
             {
                 "warnings": plumbing_map.press_warnings(

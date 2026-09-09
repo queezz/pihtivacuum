@@ -19,6 +19,7 @@
            and the line beside Save says once that nothing is recorded yet. #}
         <section class="rail-card practice-card" id="practice-card">
             <h2 class="rail-label">Practice</h2>
+            <p class="practice-note">Use the diagram before operating valves, gauges or pumps.</p>
             <p class="band-switch practice-switch">
                 <label>
                     <input type="checkbox" id="practice-toggle">
@@ -56,6 +57,7 @@
             <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">State &amp; guide</button>
         </div>
         <p class="practice-banner" id="practice-banner" role="status" hidden>Practising. This drawing is a copy, not the record.</p>
+        <p id="warning-banner" class="oil-warning" role="alert" hidden></p>
         <div id="diagram-container" aria-label="PIHTI vacuum system diagram"></div>
         <div id="tooltip"></div>
     </main>
@@ -76,7 +78,6 @@
                     <span class="card-toggle__mark" aria-hidden="true"></span>
                 </button>
             </h2>
-            <p id="oil-warning" class="oil-warning" role="status" hidden></p>
             <ul id="vacuum-compact" class="vacuum-compact" hidden></ul>
             <div id="state-card-body">
                 <p class="rail-lead">Predicted from the valve positions, not measured.</p>

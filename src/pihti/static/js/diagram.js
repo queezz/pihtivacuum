@@ -38,6 +38,7 @@
      * practice section below for the whole of it. Declared up here with the
      * rest of this page's state because the press handler reads it. */
     let practiceOn = false;
+    let practiceWarningHold = false;
     let practicePresses = [];
     let practiceRecorded = null;
     let practiceMemory = null;
@@ -93,7 +94,7 @@
                 ? await fetch("/press-warnings", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({id, status, state: vacuumState})
+                    body: JSON.stringify({id, status, state: vacuumState, memory: practiceMemory})
                 })
                 : await fetch(
                     `/press-warnings?id=${encodeURIComponent(id)}&status=${encodeURIComponent(status)}`
@@ -112,7 +113,7 @@
      * newly expose, and the sentence says up front that it is read from the
      * valve positions — the confirm box is a modal of its own, and a reader
      * about to press something must know whether this is a measurement. It is
-     * not, and it stops nothing: a warning here is still only a confirm box. */
+     * not. A warned press stays in Practice until explicitly reviewed. */
     function warningText(warnings) {
         const sentences = [];
         const gauges = warnings.filter((item) => item.kind === "gauge");
@@ -122,12 +123,12 @@
             const what = states.has("air") && states.has("gas")
                 ? "gas and vent air"
                 : states.has("air") ? "vent air" : "gas";
-            sentences.push(`Warning, predicted from the valve positions: this would let ${what} reach the ${joinWords(
+            sentences.push(`Warning, predicted from the valve positions: ${what} reaches the ${joinWords(
                 gauges.map((item) => inSentence(displayName(item.id)))
-            )}, ${gauges.length > 1 ? "which are" : "which is"} switched on.`);
+            )}, ${gauges.length > 1 ? "which are" : "which is"} switched on. Switch it off before admitting gas or air.`);
         }
         if (turbos.length) {
-            sentences.push(`Warning, predicted from the valve positions: this would let vent air reach the ${joinWords(
+            sentences.push(`Warning, predicted from the valve positions: vent air reaches the ${joinWords(
                 turbos.map((item) => inSentence(displayName(item.id)))
             )}, ${turbos.length > 1 ? "which are" : "which is"} marked running.`);
         }
@@ -149,14 +150,25 @@
         isInteracting = true;
         try {
             const warnings = await pressWarnings(element.id, newStatus);
-            const notice = warnings === null
-                ? "This press could not be checked against the diagram just now."
-                : warningText(warnings);
-            const question = `Mark ${displayName(element.id)} ${newStatus}?`;
-            // A warning is a confirm: an element with no confirm box of its own
-            // still asks when there is something to say.
-            if ((notice || config.confirmToggle)
-                && !window.confirm(notice ? `${notice}\n\n${question}` : question)) return;
+            if (warnings === null) {
+                if (!practiceOn) await setPractice(true);
+                practiceWarningHold = true;
+                stopPracticeTimer();
+                window.alert("This press could not be checked. It will stay in Practice; review before operating hardware.");
+            } else if (warnings.length) {
+                const response = await fetch("/warning-attempt", {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({id: element.id, status: newStatus, state: vacuumState, memory: practiceMemory})
+                });
+                if (!response.ok) {
+                    if (response.status === 428) window.location.assign("/identify");
+                    else window.alert("The warning attempt could not be recorded. Please retry.");
+                    return;
+                }
+                if (!practiceOn) await setPractice(true);
+                practiceWarningHold = true;
+                stopPracticeTimer();
+            } else if (config.confirmToggle && !window.confirm(`Mark ${displayName(element.id)} ${newStatus}?`)) return;
             // Practising: the press changes the local copy and nothing else.
             // No state file, no history, no round trip but the one that asks
             // the same predictor what the copy now looks like.
@@ -176,7 +188,14 @@
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
                 applyState(vacuumState);
-                if (response.status === 428) window.location.assign("/identify");
+                if (result.requires_practice) {
+                    await setPractice(true);
+                    practiceWarningHold = true;
+                    practicePresses.push({id: element.id, status: newStatus});
+                    vacuumState = {...vacuumState, [element.id]: newStatus};
+                    await refreshPractice();
+                    renderPractice();
+                } else if (response.status === 428) window.location.assign("/identify");
                 else window.alert(result.error || "The diagram state could not be updated.");
                 return;
             }
@@ -830,9 +849,20 @@
         renderConnections(prediction.connections || {});
         const oilNotice = document.getElementById("oil-warning");
         if (oilNotice) {
-            const warnings = (prediction.warnings || []).filter((item) => item.kind === "oil");
+            const warnings = prediction.warnings || [];
             oilNotice.hidden = !warnings.length;
             oilNotice.textContent = warningText(warnings);
+        }
+        const affected = new Set((prediction.warnings || []).map((item) => item.id));
+        document.querySelectorAll("#diagram-container .equipment-warning").forEach((item) => {
+            if (!affected.has(item.id)) item.classList.remove("equipment-warning");
+        });
+        affected.forEach((id) => document.getElementById(id)?.classList.add("equipment-warning"));
+        const warningBanner = document.getElementById("warning-banner");
+        if (warningBanner) {
+            warningBanner.hidden = !affected.size;
+            warningBanner.textContent = warningText(prediction.warnings || [])
+                + (practiceOn ? " In Practice — use Undo to reverse the press before operating hardware." : " Check the diagram before operating hardware.");
         }
         // A guide step may be satisfied by the prediction rather than by a valve
         // position, so the steps are read again now that this prediction has
@@ -1402,7 +1432,7 @@
         // both: while practising it is the standing reminder that nothing is
         // recorded until Save, which is the sentence queezz asked to be taught.
         note.textContent = practiceOn
-            ? "Nothing is recorded until you press Save."
+            ? "State history waits for Save. Warning attempts are recorded separately."
             : "Presses are recorded in history as you make them.";
         const count = practicePresses.length;
         // The count rides on the button, so the thing you must press is also
@@ -1418,6 +1448,10 @@
     function renderPracticeCountdown() {
         const line = document.getElementById("practice-timer");
         if (!line) return;
+        if (practiceUnsaved() && practiceWarningHold) {
+            line.textContent = "Automatic saving paused; Undo or review and Save.";
+            return;
+        }
         if (!practiceUnsaved() || !practiceDeadline) {
             line.textContent = "";
             return;
@@ -1442,6 +1476,7 @@
      * appears until after the press lands — so the timer waits its turn rather
      * than saving a sequence somebody is still deciding about. */
     function startPracticeTimer() {
+        if (practiceWarningHold) { stopPracticeTimer(); return; }
         practiceDeadline = Date.now() + practiceAutosaveSeconds * 1000;
         if (practiceTick === null) {
             practiceTick = window.setInterval(() => {
@@ -1453,25 +1488,35 @@
         renderPracticeCountdown();
     }
 
-    async function savePractice(auto) {
+    async function savePractice(auto, acknowledgeWarnings = false) {
         if (!practicePresses.length || isInteracting) return;
+        if (auto && practiceWarningHold) return;
         const presses = practicePresses.slice();
         isInteracting = true;
         try {
             const response = await fetch("/practice/save", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({presses, auto: Boolean(auto)})
+                body: JSON.stringify({presses, auto: Boolean(auto), acknowledge_warnings: acknowledgeWarnings})
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
                 if (response.status === 428) window.location.assign("/identify");
-                else window.alert(result.error || "The practised sequence could not be recorded.");
+                else if (result.warnings?.length) {
+                    practiceWarningHold = true;
+                    stopPracticeTimer();
+                    renderPractice();
+                    if (!auto && window.confirm(warningText(result.warnings) + "\n\nRecord this reviewed sequence anyway? This records the diagram only.")) {
+                        isInteracting = false;
+                        await savePractice(false, true);
+                    }
+                } else window.alert(result.error || "The practised sequence could not be recorded.");
                 return;
             }
             // Recorded: the copy and the record are the same thing again, and
             // practice stays on with nothing waiting.
             practicePresses = [];
+            practiceWarningHold = false;
             practiceMemory = null;
             practiceRecorded = result.state || vacuumState;
             vacuumState = {...practiceRecorded};
@@ -1519,6 +1564,7 @@
             }
         }
         practiceOn = on;
+        practiceWarningHold = false;
         practicePresses = [];
         practiceMemory = null;
         stopPracticeTimer();

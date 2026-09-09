@@ -1040,3 +1040,10 @@ button.tiny {
    itself rather than pushing the guide card's own text out of its box. */
 
 .oil-warning { color: #ffd19a; border-left: 3px solid #e8a24b; padding-left: 10px; font-size: .85rem; line-height: 1.5; }
+
+/* Keep the affected equipment readable and clickable, including reduced motion. */
+@keyframes equipment-warning-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+#diagram-container .equipment-warning { animation: equipment-warning-pulse 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+    #diagram-container .equipment-warning { animation-duration: 3s; }
+}

@@ -1026,7 +1026,7 @@ def predict(
         "elements": elements,
         "air": air,
         "connections": connections,
-        "warnings": oil_warnings(plumbing, state, by_volume, sealed, memory),
+        "warnings": equipment_warnings(plumbing, state, by_volume, sealed, memory),
         "gas_symbols": _gas_symbols(volumes, connections, sealed),
         "line_mode": line_mode or "unknown",
         "linked_valve": linked_valve_status(plumbing, line_mode),
@@ -1190,6 +1190,25 @@ def oil_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memo
     return found
 
 
+def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict) -> list[dict]:
+    """Standing advisories, shared by the drawing and press comparisons."""
+    found = oil_warnings(plumbing, state, verdicts, sealed, memory)
+    for kind, items, wanted in [("gauge", plumbing.get("gauges", []), IONIZATION),
+                                ("turbo", plumbing.get("pumps", []), TURBO)]:
+        for item in items:
+            if item.get("kind") != wanted or not _is(state, item["id"], "active"):
+                continue
+            volume = item.get("volume")
+            verdict = verdicts.get(volume, ISOLATED)
+            if verdict == ISOLATED:
+                verdict = (sealed.get(volume) or {}).get("was", (memory.get(volume) or {}).get("state", ISOLATED))
+            level = _exposure(verdict) if kind == "gauge" else (2 if verdict == AIR else 0)
+            if level:
+                found.append({"kind": kind, "id": item["id"], "volume": volume,
+                              "state": verdict, "level": level})
+    return found
+
+
 def exposures(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     """What each switched-on ion gauge and running turbo is predicted to stand in.
 
@@ -1207,35 +1226,7 @@ def exposures(plumbing: dict, state: dict, line_mode: str | None = None) -> dict
     Keyed by kind and id, so two readings of the same rig can be compared.
     """
     prediction = predict(plumbing, state, line_mode)
-    verdicts = prediction["volumes"]
-    state = apply_line_mode_to_state(plumbing, state, line_mode)
-    found: dict[tuple[str, str], dict] = {}
-    for gauge in plumbing.get("gauges") or []:
-        if gauge.get("kind") != IONIZATION or not _is(state, gauge["id"], "active"):
-            continue
-        verdict = verdicts.get(gauge.get("volume"), ISOLATED)
-        found[("gauge", gauge["id"])] = {
-            "kind": "gauge",
-            "id": gauge["id"],
-            "volume": gauge.get("volume"),
-            "state": verdict,
-            "level": _exposure(verdict),
-        }
-    for pump in plumbing.get("pumps") or []:
-        if pump.get("kind") != TURBO or not _is(state, pump["id"], "active"):
-            continue
-        verdict = verdicts.get(pump.get("volume"), ISOLATED)
-        found[("turbo", pump["id"])] = {
-            "kind": "turbo",
-            "id": pump["id"],
-            "volume": pump.get("volume"),
-            "state": verdict,
-            # Gas through a spinning turbo is ordinary running; air is not.
-            "level": 2 if verdict == AIR else 0,
-        }
-    for item in prediction["warnings"]:
-        found[("oil", item["id"])] = item
-    return found
+    return {(item["kind"], item["id"]): item for item in prediction["warnings"]}
 
 
 def press_warnings(
