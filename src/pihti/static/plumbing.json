@@ -308,10 +308,10 @@
     "pumps": [
         {"id": "TMPU", "kind": "turbo", "volume": "plasma-turbo-line", "backed_by": "plasma-foreline", "stopped": "passage", "serves": "plasma-vessel", "parts": ["path1563", "path1565", "path1567", "path1567-9"]},
         {"id": "TMPD", "kind": "turbo", "volume": "qms-turbo-line", "backed_by": "qms-foreline", "stopped": "passage", "serves": "qms-vessel", "parts": ["path1563-6", "path1565-82", "path1567-3", "path1567-9-3"]},
-        {"id": "RoughU", "kind": "rough", "volume": "plasma-foreline", "parts": ["path1563-5", "path1565-8", "path1567-8"]},
+        {"id": "RoughU", "kind": "rough", "oil_sealed": true, "volume": "plasma-foreline", "parts": ["path1563-5", "path1565-8", "path1567-8"]},
         {"id": "RoughD", "kind": "rough", "volume": "qms-foreline", "parts": ["path1563-5-7", "path1565-8-3", "path9368"]},
-        {"id": "Rough-Bypass", "kind": "rough", "volume": "bypass-pumpline", "parts": ["path1563-5-72", "path1565-8-6", "path1567-8-0"]},
-        {"id": "gaspanel-pump", "kind": "rough", "volume": "gas-panel-pumpline", "parts": ["path1563-5-79", "path1565-8-5", "path1567-8-4"]}
+        {"id": "Rough-Bypass", "kind": "rough", "oil_sealed": true, "volume": "bypass-pumpline", "parts": ["path1563-5-72", "path1565-8-6", "path1567-8-0"]},
+        {"id": "gaspanel-pump", "kind": "rough", "oil_sealed": true, "volume": "gas-panel-pumpline", "parts": ["path1563-5-79", "path1565-8-5", "path1567-8-4"]}
     ],
     "gas_sources_note": "`symbol` is what the bottle wears on the drawing, and since 0.15.0 it is also drawn large inside any vessel the gas reaches (queezz, 2026-09-08: 'we can put a gas in a circle (same as the bottle sign) inside the plasma vessel. Ar, O2, H2. So it's visible big at a glance'). Several gases open at once draw several circles. Nothing is derived from the gas name: the symbol is written here beside it.",
     "gas_sources": [

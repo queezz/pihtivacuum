@@ -131,6 +131,10 @@
                 turbos.map((item) => inSentence(displayName(item.id)))
             )}, ${turbos.length > 1 ? "which are" : "which is"} marked running.`);
         }
+        const oil = warnings.filter((item) => item.kind === "oil");
+        if (oil.length) sentences.push(`Oil leak into pipes — risk: ${joinWords(
+            oil.map((item) => inSentence(displayName(item.id)))
+        )} stopped with vacuum at the inlet. Predicted from diagram state; check the pump and inlet isolation.`);
         return sentences.join("\n\n");
     }
 
@@ -824,6 +828,12 @@
         // straight through it. Under *Blank* the blank itself is said further
         // along, by the probe segment in the flange tone.
         renderConnections(prediction.connections || {});
+        const oilNotice = document.getElementById("oil-warning");
+        if (oilNotice) {
+            const warnings = (prediction.warnings || []).filter((item) => item.kind === "oil");
+            oilNotice.hidden = !warnings.length;
+            oilNotice.textContent = warningText(warnings);
+        }
         // A guide step may be satisfied by the prediction rather than by a valve
         // position, so the steps are read again now that this prediction has
         // landed — `applyState` renders them before it asks for one.
@@ -1051,6 +1061,8 @@
         const list = document.getElementById("vacuum-connections");
         if (!list) return;
         if (!Object.keys(connections).length) {
+            const oilNotice = document.getElementById("oil-warning");
+            if (oilNotice) { oilNotice.hidden = true; oilNotice.textContent = ""; }
             list.replaceChildren(emptyReadout());
             renderStateCompact(connections);
             scheduleFit();

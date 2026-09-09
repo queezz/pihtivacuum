@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.8"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.8"}
-    assert b"v0.20.8" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.9"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.9"}
+    assert b"v0.20.9" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -2257,6 +2257,7 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
         "gas_symbols",
         "line_mode",
         "linked_valve",
+        "warnings",
     }
     assert client.get("/predicted-vacuum", query_string={"at": "bad"}).status_code == 400
     identify(client)
@@ -3745,3 +3746,60 @@ def test_pump_with_an_alternative_wide_route_is_not_labelled_slow(client):
     direct = plumbing_map.predict(mapping, state, "membrane")["connections"]["plasma-vessel"]
     assert direct["slow_route_only"] is False
     assert "route_hint" not in direct["pumps"][0]
+
+
+@pytest.mark.parametrize("pump_id", ["RoughU", "Rough-Bypass", "gaspanel-pump"])
+def test_stopping_oil_rotary_warns_for_vacuum_held_at_its_inlet(client, pump_id):
+    mapping = client.get("/plumbing").json
+    state = {pump_id: "active"}
+    before = json.dumps(state)
+    warnings = plumbing_map.press_warnings(mapping, state, pump_id, "inactive", "membrane")
+    assert [w["id"] for w in warnings if w["kind"] == "oil"] == [pump_id]
+    assert warnings[0]["sealed"] is True
+    assert json.dumps(state) == before
+    now = datetime(2026, 9, 10)
+    memory = plumbing_map.update_memory(mapping, {}, plumbing_map.predict(mapping, state), now)
+    state[pump_id] = "inactive"
+    memory = plumbing_map.update_memory(mapping, memory, plumbing_map.predict(mapping, state, memory=memory), now)
+    state[plumbing_map.MEMORY_KEY] = memory
+    result = plumbing_map.predict(mapping, state, now=now)
+    assert [w["id"] for w in result["warnings"]] == [pump_id]
+    assert plumbing_map.press_warnings(mapping, state, pump_id, "active") == []
+    assert plumbing_map.predict(mapping, dict(state, **{pump_id: "active"}))["warnings"] == []
+
+
+def test_oil_warning_needs_vacuum_not_air_unknown_or_dry_scroll(client):
+    mapping = client.get("/plumbing").json
+    assert plumbing_map.predict(mapping, {})["warnings"] == []
+    assert plumbing_map.press_warnings(mapping, {"RoughD": "active"}, "RoughD", "inactive") == []
+    state = {"Rough-Bypass": "active", "bypass-pumpline-vent-valve": "active"}
+    assert plumbing_map.press_warnings(mapping, state, "Rough-Bypass", "inactive") == []
+    # Opening an inlet onto a turbo-pumped volume warns for the stopped rotary.
+    state = {"TMPU": "active", "GVU": "active", "GVBU": "active"}
+    warnings = plumbing_map.press_warnings(mapping, state, "bypass-l2", "active", "membrane")
+    assert [w["id"] for w in warnings if w["kind"] == "oil"] == ["Rough-Bypass"]
+    state["bypass-l2"] = "active"
+    assert plumbing_map.predict(mapping, state, "membrane")["warnings"][0]["sealed"] is False
+
+
+def test_first_stop_of_legacy_rotary_keeps_oil_warning_after_update(tmp_path):
+    (tmp_path / "elements_state.json").write_text(json.dumps({"Rough-Bypass": "active"}))
+    (tmp_path / "operators.json").write_text(json.dumps({"operators": ["operator"]}))
+    app = make_app(tmp_path)
+    client = app.test_client()
+    identify(client)
+    result = client.post("/update", json={"id": "Rough-Bypass", "status": "inactive"})
+    assert result.status_code == 200
+    assert [w["id"] for w in result.json["prediction"]["warnings"]] == ["Rough-Bypass"]
+    assert client.get("/predicted-vacuum").json["warnings"][0]["sealed"] is True
+
+
+
+def test_practice_first_stop_warns_before_sealed_timestamp_exists(client):
+    mapping = client.get("/plumbing").json
+    response = client.post("/practice/prediction", json={
+        "state": {"gaspanel-pump": "inactive"},
+        "memory": {"gas-panel-pumpline": {"state": "rough-vacuum", "since": None}},
+    })
+    assert response.status_code == 200
+    assert [w["id"] for w in response.json["prediction"]["warnings"]] == ["gaspanel-pump"]

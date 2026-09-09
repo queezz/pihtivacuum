@@ -1026,6 +1026,7 @@ def predict(
         "elements": elements,
         "air": air,
         "connections": connections,
+        "warnings": oil_warnings(plumbing, state, by_volume, sealed, memory),
         "gas_symbols": _gas_symbols(volumes, connections, sealed),
         "line_mode": line_mode or "unknown",
         "linked_valve": linked_valve_status(plumbing, line_mode),
@@ -1172,6 +1173,23 @@ def _exposure(verdict: str) -> int:
     return {GAS: 1, AIR: 2}.get(verdict, 0)
 
 
+def oil_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict) -> list[dict]:
+    """Owner advisory: stopped oil rotary with vacuum at its inlet, live or held."""
+    vacuum = {ROUGH, "upstream-high-vacuum", "downstream-high-vacuum"}
+    found = []
+    for pump in plumbing.get("pumps") or []:
+        if not pump.get("oil_sealed") or _is(state, pump["id"], "active"):
+            continue
+        volume = pump["volume"]
+        verdict = verdicts.get(volume, ISOLATED)
+        held = (sealed.get(volume) or {"was": (memory.get(volume) or {}).get("state")}) if verdict == ISOLATED else None
+        shown = held.get("was") if held else verdict
+        if shown in vacuum:
+            found.append({"kind": "oil", "id": pump["id"], "volume": volume,
+                          "state": shown, "sealed": bool(held), "level": 1})
+    return found
+
+
 def exposures(plumbing: dict, state: dict, line_mode: str | None = None) -> dict:
     """What each switched-on ion gauge and running turbo is predicted to stand in.
 
@@ -1188,7 +1206,8 @@ def exposures(plumbing: dict, state: dict, line_mode: str | None = None) -> dict
 
     Keyed by kind and id, so two readings of the same rig can be compared.
     """
-    verdicts = predict(plumbing, state, line_mode)["volumes"]
+    prediction = predict(plumbing, state, line_mode)
+    verdicts = prediction["volumes"]
     state = apply_line_mode_to_state(plumbing, state, line_mode)
     found: dict[tuple[str, str], dict] = {}
     for gauge in plumbing.get("gauges") or []:
@@ -1214,6 +1233,8 @@ def exposures(plumbing: dict, state: dict, line_mode: str | None = None) -> dict
             # Gas through a spinning turbo is ordinary running; air is not.
             "level": 2 if verdict == AIR else 0,
         }
+    for item in prediction["warnings"]:
+        found[("oil", item["id"])] = item
     return found
 
 
@@ -1243,6 +1264,12 @@ def press_warnings(
     before = exposures(plumbing, state, line_mode)
     after_state = dict(state)
     after_state[element_id] = status
+    # Simulate the normal memory transition without writing: stopping the only
+    # pump leaves vacuum held at its inlet, even when no prior memory exists.
+    now = datetime.now()
+    memory = update_memory(plumbing, read_memory(state), predict(plumbing, state, line_mode), now)
+    after_prediction = predict(plumbing, after_state, line_mode, memory=memory, now=now)
+    after_state[MEMORY_KEY] = update_memory(plumbing, memory, after_prediction, now)
     return [
         item
         for key, item in exposures(plumbing, after_state, line_mode).items()

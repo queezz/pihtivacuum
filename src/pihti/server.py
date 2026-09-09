@@ -963,6 +963,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         touch_operator()
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Preserve inlet vacuum even on the first press of a legacy state file.
+        remember_now()
         elements_state[element_id] = status
         # What each volume was last under is updated from the state this press
         # just made, and saved in the one file beside the valve positions.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.9
+
+- Warn of oil leaking into pipes when an oil rotary is stopped with
+  predicted or remembered vacuum at its inlet. Exclude the dry scroll.
+- Keep the advisory visible when the state card is collapsed; show it
+  before a risky press, during Practice and in historical replay.
+- Preserve inlet vacuum on the first stop from an older state file.
+
 ## 0.20.8
 
 - Qualify pumping that can reach a vessel only through the long quarter-inch

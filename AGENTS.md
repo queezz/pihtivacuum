@@ -197,6 +197,17 @@ When all reachable pumps are so limited, the expanded and compact vessel
 readouts say "slow route". This does not change state colours, connectivity,
 guides or predicted mixtures and estimates neither pressure nor pumping time.
 
+## Stopped oil rotary warning (owner, 2026-09-10; 0.20.9)
+
+`oil_sealed` explicitly marks the plasma backing rotary, bypass rotary and gas
+panel rotary in the map; the downstream dry scroll is excluded. A stopped oil
+rotary with predicted or remembered rough/high vacuum at its own inlet carries
+an oil-leak-into-pipes risk warning. A closed upstream valve does not clear
+vacuum held between it and the stopped pump. Running, vented or unknown inlets
+do not trigger this warning. It is advisory, not evidence of oil movement.
+The warning persists outside the state card's collapse and appears before a
+press newly creates the condition, including in Practice; History replays it.
+
 ## Web UI invariants
 
 - Every page uses the one `.page` grid: left rail for controls, main column for content, right rail for context. Rail widths and the sticky offset (`--bar` + `--content-gap`) are shared, so rails stand at the same address on every tab and never move on scroll.

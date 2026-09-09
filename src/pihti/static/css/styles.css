@@ -1038,3 +1038,5 @@ button.tiny {
 
 /* The warning names every volume it found; on a short rail it scrolls inside
    itself rather than pushing the guide card's own text out of its box. */
+
+.oil-warning { color: #ffd19a; border-left: 3px solid #e8a24b; padding-left: 10px; font-size: .85rem; line-height: 1.5; }
