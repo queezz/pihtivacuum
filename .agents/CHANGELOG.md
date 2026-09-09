@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.4
+
+- Paint the nitrogen source handle using the shared valve logic: open fill
+  and edge follow the manifold prediction; closed uses the theme's closed
+  valve inks. Bottle colours and gas connectivity remain unchanged.
+
 ## 0.20.3
 
 - Adopt the updated drawing with thicker pipes, rounded corners, a curved

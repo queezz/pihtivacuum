@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.3"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.3"}
-    assert b"v0.20.3" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.4"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.4"}
+    assert b"v0.20.4" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -3616,3 +3616,25 @@ def test_the_page_teaches_saving_and_says_it_is_practising(client):
     css = diagram_styles()
     assert ".practice-save {" in css
     assert ".practice-banner {" in css
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("opened", [False, True])
+@pytest.mark.parametrize("vented", [False, True])
+def test_nitrogen_source_handle_uses_shared_valve_paint(client, theme, opened, vented):
+    mapping = plumbing_map.themed_map(client.get("/plumbing").json, theme)
+    state = {"gaspanel-valve-n": "active" if opened else "inactive"}
+    if vented:
+        state["gaspanel-valve-vent"] = "active"
+    prediction = plumbing_map.predict(mapping, state, "membrane")
+    valve = prediction["elements"]["gaspanel-valve-n"]
+    assert valve["valve"] and valve["open"] is opened
+    if opened:
+        pipe = prediction["elements"]["gaspanel-manifold"]
+        assert valve["fill"] == valve["stroke"] == pipe["stroke"]
+    else:
+        assert valve["fill"] == mapping["drawing"]["valve_closed"]
+        assert valve["stroke"] == mapping["drawing"]["valve_closed_edge"]
+    assert "gaspanel-valve-n" not in mapping["dark_theme"]["surfaces"]
+    rendered = plumbing_map.style_rules(mapping, state, "membrane")
+    assert f'#gaspanel-valve-n{{stroke:{valve["stroke"]} !important;fill:{valve["fill"]} !important}}' in rendered

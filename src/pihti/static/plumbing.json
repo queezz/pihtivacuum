@@ -16,8 +16,7 @@
             "isolated": "#777f89"
         },
         "surfaces": {
-            "rect11": {"fill": "#32352c", "stroke": "#666b5d"},
-            "gaspanel-valve-n": {"stroke": "#aebfce"}
+            "rect11": {"fill": "#32352c", "stroke": "#666b5d"}
         }
     },
     "drawing": {
@@ -315,7 +314,7 @@
         {"id": "oxygen-bottle", "volume": "oxygen-line", "gas": "oxygen", "symbol": "O2"},
         {"id": "argon-bottle", "volume": "argon-line", "gas": "argon", "symbol": "Ar"},
         {"id": "helium-bottle", "volume": "argon-line", "gas": "helium", "symbol": "He"},
-        {"id": "gaspanel-valve-n", "volume": "gas-panel-manifold", "gas": "nitrogen", "symbol": "N2"}
+        {"id": "gaspanel-valve-n", "valve": true, "volume": "gas-panel-manifold", "gas": "nitrogen", "symbol": "N2"}
     ],
     "line_configuration": {
         "note": "What sits in the narrow pipe between the two vessels, from the Line configuration annotation an operator sets on the Vacuum page. Only 'Pipe open' is a connection: with a membrane installed, something is mounted across the whole pipe and each valve on it opens onto its own private side of the barrier, so the two vessels are separate spaces (owner review 2026-09-08). Boron deposition uses the same pipe, but its far (downstream) end is not joined at all: queezz, 2026-09-08 (letter 20260907-dc825e44-e6d89e) -- 'Boron uses same pipe. But other end not connected to downstream. Could be pumped from plasma side via bypass.' -- so `dead_end_valve` names the downstream valve that never reaches this pipe in that mode, whatever position it is in; the pipe then simply takes the plasma side's own predicted state (or isolated, if even that side is shut), and it can still be pumped from the plasma side through the bypass manifold because that reach never ran through this pipe's far end. Until an operator has recorded which configuration applies, the prediction does not claim a connection nobody has told it about. `linked_valve` names the drawn valve this whole annotation also governs directly (owner decision 2026-09-08, same letter: 'Membrane installed and the membrane valve should be linked') -- it has no press of its own any more, closed only under `closed_mode` and open under every other configuration, so its own colour and what it does to the diagram's connectivity can never disagree. **Amended 2026-09-09** (owner correction, letter 20260908-5d638879-1b617e): `closed_modes` now names Boron deposition too. queezz, on 0.17.x with Boron selected and both vessels drawn joined: 'Boron deposition, the pipe to the bypass cross (probe cross) is not connected then.' The sample holder sits at the same physical spot a membrane, a blank flange or a probe would, so it blocks `Membrane` exactly as they do -- `probe-line` (the drawn `probe-pipe`, its cross, and `probe-pipe-cross-to-GVBD`) can then only ever reach `bypass-manifold` through the real `bypass-l1` valve, and belongs to the bypass side rather than to the plasma vessel. This is the *same* edge set doing the work, not a second special case: one more mode added to a list a valve already reads. The vessel-crossover's own `dead_end_valve` is untouched -- it is a separate physical pipe from `probe-line`, dead-ended at its own far end, and the two vessels still join only through the real bypass gate valves (`GVBU`, `bypass-l1`, `GVBD`) when an operator actually opens them, never through the crossover.",

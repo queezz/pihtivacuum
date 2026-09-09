@@ -864,7 +864,15 @@ def predict(
     drawing = plumbing.get("drawing") or {}
     closed_ink = drawing.get("valve_closed") or "#ffffff"
     closed_edge = drawing.get("valve_closed_edge") or "#000000"
-    for valve in plumbing.get("valves") or []:
+    # A source drawn as a valve uses the same painter, without adding a
+    # connection to another volume. Bottle symbols keep their own palette.
+    drawn_valves = list(plumbing.get("valves") or [])
+    drawn_valves.extend(
+        dict(source, joins=[source["volume"]])
+        for source in plumbing.get("gas_sources") or []
+        if source.get("valve")
+    )
+    for valve in drawn_valves:
         joins = list(valve.get("joins") or ())
         if _is(state, valve["id"], valve.get("open_when", "active")):
             # Both sides of an open valve are one space by construction, so
