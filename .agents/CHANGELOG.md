@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.23.2
+
+- Restore the oil reminder above the live drawing in amber, while retaining
+  ordinary recording without automatic Practice or pulsing.
+
 ## 0.23.1
 
 - Move MFC reminders to cutoff-opening confirmations; no idle banner or pulse.

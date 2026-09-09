@@ -347,3 +347,10 @@ History, without pulse; venting clears it. Neither advisory forces Practice,
 holds autosave, requires special save review or enters the mistake audit.
 Urgent active-ion-gauge/running-turbo exposures retain their previous behavior,
 including when they coincide with an advisory. Explicit Practice still works.
+
+## Amber advisory placement (owner correction 2026-09-10; 0.23.2)
+
+The oil reminder belongs above the live drawing in amber: owner says 'Top and
+amber, yes. Just no practice confusion.' This replaces only the muted/below
+live placement in 0.23.1. Advisory semantics remain: no automatic Practice,
+pulse, timer hold or mistake audit. MFC cutoff-opening reminders are unchanged.
