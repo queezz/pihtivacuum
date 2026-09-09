@@ -162,12 +162,15 @@
             "group": "pipes-bypass-manifold",
             "junctions": [
                 "bypass-manifold-t-downstream-t",
+                "bypass-manifold-t-downstream-t-abs",
                 "bypass-manifold-t-upstream"
             ],
             "elements": [
                 "bypass-manifold-downstream-line",
+                "bypass-manifold-downstream-line-two-t",
                 "bypass-manifold-main",
                 "bypass-manifold-t-downstream-t",
+                "bypass-manifold-t-downstream-t-abs",
                 "bypass-manifold-t-upstream",
                 "bypass-manifold-upstream-gv",
                 "bypass-manifold-upstream-t-to-pipe"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.3
+
+- Adopt the updated drawing with thicker pipes, rounded corners, a curved
+  crossover and the bypass absolute-gauge tee. Preserve the authored groups
+  and drawing order.
+- Colour the new tee and its connecting pipe with the bypass prediction on
+  Vacuum, History and exported state SVGs.
+
 ## 0.20.2
 
 - Add a remembered Dark diagram option on Vacuum and History, with a lifted

@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.20.2"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.20.2"}
-    assert b"v0.20.2" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.20.3"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.20.3"}
+    assert b"v0.20.3" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -1647,8 +1647,8 @@ def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):
     queezz, 2026-09-08: "main vessels shape fill is a bit too quiet. We can go
     very loud, why not? Color it the color of the vacuum I say. Or gas. Or
     air." — which supersedes the light tint of 0.11.2. And, the same morning:
-    "the Ts and Cross in the bypass don't get colored, stay white. Bad." Those
-    three are the drawing's only opaque white junction shapes, so no white tee
+    "the Ts and Cross in the bypass don't get colored, stay white. Bad." These
+    are the drawing's opaque white junction shapes, so no white tee
     or cross can survive in any state. Every other element the map names is a
     line and keeps its authored fill.
     """
@@ -1671,6 +1671,7 @@ def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):
         "plasma-vacuum",
         "qms-vacuum",
         "bypass-manifold-t-downstream-t",
+        "bypass-manifold-t-downstream-t-abs",
         "bypass-manifold-t-upstream",
         "probe-pipe-cross",
     }
@@ -1695,6 +1696,8 @@ def test_every_body_on_the_drawing_is_filled_with_its_full_state_colour(client):
     assert prediction["elements"]["plasma-vacuum"]["fill"] == upstream
     assert prediction["elements"]["qms-vacuum"]["fill"] == colours["isolated"]
     assert prediction["elements"]["bypass-manifold-t-upstream"]["fill"] == upstream
+    assert prediction["elements"]["bypass-manifold-t-downstream-t-abs"]["fill"] == upstream
+    assert prediction["elements"]["bypass-manifold-downstream-line-two-t"]["stroke"] == upstream
     assert prediction["elements"]["probe-pipe-cross"]["fill"] == colours["isolated"]
     # A body says its state with its body, edge and all. queezz, 2026-09-08:
     # "I think I'd like it without black shape borders. All one color. Why not?
@@ -2052,7 +2055,7 @@ def test_a_saved_render_really_carries_the_prediction(client):
     widths = plumbing_map.authored_stroke_widths(
         (PROJECT_ROOT / "src" / "pihti" / "static" / "diagram.svg").read_text(encoding="utf-8")
     )
-    assert widths["upstream-tmp-to-rotary-pipe"] == pytest.approx(3.77953)
+    assert widths["upstream-tmp-to-rotary-pipe"] == pytest.approx(8)
     banded = round(widths["upstream-tmp-to-rotary-pipe"] * plumbing["drawing"]["band"], 3)
     # The widening is off on both sides by default now, so the saved render is
     # his own widths — and `?wide=1` matches a browser with the switch on.

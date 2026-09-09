@@ -23,9 +23,9 @@
    inkscape:pagecheckerboard="0"
    inkscape:deskcolor="#d1d1d1"
    showgrid="false"
-   inkscape:zoom="2.8191075"
-   inkscape:cx="428.50442"
-   inkscape:cy="241.03374"
+   inkscape:zoom="2.2418683"
+   inkscape:cx="311.34746"
+   inkscape:cy="307.55598"
    inkscape:window-width="3840"
    inkscape:window-height="2054"
    inkscape:window-x="-11"
@@ -51,27 +51,35 @@
    id="pipes-bypass-manifold"
    inkscape:label="bypass-manifold">
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
    d="m 488.45101,188.70585 75.69701,0.0886"
    id="bypass-manifold-downstream-line"
+   sodipodi:nodetypes="cc" /><path
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
+   d="m 526.38811,113.05314 -0.0886,75.69701"
+   id="bypass-manifold-downstream-line-two-t"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
-   d="m 346.13776,121.94012 h 180 v 63"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1;stroke-linejoin:round"
+   d="M 346.13776,121.94012 H 441.2 V 70.5 h 84.341 v 13.972891"
    id="bypass-manifold-main"
-   sodipodi:nodetypes="ccc" />
+   sodipodi:nodetypes="ccccc" />
     <path
    style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
    d="m 499.4451,200.62628 h 53.12366 v -20 h -17.9776 v -20 h -17.04479 v 20 H 499.4451 Z"
    id="bypass-manifold-t-downstream-t"
+   sodipodi:nodetypes="ccccccccc" /><path
+   style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   d="m 515.5407,84.472891 v 53.123659 h 20 v -17.9776 h 20 v -17.04479 h -20 V 84.472891 Z"
+   id="bypass-manifold-t-downstream-t-abs"
    sodipodi:nodetypes="ccccccccc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="m 315.13776,147.94486 v 31.99526"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
+   d="m 315.13776,147.94486 v 27.99526"
    id="bypass-manifold-upstream-gv"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:6;stroke-dasharray:none;stroke-opacity:1"
    d="m 315.56427,70 v 41.99526"
    id="bypass-manifold-upstream-t-to-pipe"
    sodipodi:nodetypes="cc" />
@@ -85,12 +93,12 @@
    id="pipes-bypass-pumpline"
    inkscape:label="bypass-pumpline">
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
-   d="m 452.13776,482.94012 v -294 h 23"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1;stroke-linejoin:round"
+   d="m 452.13776,482.94012 v -294 h 19"
    id="bypass-pumpline"
    sodipodi:nodetypes="ccc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:6;stroke-opacity:1;stroke-dasharray:none"
    d="M 473.32388,444.6928 H 452.57187"
    id="bypass-pumpline-vent"
    sodipodi:nodetypes="cc" />
@@ -99,16 +107,16 @@
    id="pipes-crossover"
    inkscape:label="vessel-crossover">
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="m 362.07397,401.7194 h 29.18356 l -1.11977,191.22072 h 144 l 2,-190 h 22"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-dasharray:none;stroke-opacity:1"
+   d="m 374.07397,401.7194 c 0,0 6.2528,-0.31373 17.18356,0 53.0668,1.52308 -33.1458,125.73132 1.39502,168.03811 34.54082,42.30679 97.38566,39.75239 130.02609,-0.0448 32.64043,-39.79721 -33.11127,-161.0203 13.45912,-166.77256 7.85351,-0.97005 18,0 18,0"
    id="upstream-to-downstream-narrow-pipe"
-   sodipodi:nodetypes="cccccc" />
+   sodipodi:nodetypes="cszzsc" />
   </g>
   <g
    id="pipes-downstream-pumpline"
    inkscape:label="qms-foreline">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-opacity:1;stroke-dasharray:none"
    d="m 667.16016,557.29767 h 62"
    id="downstream-tmp-to-scroll-pipe"
    sodipodi:nodetypes="cc" />
@@ -117,17 +125,17 @@
    id="pipes-gasline-argon"
    inkscape:label="argon-line">
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
    d="M 96.765962,335.29788 C 96.853901,286.23207 96.33909,186.0869 96.00793,142.42234"
    id="gasline-argon"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="m 96.758135,335.14903 v 71.28544"
    id="gasline-argon-1"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-linejoin:round"
    d="M 95.418782,167.98586 72.697725,167.78779 V 31.985866 H 710.93706 V 189.79392 h -28.00613"
    id="gasline-argon-to-downstream"
    sodipodi:nodetypes="cccccc" />
@@ -136,12 +144,12 @@
    id="pipes-gasline-hydrogen"
    inkscape:label="hydrogen-line">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="m 210.35431,333.45057 v 69.06635"
    id="gasline-hydrogen-1"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
    d="m 210.37053,334.69155 c 1.12241,-31.05812 -27.83381,-14.92453 -39.07793,-31.51185 -6.28405,-9.27023 -2.79304,-56.29218 -2.79224,-89.74303"
    id="gasline-hydrogen"
    sodipodi:nodetypes="csc" />
@@ -155,23 +163,23 @@
    id="pipes-gasline-manifold"
    inkscape:label="gas-manifold">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
-   d="M 95.992282,75.373664 V 135.09727"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   d="M 114.2806,74.894 H 95.992282 v 60.20327"
    id="gasline-manifold-argon"
-   sodipodi:nodetypes="cc" />
+   sodipodi:nodetypes="ccc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="M 168.50392,74.365601 V 136.08921"
    id="gasline-manifold-hydrogen"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="m 128.2566,74.24194 v 61.72361"
    id="gasline-manifold-oxygen"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
-   d="m 199.56522,243.66989 c -0.15723,-35.86828 -0.32801,-105.81322 -0.2668,-168.775527 H 95.00471"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   d="M 199.56522,243.66989 C 199.40799,207.80161 199.23721,137.85631 199.29842,74.894 H 99.00471"
    id="gasline-manifold"
    sodipodi:nodetypes="ccc" />
   </g>
@@ -179,12 +187,12 @@
    id="pipes-gasline-oxygen"
    inkscape:label="oxygen-line">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="m 153.12857,335.38836 v 69.72361"
    id="gasline-oxygen-1"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
    d="m 153.14231,335.47355 c 0.70591,-71.62207 -29.08773,-57.06964 -24.90197,-126.40298"
    id="gasline-oxygen"
    sodipodi:nodetypes="cc" />
@@ -198,28 +206,28 @@
    id="pipes-gaspanel-manifold"
    inkscape:label="gas-panel-manifold">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="m 96.645278,413 v 27.28544"
    id="gaspanel-manifold-argon"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="m 210.91155,412.25588 v 27.28544"
    id="gaspanel-manifold-hydrogen"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
    d="m 153,440.28544 0.087,26.30905"
    id="gaspanel-manifold-pump"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3;stroke-dasharray:none;stroke-opacity:1"
    d="m 153,413 v 27.28544"
    id="gaspanel-manifold-oxygen"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
-   d="M 34.031237,439.64928 255.36007,439.50321"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   d="M 34.031237,439.64928 249.36007,439.50321"
    id="gaspanel-manifold"
    sodipodi:nodetypes="cc" />
   </g>
@@ -227,13 +235,13 @@
    id="pipes-gaspanel-pumpline"
    inkscape:label="gas-panel-pumpline">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
-   d="m 94.693596,499.17378 v 20.40507"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   d="m 94.693596,499.17378 v 14.40507"
    id="gasline-pumping-to-vent"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
-   d="m 153.05309,479.71418 v 19.88315 H 69.551633"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   d="m 153.05309,483.71418 v 15.88315 H 69.551633"
    id="gasline-pumping"
    sodipodi:nodetypes="ccc" />
   </g>
@@ -241,7 +249,7 @@
    id="pipes-plasma-turbo-line"
    inkscape:label="plasma-turbo-line">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:14;stroke-opacity:1;stroke-dasharray:none"
    d="m 316.13776,463.8077 v 62.13242"
    id="plasma-vacuum-gv-to-tmp-pipe"
    sodipodi:nodetypes="cc" />
@@ -250,27 +258,27 @@
    id="pipes-plasma-vacuum"
    inkscape:label="plasma-vessel">
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3;stroke-dasharray:none;stroke-opacity:1;stroke-linejoin:round"
    d="m 221.13776,297.44 c -21.57276,0 0,0 -21.57276,0 2.2e-4,-28.77011 0,0 0,-28.77011"
    id="plasma-vacuum-gas-manifold"
    sodipodi:nodetypes="ccc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="M 314.77657,176.04904 V 208.0443"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
+   d="M 314.77657,186.04904 V 208.0443"
    id="plasma-vacuum-gate-port"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:6;stroke-opacity:1;stroke-dasharray:none;stroke-linejoin:round"
    d="M 422.88977,170.94936 422.978,299.995 h -21.36768"
    id="plasma-vacuum-gauge-manifold"
    sodipodi:nodetypes="ccc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-opacity:1;stroke-dasharray:none"
    d="m 316.13872,401.73173 h 47.18356"
    id="plasma-vacuum-pump-manifold"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-opacity:1;stroke-dasharray:none"
    d="m 316.13776,387.94012 v 30"
    id="plasma-vacuum-pump-port" />
   </g>
@@ -278,15 +286,15 @@
    id="pipes-probe"
    inkscape:label="probe-line">
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
    d="m 629.82195,204.17375 v 43.37656"
    id="probe-pipe-cross-to-GVBD" /><path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1;stroke-linejoin:round"
    d="M 315.5709,70.844151 V 49.7496 h 314.5475 v 138.24097"
    id="probe-pipe"
    sodipodi:nodetypes="cccc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
    d="m 586.45829,188.77789 91.69701,0.0886"
    id="probe-pipe-cross-line"
    sodipodi:nodetypes="cc" />
@@ -300,7 +308,7 @@
    id="pipes-qms-sensor"
    inkscape:label="qms-sensor-line">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-opacity:1;stroke-dasharray:none"
    d="m 771.13776,277.94012 v 30"
    id="qms-sensor-pipe" />
   </g>
@@ -308,7 +316,7 @@
    id="pipes-qms-turbo-line"
    inkscape:label="qms-turbo-line">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:14;stroke-opacity:1;stroke-dasharray:none"
    d="m 626.67087,462.07673 v 61.5482"
    id="qms-vacuum-gv-to-tmp-pipe"
    sodipodi:nodetypes="cc" />
@@ -317,39 +325,40 @@
    id="pipes-qms-vacuum"
    inkscape:label="qms-vessel">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="m 658.13776,338.94012 h 113"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
+   d="m 658.13776,338.94012 105,-1.2e-4"
    id="qms-vacuum-gauges-port"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="m 771.06473,325.41822 v 13.64271 l -23.95326,-0.18987"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   d="M 771.06473,325.41822 V 338.94 h -23.95326"
    id="qms-vacuum-gauges-port-1"
    sodipodi:nodetypes="ccc" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:6;stroke-dasharray:none;stroke-opacity:1"
    d="m 558.97386,402.53633 67.69701,0.0886"
    id="qms-vacuum-pumping-bypass-port"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-opacity:1;stroke-dasharray:none"
    d="m 626.67087,385.62493 v 30"
    id="qms-vacuum-pumping-port" />
     <path
-   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
-   d="m 630.77389,251.76043 v 43.37656"
-   id="qms-vacuum-upstream-port" />
+   style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+   d="m 630.77389,261.76043 v 33.37656"
+   id="qms-vacuum-upstream-port"
+   sodipodi:nodetypes="cc" />
   </g>
   <g
    id="pipes-upstream-pumpline"
    inkscape:label="plasma-foreline">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="m 236.13776,532.94012 v 28"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
+   d="m 236.13776,538.94012 v 22"
    id="upstream-tmp-to-rotary-pipe-vent"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-opacity:1;stroke-dasharray:none"
    d="m 214.13776,560.94012 h 62"
    id="upstream-tmp-to-rotary-pipe"
    sodipodi:nodetypes="cc" />
@@ -358,28 +367,28 @@
    id="pipes-vent-air"
    inkscape:label="atmosphere">
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="M 498.75201,443.88977 H 478"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:6;stroke-dasharray:none;stroke-opacity:1"
+   d="M 498.75201,443.88977 H 484"
    id="bypass-pumpline-vent-air-side"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="m 707.91722,507.62493 v 26"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
+   d="m 707.91722,507.62493 v 18"
    id="downstream-tmp-to-scroll-pipe-vent-air-side"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
-   d="m 94.620457,517 v 20.40507"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   d="m 94.620457,521 v 16.40507"
    id="gasline-pumping-air-vent"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
-   d="m 254.50094,439.57553 23.32883,-0.14607"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-dasharray:none;stroke-opacity:1"
+   d="m 260.50094,439.57553 17.32883,-0.14607"
    id="gaspanel-air-vent"
    sodipodi:nodetypes="cc" />
     <path
-   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-   d="m 235.88977,508 v 26"
+   style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-opacity:1;stroke-dasharray:none"
+   d="m 235.88977,508 v 20"
    id="upstream-tmp-to-rotary-pipe-vent-air-side"
    sodipodi:nodetypes="cc" />
   </g><path
@@ -493,8 +502,8 @@
      class="non-clickable" /></g><g
    id="g3676"
    transform="translate(207.38411,95.940123)"><path
-     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
-     d="m 500.53311,434.68481 v 28"
+     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:8;stroke-dasharray:none;stroke-opacity:1"
+     d="m 500.53311,440.68481 v 22"
      id="downstream-tmp-to-scroll-pipe-to-vent"
      sodipodi:nodetypes="cc" /><path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:1.88977;stroke-linejoin:round;stroke-opacity:1"
@@ -614,7 +623,7 @@
    sodipodi:nodetypes="ccccc" /><g
    id="g5"
    transform="translate(23.823685,95.801471)"><path
-     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-opacity:1;stroke-dasharray:none"
      d="m 175.112,274.24228 h 12.34275"
      id="path1464-1-3-1-5"
      sodipodi:nodetypes="cc" /><circle
@@ -637,7 +646,7 @@
        class="non-clickable" /></g></g><g
    id="g5-2"
    transform="translate(-90.44589,96.967527)"><path
-     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-opacity:1;stroke-dasharray:none"
      d="m 175.112,274.24228 h 13"
      id="path1464-1-3-1-5-7"
      sodipodi:nodetypes="cc"
@@ -665,7 +674,7 @@
    r="17.350624" /><g
    id="g5-5"
    transform="translate(-35.985328,97.775706)"><path
-     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+     style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-opacity:1;stroke-dasharray:none"
      d="m 175.112,274.24228 h 13"
      id="path-123"
      sodipodi:nodetypes="cc" /><circle
@@ -734,7 +743,7 @@
    sodipodi:nodetypes="ccccc"
    class="clickable" /><g
    id="g7"
-   transform="translate(-28)"><path
+   transform="rotate(90,506.87731,172.60351)"><path
      style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
      d="M 445.02137,92.795774 V 121.94012"
      id="path1464-1-2-8-9"
@@ -846,7 +855,7 @@
    id="g996"><g
      id="g5-2-1"
      transform="translate(-91.20917,44.404026)"><path
-       style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:3.77953;stroke-opacity:1"
+       style="fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-opacity:1;stroke-dasharray:none"
        d="m 175.112,274.24228 h 13"
        id="path1464-1-3-1-5-7-47"
        sodipodi:nodetypes="cc"
