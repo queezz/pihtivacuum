@@ -1354,18 +1354,23 @@
         list.classList.add("guide-steps--scrolls");
     }
 
+    let predictionRequest = 0;
     async function refreshPrediction(moment) {
-        if (!plumbing || predictionPending) return;
+        if (!plumbing || (predictionPending && !window.historyMode)) return;
         if (window.historyMode && !moment) return;
+        const request = ++predictionRequest;
         predictionPending = true;
         try {
             const query = moment ? `?at=${encodeURIComponent(moment)}` : "";
             const response = await fetch(`/predicted-vacuum${query}`);
-            if (response.ok) paintPrediction(await response.json());
+            if (response.ok) {
+                const result = await response.json();
+                if (request === predictionRequest) paintPrediction(result);
+            }
         } catch (error) {
             console.error("Predicted vacuum state could not be read", error);
         } finally {
-            predictionPending = false;
+            if (request === predictionRequest) predictionPending = false;
         }
     }
 

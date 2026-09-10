@@ -354,3 +354,15 @@ The oil reminder belongs above the live drawing in amber: owner says 'Top and
 amber, yes. Just no practice confusion.' This replaces only the muted/below
 live placement in 0.23.1. Advisory semantics remain: no automatic Practice,
 pulse, timer hold or mistake audit. MFC cutoff-opening reminders are unchanged.
+
+## History landing and rail room (owner, 2026-09-10; 0.23.3)
+
+History restores the exact last selected timestamp in this browser, falling
+back to the latest recorded event if that timestamp is absent. Explicit moment
+or day URLs take priority. A day selects its final recorded event; a day without
+changes carries the preceding recorded state and labels its actual timestamp.
+Before the first event, an empty log, and a failed load show their distinct
+status rather than an unpainted diagram posing as history. The timeline card
+has natural height; its containing rail is the only scroll surface, on desktop
+and in the drawer. Shared rail widths adapt from 17rem to 20rem as width allows.
+Run both tests/history-groups.test.cjs and tests/history-selection.test.cjs.

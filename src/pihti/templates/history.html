@@ -17,10 +17,11 @@
             <div id="calendar-grid" class="cal-grid" role="group" aria-label="Days with diagram changes"></div>
             <button type="button" id="calendar-latest" style="margin-top: 8px; width: 100%;">Latest change</button>
         </section>
-        <section class="rail-card rail-card--growing">
+        <section class="rail-card">
             <h2 class="rail-label" id="timeline-label">Timeline</h2>
             <p class="muted tl-help">Changes by the same operator within a minute are grouped. Expand to inspect each change.</p>
-            <div class="scrolls">
+            <input id="history-find" type="search" aria-label="Find in this day's timeline" placeholder="Find a change…">
+            <div>
                 <div id="history-events" class="timeline" role="group" aria-label="Diagram changes on the selected day"></div>
                 <p id="history-no-events" class="muted" hidden>No diagram changes on this day.</p>
             </div>
@@ -32,8 +33,9 @@
             <button type="button" data-drawer="history-controls" aria-controls="history-controls" aria-expanded="false">Calendar &amp; timeline</button>
             <button type="button" data-drawer="history-context" aria-controls="history-context" aria-expanded="false">Selected moment</button>
         </div>
-        <div id="diagram-container" aria-label="Diagram state at the selected moment"></div>
-        <section class="diagram-legend" aria-label="What the drawing predicts">
+        <p id="history-status" class="muted" role="status">Loading recorded history…</p>
+        <div id="diagram-container" aria-label="Diagram state at the selected moment" hidden></div>
+        <section class="diagram-legend" aria-label="What the drawing predicts" hidden>
             <h2 class="rail-label">Predicted state</h2>
             <p class="rail-lead">Predicted from the valve positions at the selected moment, not measured.</p>
             <p id="oil-warning" class="oil-warning" role="status" hidden></p>
@@ -53,7 +55,7 @@
         <button class="drawer-close" type="button">Close</button>
         <section class="rail-card">
             <h2 class="rail-label">Selected moment</h2>
-            <p id="moment-empty" class="muted">The diagram shows its current state. Choose a moment in the timeline to replay it.</p>
+            <p id="moment-empty" class="muted">Loading recorded history…</p>
             <dl id="moment-facts" class="facts" hidden>
                 <dt>Time</dt><dd><a id="moment-link" href="#"></a></dd>
                 <dt>Element</dt><dd id="moment-element"></dd>

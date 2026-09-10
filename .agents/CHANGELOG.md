@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.23.3
+
+- Give rails more width as the window allows; History scrolls at the rail edge
+  instead of inside the timeline card, with a local Find for longer days.
+- Open History on the last selected moment, or the latest change on a first
+  visit. Selecting a day shows its final recorded state, carrying the last
+  known state across days without changes. Explicit moment links take priority.
+- Distinguish empty history from a failed load and ignore outdated prediction
+  responses when rapidly selecting different moments.
+
 ## 0.23.2
 
 - Restore the oil reminder above the live drawing in amber, while retaining

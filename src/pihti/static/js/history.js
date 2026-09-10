@@ -28,9 +28,12 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
     let dailyCounts = {};
     let selectedIdx = null;
     let selectedDate = null;
+    let unavailableMoment = null;
     let currentMonth = null;
     let pendingState = null;
     let diagramReady = false;
+    let loadFailed = false;
+    const SELECTION_KEY = "pihti-history-moment";
     /* Component names arrive with the diagram's own element configuration,
      * which diagram.js fetches. Until it reports ready, nothing here can tell
      * a named component from one the diagram no longer carries, so the rows
@@ -112,8 +115,8 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         const day = (params.get("day") || "").trim();
         if (at) {
             const idx = indexAtOrBefore(at);
-            if (idx !== null) return {idx, date: dateOf(events[idx].ts)};
-            if (/^\d{4}-\d{2}-\d{2}/.test(at)) return {idx: null, date: at.slice(0, 10)};
+            if (idx !== null) return {idx, date: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : dateOf(events[idx].ts)};
+            if (/^\d{4}-\d{2}-\d{2}/.test(at)) return {idx: null, date: at.slice(0, 10), cutoff: at};
         }
         if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return {idx: null, date: day};
         return null;
@@ -121,7 +124,12 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
 
     function writeAddress() {
         const params = new URLSearchParams();
-        if (selectedIdx !== null) params.set("at", events[selectedIdx].ts);
+        if (selectedIdx !== null) {
+            params.set("at", events[selectedIdx].ts);
+            if (selectedDate !== dateOf(events[selectedIdx].ts)) params.set("day", selectedDate);
+            try { localStorage.setItem(SELECTION_KEY, events[selectedIdx].ts); } catch (_) { /* Storage is optional. */ }
+        }
+        else if (unavailableMoment) params.set("at", unavailableMoment);
         else if (selectedDate) params.set("day", selectedDate);
         const query = params.toString();
         window.history.replaceState(null, "", query ? `/history?${query}` : "/history");
@@ -214,15 +222,31 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
             container.append(header, children);
             return container;
         }));
+        filterTimeline();
         // Reveal the selection inside the timeline, without scrolling the page.
         const chosen = list.querySelector('.tl-group-select[aria-pressed="true"]')
             || list.querySelector('.tl-row[aria-pressed="true"]');
-        const scroller = list.closest(".scrolls");
+        const scroller = list.closest(".rail");
         if (chosen && scroller) {
             const target = chosen.getBoundingClientRect(), bounds = scroller.getBoundingClientRect();
             if (target.bottom > bounds.bottom) scroller.scrollTop += target.bottom - bounds.bottom;
             else if (target.top < bounds.top) scroller.scrollTop += target.top - bounds.top;
         }
+    }
+
+    function filterTimeline() {
+        const query = (document.getElementById("history-find")?.value || "").trim().toLowerCase();
+        const list = document.getElementById("history-events");
+        if (!list) return;
+        const rows = [...list.children];
+        rows.forEach((row) => {
+            const words = [row.textContent, row.title, ...[...row.querySelectorAll("[title]")].map((item) => item.title)].join(" ");
+            row.hidden = Boolean(query) && !words.toLowerCase().includes(query);
+        });
+        const empty = document.getElementById("history-no-events");
+        empty.hidden = rows.some((row) => !row.hidden);
+        empty.textContent = loadFailed ? "History could not be loaded."
+            : rows.length ? "No matching changes." : "No diagram changes on this day.";
     }
 
     function renderMoment() {
@@ -234,6 +258,13 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         emptyNote.hidden = Boolean(event);
         facts.hidden = !event;
         image.hidden = !event;
+        const status = document.getElementById("history-status");
+        const message = loadFailed ? "History could not be loaded. Reload to try again."
+            : events.length ? "No recorded state at or before this moment." : "No recorded changes yet.";
+        emptyNote.textContent = message;
+        if (status) { status.hidden = Boolean(event); status.textContent = message; }
+        document.getElementById("diagram-container").hidden = !event;
+        document.querySelector(".diagram-legend").hidden = !event;
         if (!event) return;
         const link = document.getElementById("moment-link");
         link.textContent = event.ts;
@@ -264,23 +295,32 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         window.applyState(stateForApply, selectedIdx === null ? null : events[selectedIdx].ts);
     }
 
-    function selectDate(dateStr) {
+    function selectDate(dateStr, cutoff = `${dateStr} 23:59:59`) {
+        const idx = indexAtOrBefore(cutoff);
+        if (idx !== null) { selectEvent(idx, dateStr); return; }
+        unavailableMoment = cutoff === `${dateStr} 23:59:59` ? null : cutoff;
         selectedDate = dateStr;
+        const find = document.getElementById("history-find");
+        if (find) find.value = "";
         currentMonth = monthOf(dateStr);
-        if (selectedIdx !== null && dateOf(events[selectedIdx].ts) !== dateStr) selectedIdx = null;
+        selectedIdx = null;
+        pendingState = null;
         renderCalendar();
         renderTimeline();
         renderMoment();
         writeAddress();
     }
 
-    function selectEvent(idx) {
+    function selectEvent(idx, dateStr = dateOf(events[idx]?.ts)) {
         if (idx < 0 || idx >= events.length) return;
         selectedIdx = idx;
+        unavailableMoment = null;
+        const find = document.getElementById("history-find");
+        if (find) find.value = "";
         const group = pihtiGroupHistoryEvents(events.map((event, eventIdx) => ({event, idx: eventIdx})))
             .find((items) => items.some((item) => item.idx === idx));
         if (group && group[group.length - 1].idx !== idx) expandedGroups.add(String(group[0].idx));
-        selectedDate = dateOf(events[idx].ts);
+        selectedDate = dateStr;
         currentMonth = monthOf(selectedDate);
         renderCalendar();
         renderTimeline();
@@ -296,6 +336,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
     }
 
     function attachListeners() {
+        document.getElementById("history-find")?.addEventListener("input", filterTimeline);
         document.getElementById("calendar-prev")?.addEventListener("click", () => shiftMonth(-1));
         document.getElementById("calendar-next")?.addEventListener("click", () => shiftMonth(1));
         document.getElementById("calendar-latest")?.addEventListener("click", () => {
@@ -318,12 +359,15 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
             const [eventsResponse, stateResponse] = await Promise.all([
                 fetch("/history/events"), fetch("/elements-state"),
             ]);
+            if (!eventsResponse.ok || !stateResponse.ok) throw new Error("History request failed");
             events = await eventsResponse.json();
             currentState = await stateResponse.json();
+            if (!Array.isArray(events)) throw new Error("Invalid history response");
         } catch (error) {
             console.error("History events could not be loaded", error);
             events = [];
             currentState = {};
+            loadFailed = true;
         }
         dailyCounts = {};
         events.forEach((event) => {
@@ -332,15 +376,15 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         });
         const requested = readAddress();
         if (requested?.idx !== null && requested?.idx !== undefined) {
-            selectEvent(requested.idx);
+            selectEvent(requested.idx, requested.date);
         } else if (requested?.date) {
-            selectDate(requested.date);
+            selectDate(requested.date, requested.cutoff);
         } else {
-            selectedDate = events.length ? dateOf(events[events.length - 1].ts) : todayStr();
-            currentMonth = monthOf(selectedDate);
-            renderCalendar();
-            renderTimeline();
-            renderMoment();
+            let remembered;
+            try { remembered = localStorage.getItem(SELECTION_KEY); } catch (_) { /* Storage is optional. */ }
+            const idx = events.findIndex((event) => event.ts === remembered);
+            if (events.length) selectEvent(idx >= 0 ? idx : events.length - 1);
+            else selectDate(todayStr());
         }
     }
 

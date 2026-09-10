@@ -55,7 +55,7 @@
      scroll 0 and never drift when stickiness engages. */
   --bar: 56px;
   --content-gap: 20px;
-  --rail-w: 16rem;
+  --rail-w: clamp(17rem, 20vw, 20rem);
   --page-max: 1600px;
   font-family: Aptos, Calibri, system-ui, sans-serif;
 }
@@ -689,6 +689,11 @@ details.command pre {
 .cal-empty { min-height: 30px; }
 
 .timeline { display: flex; flex-direction: column; gap: 3px; }
+
+/* History has one scroll surface: the rail, never a box inside its card. */
+#history-controls > .rail-card { flex: 0 0 auto; }
+#history-controls { scrollbar-gutter: stable; }
+#history-find { width: 100%; margin-bottom: 8px; }
 
 .tl-row {
   display: grid;
