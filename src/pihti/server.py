@@ -1018,6 +1018,15 @@ def create_app(test_config: dict | None = None) -> Flask:
     def get_elements_state():
         return jsonify(elements_state)
 
+    @app.route("/diagram-state")
+    def diagram_state():
+        """One read-only snapshot for both operational and connectivity paint."""
+        state = dict(elements_state)
+        memory = {name: dict(entry) for name, entry in live_memory().items()}
+        mode = current_line_mode()
+        prediction = plumbing_map.predict(plumbing, state, mode, memory=memory)
+        return jsonify({"state": state, "prediction": prediction})
+
     @app.route("/elements-config")
     def serve_config():
         return send_from_directory(directory=app.static_folder, path="elementsConfig.json")

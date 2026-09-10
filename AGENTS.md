@@ -376,3 +376,14 @@ is in the State & moment drawer. More keeps the appearance switches and longer
 meanings one press away. Export actions use an explicit gap and equal padding;
 their borders must not touch. Timeline pagination remains a discussed option,
 not an adopted browsing change.
+
+## Complete first paint (owner defect report, 2026-09-10; 0.23.5)
+
+The first visible SVG must already carry its final state and prediction colours.
+Load initial resources together; `/diagram-state` returns the live state and its
+prediction in one read-only response. History waits for the selected moment's
+prediction before painting operator colours. Never expose the authored drawing
+or legacy green valve palette while requests are pending. Initial failure shows
+an explicit load error; a failed History selection cannot leave the previous
+moment posing as the selected one. Run `node --test tests/diagram-paint.test.cjs`
+and verify delayed responses in a rendered browser when changing this path.

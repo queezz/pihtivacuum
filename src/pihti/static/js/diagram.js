@@ -1355,7 +1355,7 @@
     }
 
     let predictionRequest = 0;
-    async function refreshPrediction(moment) {
+    async function refreshPrediction(moment, state = vacuumState) {
         if (!plumbing || (predictionPending && !window.historyMode)) return;
         if (window.historyMode && !moment) return;
         const request = ++predictionRequest;
@@ -1363,11 +1363,11 @@
         try {
             const query = moment ? `?at=${encodeURIComponent(moment)}` : "";
             const response = await fetch(`/predicted-vacuum${query}`);
-            if (response.ok) {
-                const result = await response.json();
-                if (request === predictionRequest) paintPrediction(result);
-            }
+            if (!response.ok) throw new Error("Prediction unavailable");
+            const result = await response.json();
+            if (request === predictionRequest) applyState(state, moment, result);
         } catch (error) {
+            if (request === predictionRequest) diagramLoadFailed();
             console.error("Predicted vacuum state could not be read", error);
         } finally {
             if (request === predictionRequest) predictionPending = false;
@@ -1376,10 +1376,13 @@
 
     function applyState(state, moment, prediction) {
         if (!elementsConfig.length) return;
+        // Resolve the prediction first. No intermediate operator palette may
+        // paint while that request is outstanding, including History replay.
+        if (!prediction) return refreshPrediction(moment, state);
         // Everything the prediction fills — every valve, and the five bodies —
         // is the prediction's to paint (0.15.0). Painting the operator palette
         // over it first and correcting it a moment later is what a flicker is.
-        const predicted = lastPrediction?.elements || {};
+        const predicted = prediction.elements || {};
         elementsConfig.forEach((element) => {
             // The Line configuration sets this element's fill in
             // paintPrediction, from the same annotation it has no press of its
@@ -1397,12 +1400,22 @@
         });
         // A prediction that came back with the change itself needs no second
         // request: one small round trip, one redraw in place.
-        if (prediction) {
-            paintPrediction(prediction);
-            return;
-        }
-        renderGuide();
-        refreshPrediction(moment);
+        paintPrediction(prediction);
+        const container = document.getElementById("diagram-container");
+        container.dataset.paint = "ready";
+        container.setAttribute("aria-busy", "false");
+    }
+
+    function diagramLoadFailed() {
+        // Keep an already rendered state when a later poll fails. Initial
+        // failures must never expose the authored SVG as a live reading.
+        if (lastPrediction && !window.historyMode) return;
+        const container = document.getElementById("diagram-container");
+        if (!container) return;
+        container.dataset.paint = "error";
+        container.setAttribute("aria-busy", "false");
+        const message = container.querySelector(".diagram-load-status");
+        if (message) message.textContent = "Diagram could not be loaded. Reload to try again.";
     }
 
     /* -- practice: rehearse the presses, record the procedure once ---------
@@ -1606,18 +1619,12 @@
         }
     }
 
-    async function setupPractice() {
+    function setupPractice(settings = {}) {
         const toggle = document.getElementById("practice-toggle");
         if (!toggle) return;
-        try {
-            const response = await fetch("/practice/settings");
-            if (response.ok) {
-                const settings = await response.json();
-                if (Number(settings.autosave_seconds) > 0) {
-                    practiceAutosaveSeconds = Number(settings.autosave_seconds);
-                }
-            }
-        } catch (error) { /* the default interval still counts down */ }
+        if (Number(settings.autosave_seconds) > 0) {
+            practiceAutosaveSeconds = Number(settings.autosave_seconds);
+        }
         toggle.addEventListener("change", () => setPractice(toggle.checked));
         document.getElementById("practice-save")?.addEventListener("click", () => savePractice(false));
         document.getElementById("practice-undo")?.addEventListener("click", undoPractice);
@@ -1637,10 +1644,14 @@
         if (practiceOn) return;
         if (isInteracting) return;
         try {
-            const response = await fetch("/elements-state");
-            vacuumState = await response.json();
-            applyState(vacuumState);
+            const result = await readDiagramJSON("/diagram-state");
+            // Practice or a confirmation may have started while the poll was
+            // in flight. Never paint the record over that local rehearsal.
+            if (practiceOn || isInteracting) return;
+            vacuumState = result.state;
+            applyState(vacuumState, undefined, result.prediction);
         } catch (error) {
+            diagramLoadFailed();
             console.error("Diagram state refresh failed", error);
         }
     }
@@ -1781,15 +1792,28 @@
         // Stamped with the release so the browser may keep it: the drawing is
         // 185 kB and every tab that shows it used to re-fetch it.
         const stamp = document.body.dataset.assetVersion || "";
-        const svgResponse = await fetch(`/static/diagram.svg?v=${encodeURIComponent(stamp)}`);
-        container.innerHTML = await svgResponse.text();
+        const [svgText, config, map, live, guides, user, context, settings] = await Promise.all([
+            fetch(`/static/diagram.svg?v=${encodeURIComponent(stamp)}`).then(response => {
+                if (!response.ok) throw new Error("Drawing unavailable");
+                return response.text();
+            }),
+            readDiagramJSON("/elements-config"),
+            readDiagramJSON("/plumbing"),
+            window.historyMode ? null : readDiagramJSON("/diagram-state"),
+            window.historyMode ? null : readDiagramJSON("/operation-guides"),
+            window.historyMode ? null : readDiagramJSON("/get_current_user"),
+            window.historyMode ? null : readDiagramJSON("/operation-context"),
+            window.historyMode ? null : readDiagramJSON("/practice/settings").catch(() => ({}))
+        ]);
+        // Everything needed for the first live paint is now in memory. The
+        // remaining setup and paint run in one task, before the browser draws.
+        container.insertAdjacentHTML("afterbegin", svgText);
         document.querySelectorAll(".non-clickable").forEach((element) => { element.style.pointerEvents = "none"; });
-        const configResponse = await fetch("/elements-config");
-        elementsConfig = await configResponse.json();
+        elementsConfig = config;
         nameById = Object.fromEntries(
             elementsConfig.filter((item) => item.label).map((item) => [item.id, item.label])
         );
-        plumbing = await fetch("/plumbing").then((response) => response.ok ? response.json() : null).catch(() => null);
+        plumbing = map;
         renderVacuumLegend();
         setupBandToggle();
         setupThemeToggle();
@@ -1801,30 +1825,34 @@
         if (window.historyMode) {
             container.style.pointerEvents = "none";
             renderConnections({});
-            await fetchAndUpdateStates();
             attachElementListeners();
             document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));
             return;
         }
-        const [guidesResponse, userResponse, contextResponse] = await Promise.all([
-            fetch("/operation-guides"), fetch("/get_current_user"), fetch("/operation-context")
-        ]);
-        guideConfig = await guidesResponse.json();
+        guideConfig = guides;
         guideFacts = guideConfig.facts || {};
-        const user = await userResponse.json();
         operatorIdentified = user.is_identified;
-        const context = await contextResponse.json();
         setupGuideControls();
         setupLineModes(context);
-        await setupPractice();
-        await fetchAndUpdateStates();
+        setupPractice(settings);
+        vacuumState = live.state;
+        applyState(vacuumState, undefined, live.prediction);
         attachElementListeners();
         document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));
         window.setInterval(fetchAndUpdateStates, 5000);
     }
 
+    async function readDiagramJSON(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Diagram resource unavailable: ${url}`);
+        return response.json();
+    }
+
     window.applyState = applyState;
     window.pihtiElementName = elementName;
     window.pihtiUpdateImageLink = updateImageLink;
-    loadDiagram().catch((error) => console.error("Diagram could not be loaded", error));
+    loadDiagram().catch((error) => {
+        diagramLoadFailed();
+        console.error("Diagram could not be loaded", error);
+    });
 }());

@@ -502,6 +502,26 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 
 #diagram-container svg { display: block; width: 100%; height: auto; }
 
+/* Never expose authored/operator paint before connectivity and theme are ready.
+   Reserve the drawing's own proportions so loading does not shift the page. */
+#diagram-container[data-paint="loading"],
+#diagram-container[data-paint="error"] {
+  position: relative;
+  aspect-ratio: 841.4397 / 648.93042;
+  background: var(--panel);
+}
+#diagram-container:not([data-paint="ready"]) > svg { visibility: hidden; }
+.diagram-load-status {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-content: center;
+  padding: 24px;
+  color: var(--muted);
+}
+#diagram-container[data-paint="ready"] > .diagram-load-status { display: none; }
+
 #tooltip {
   position: absolute;
   z-index: 20;

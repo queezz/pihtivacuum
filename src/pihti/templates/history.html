@@ -34,7 +34,9 @@
             <button type="button" data-drawer="history-context" aria-controls="history-context" aria-expanded="false">State &amp; moment</button>
         </div>
         <p id="history-status" class="muted" role="status">Loading recorded history…</p>
-        <div id="diagram-container" aria-label="Diagram state at the selected moment" hidden></div>
+        <div id="diagram-container" data-paint="loading" aria-busy="true" aria-label="Diagram state at the selected moment" hidden>
+            <p class="diagram-load-status" role="status">Loading diagram…</p>
+        </div>
         <div id="tooltip"></div>
     </main>
 

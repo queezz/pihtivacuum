@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.5
+
+- Show the diagram only after its state and predicted colours are ready, removing
+  the bare SVG and green-valve flashes when moving from History to Vacuum.
+- Load initial resources together and return live state plus prediction in one
+  read-only snapshot. History also waits for its selected moment's prediction.
+- Show an explicit initial-load error instead of exposing an uncoloured drawing.
+
 ## 0.23.4
 
 - Move History's predicted state and its single legend to the top of the right

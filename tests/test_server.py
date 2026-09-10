@@ -71,6 +71,21 @@ def identify(client):
     return client.post("/api/identify", json={"username": "operator"})
 
 
+def test_diagram_snapshot_contains_matching_state_and_prediction_without_writes(app, client):
+    identify(client)
+    assert client.post("/update", json={"id": "TMPU", "status": "active"}).status_code == 200
+    paths = [Path(app.config[key]) for key in ("STATE_FILE", "LOG_FILE")]
+    before = [path.read_bytes() for path in paths]
+    response = app.test_client().get("/diagram-state")
+    assert response.status_code == 200  # read-only clients need no operator
+    assert response.headers["Cache-Control"] == "no-store"
+    snapshot = response.json
+    assert snapshot["state"]["TMPU"] == "active"
+    assert snapshot["prediction"]["elements"]["TMPU"]["fill"] != "#808080"
+    assert snapshot["prediction"]["elements"] == client.get("/predicted-vacuum").json["elements"]
+    assert [path.read_bytes() for path in paths] == before
+
+
 @pytest.mark.parametrize("mode", ["membrane", "open", "blank", "boron"])
 def test_dark_palette_preserves_connectivity_and_matches_browser_paints(client, mode):
     mapping = client.get("/plumbing").json
@@ -125,9 +140,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.23.4"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.23.4"}
-    assert b"v0.23.4" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.23.5"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.23.5"}
+    assert b"v0.23.5" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):

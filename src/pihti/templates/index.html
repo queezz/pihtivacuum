@@ -59,7 +59,9 @@
         <p class="practice-banner" id="practice-banner" role="status" hidden>Practising. This drawing is a copy, not the record.</p>
         <p id="warning-banner" class="oil-warning" role="alert" hidden></p>
         <p id="advisory-note" class="oil-warning" role="status" hidden></p>
-        <div id="diagram-container" aria-label="PIHTI vacuum system diagram"></div>
+        <div id="diagram-container" data-paint="loading" aria-busy="true" aria-label="PIHTI vacuum system diagram">
+            <p class="diagram-load-status" role="status">Loading diagram…</p>
+        </div>
         <div id="tooltip"></div>
     </main>
 
