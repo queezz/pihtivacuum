@@ -715,7 +715,12 @@ def create_app(test_config: dict | None = None) -> Flask:
         # without the current release on it stays uncacheable, so a stale asset
         # can never outlive the release it belongs to. Pages, data and the plot
         # are never stored.
-        versioned = request.endpoint == "static" and request.args.get("v") == __version__
+        # These two JSON documents are release-owned too. Rig settings and
+        # all recorded/predicted state remain fresh on every request.
+        versioned = (
+            request.endpoint in {"static", "serve_config", "serve_plumbing"}
+            and request.args.get("v") == __version__
+        )
         if versioned:
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         elif request.endpoint == "plot_recordings":

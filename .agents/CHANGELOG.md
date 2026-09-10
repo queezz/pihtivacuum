@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.6
+
+- Reuse release-stamped equipment configuration and plumbing JSON between
+  Vacuum and History visits; preload these and the SVG from the page head.
+  Live state, warnings, rig settings and history remain uncached.
+- Let History recognize a drawing that finished loading before its listener
+  attached, so a fast cached load cannot leave the selected moment unpainted.
+
 ## 0.23.5
 
 - Show the diagram only after its state and predicted colours are ready, removing

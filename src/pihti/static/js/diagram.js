@@ -1797,8 +1797,8 @@
                 if (!response.ok) throw new Error("Drawing unavailable");
                 return response.text();
             }),
-            readDiagramJSON("/elements-config"),
-            readDiagramJSON("/plumbing"),
+            readDiagramJSON(`/elements-config?v=${encodeURIComponent(stamp)}`),
+            readDiagramJSON(`/plumbing?v=${encodeURIComponent(stamp)}`),
             window.historyMode ? null : readDiagramJSON("/diagram-state"),
             window.historyMode ? null : readDiagramJSON("/operation-guides"),
             window.historyMode ? null : readDiagramJSON("/get_current_user"),
@@ -1826,6 +1826,7 @@
             container.style.pointerEvents = "none";
             renderConnections({});
             attachElementListeners();
+            window.pihtiDiagramReady = true;
             document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));
             return;
         }
@@ -1838,6 +1839,7 @@
         vacuumState = live.state;
         applyState(vacuumState, undefined, live.prediction);
         attachElementListeners();
+        window.pihtiDiagramReady = true;
         document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));
         window.setInterval(fetchAndUpdateStates, 5000);
     }

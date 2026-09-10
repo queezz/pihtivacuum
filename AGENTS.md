@@ -387,3 +387,12 @@ or legacy green valve palette while requests are pending. Initial failure shows
 an explicit load error; a failed History selection cannot leave the previous
 moment posing as the selected one. Run `node --test tests/diagram-paint.test.cjs`
 and verify delayed responses in a rendered browser when changing this path.
+
+## Reusing drawing resources (owner SVG-speed follow-up, 2026-09-10; 0.23.6)
+
+The SVG, equipment configuration and enriched plumbing map are release-owned
+resources. Their exact current-version URLs may be cached immutably, and the
+diagram pages preload them. Unstamped/stale URLs stay no-store. Never extend this
+to live state, prediction, history, identity, operation context or rig settings.
+The diagram-ready flag and event both matter: History may start after a cached
+SVG finishes, and must still paint the selected historical moment.

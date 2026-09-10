@@ -9,7 +9,7 @@ const events = [
     {ts: '2026-09-10 12:00:00', id: 'valve', state: true, user: 'Example'},
 ];
 
-async function open({search = '', saved, rows = events, fail = false, storageThrows = false} = {}) {
+async function open({search = '', saved, rows = events, fail = false, storageThrows = false, cachedDiagram = false} = {}) {
     const nodes = new Map(), listeners = {};
     const element = () => ({
         children: [], textContent: '', hidden: false, value: '', dataset: {},
@@ -38,10 +38,16 @@ async function open({search = '', saved, rows = events, fail = false, storageThr
         fetch: async url => ({ok: !fail, json: async () => url === '/history/events' ? rows : {valve: 'active'}}),
     };
     vm.runInNewContext(source, context);
+    if (cachedDiagram) context.window.pihtiDiagramReady = true;
     await listeners.DOMContentLoaded();
-    listeners['pihti:diagram-ready']();
+    if (!cachedDiagram) listeners['pihti:diagram-ready']();
     return {get, address: () => address, applied: () => applied, selectDay: day => calendar.onSelect(day)};
 }
+
+test('History paints when cached diagram resources finish before its load listener', async () => {
+    const page = await open({cachedDiagram: true});
+    assert.equal(page.applied().moment, events[1].ts);
+});
 
 test('first visit selects latest; memory restores an exact older event; explicit link wins', async () => {
     assert.equal((await open()).applied().moment, events[1].ts);

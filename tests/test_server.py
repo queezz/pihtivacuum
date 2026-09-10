@@ -140,9 +140,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.23.5"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.23.5"}
-    assert b"v0.23.5" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.23.6"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.23.6"}
+    assert b"v0.23.6" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -594,6 +594,23 @@ def test_static_assets_are_cacheable_only_when_they_carry_the_release(client):
     assert 'href="/static/css/styles.css"' not in page
     # Pages and data stay uncacheable whatever else changes.
     assert client.get("/elements-state").headers["Cache-Control"] == "no-store"
+
+
+def test_diagram_reference_cache_does_not_cache_live_data(client):
+    for path in ("/elements-config", "/plumbing"):
+        plain = client.get(path)
+        stamped = client.get(f"{path}?v={__version__}")
+        assert stamped.json == plain.json
+        assert stamped.headers["Cache-Control"] == "public, max-age=31536000, immutable"
+        assert plain.headers["Cache-Control"] == "no-store"
+        assert client.get(f"{path}?v=old").headers["Cache-Control"] == "no-store"
+    for path in ("/", "/history", "/diagram-state", "/elements-state",
+                 "/operation-guides", "/operation-context", "/practice/settings"):
+        assert client.get(f"{path}?v={__version__}").headers["Cache-Control"] == "no-store"
+    for path in ("/", "/history"):
+        head = client.get(path).data.decode().split("</head>")[0]
+        for resource in ("/static/diagram.svg", "/elements-config", "/plumbing"):
+            assert f'href="{resource}?v={__version__}"' in head
 
 
 def test_the_archive_travels_one_month_at_a_time(app, client, tmp_path):

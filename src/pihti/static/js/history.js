@@ -336,6 +336,9 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
     }
 
     function attachListeners() {
+        // Cached drawing resources may finish before History starts listening.
+        diagramReady = Boolean(window.pihtiDiagramReady);
+        namesReady = diagramReady;
         document.getElementById("history-find")?.addEventListener("input", filterTimeline);
         document.getElementById("calendar-prev")?.addEventListener("click", () => shiftMonth(-1));
         document.getElementById("calendar-next")?.addEventListener("click", () => shiftMonth(1));
