@@ -264,7 +264,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         emptyNote.textContent = message;
         if (status) { status.hidden = Boolean(event); status.textContent = message; }
         document.getElementById("diagram-container").hidden = !event;
-        document.querySelector(".diagram-legend").hidden = !event;
+        document.getElementById("history-state-card").hidden = !event;
         if (!event) return;
         const link = document.getElementById("moment-link");
         link.textContent = event.ts;

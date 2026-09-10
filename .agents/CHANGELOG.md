@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.23.4
+
+- Move History's predicted state and its single legend to the top of the right
+  rail, beside the drawing. The phone drawer is named State & moment.
+- Separate the export buttons with a 10px gap and consistent padding.
+
 ## 0.23.3
 
 - Give rails more width as the window allows; History scrolls at the rail edge

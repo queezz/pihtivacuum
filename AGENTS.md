@@ -366,3 +366,13 @@ status rather than an unpainted diagram posing as history. The timeline card
 has natural height; its containing rail is the only scroll surface, on desktop
 and in the drawer. Shared rail widths adapt from 17rem to 20rem as width allows.
 Run both tests/history-groups.test.cjs and tests/history-selection.test.cjs.
+
+## History legend in the rail (owner correction, 2026-09-10; 0.23.4)
+
+Supersedes the History-only below-drawing placement from 0.18.0: the predicted
+state is context to consult beside the drawing. Its single legend leads the
+right rail, followed by Selected moment and Export. On phones the same content
+is in the State & moment drawer. More keeps the appearance switches and longer
+meanings one press away. Export actions use an explicit gap and equal padding;
+their borders must not touch. Timeline pagination remains a discussed option,
+not an adopted browsing change.

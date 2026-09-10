@@ -694,6 +694,9 @@ details.command pre {
 #history-controls > .rail-card { flex: 0 0 auto; }
 #history-controls { scrollbar-gutter: stable; }
 #history-find { width: 100%; margin-bottom: 8px; }
+#history-context > .rail-card { flex: 0 0 auto; }
+.export-actions { display: grid; gap: 10px; }
+.export-actions > .button { width: 100%; margin: 0; padding: 10px 12px; }
 
 .tl-row {
   display: grid;
@@ -898,27 +901,6 @@ button.tiny {
 /* The predicted-vacuum legend: one swatch in the colour the pipes actually
    carry, the state's name, and its meaning in four or five words. It is the
    only place on the Vacuum page that explains what a pipe colour means. */
-/* The key under the drawing, on the **History** page, where the right rail
-   already carries its own cargo (the selected moment and the export). On the
-   Vacuum page the whole thing moved into the right rail in 0.18.0, by queezz's
-   own order — "I think the bottom card deserves a proper place in the rail, no?
-   And not hiding in small sizes, shying away" — which the collapse rule made
-   room for: the two cards fold to a headline instead of fighting for the rail's
-   height, so the crush this section's earlier note measured cannot happen.
-
-   Chips that wrap, the way the Services legend wears its six: the colour and
-   its name at a glance, the meanings behind More. */
-.diagram-legend {
-  max-width: 830px;
-  margin: 14px auto 0;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-}
-
-.diagram-legend .rail-lead { margin-bottom: 10px; }
-
 /* **One legend, not two** (owner, 2026-09-09, letter 20260908-c03c1788-9def42,
    on the first build of the rail card: "Why do we need two legends? ... Do we
    need that much text in a rail card??"). These chips ARE the swatches: grown

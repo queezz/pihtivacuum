@@ -125,9 +125,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.23.3"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.23.3"}
-    assert b"v0.23.3" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.23.4"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.23.4"}
+    assert b"v0.23.4" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -2265,18 +2265,16 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     stamp = client.get("/history/events").json[-1]["ts"]
     replayed = client.get("/predicted-vacuum", query_string={"at": stamp})
     assert replayed.json["volumes"]["plasma-foreline"] == "air"
-    # Every page that draws the diagram carries the key, and states the
-    # prediction once — a second telling is the textbook defect. Where the key
-    # sits differs by page since 0.18.0: on the Vacuum page it is the right
-    # rail's own state card (owner order, letter 20260908-aa2558c2-f3d03e), and
-    # on History it stays under the drawing, because that page's right rail
-    # already carries its own cargo.
+    # Both drawing pages carry one prediction key in their right rail.
     for path in ("/", "/history"):
         page = client.get(path).data.decode("utf-8")
         assert page.count("Predicted from the valve positions") == 1, path
         assert 'id="vacuum-legend"' in page, path
         assert "measure pressure" not in page, path
-    assert 'class="diagram-legend"' in client.get("/history").data.decode("utf-8")
+    history_page = client.get("/history").data.decode("utf-8")
+    context = history_page.split('id="history-context"', 1)[1].split('</aside>', 1)[0]
+    assert 'id="history-state-card"' in context
+    assert context.count('id="vacuum-legend"') == 1
     assert 'class="diagram-legend"' not in client.get("/").data.decode("utf-8")
 
 
