@@ -785,6 +785,39 @@ details.command pre {
   background: var(--panel);
 }
 
+.plot-field { display: grid; gap: 6px; margin: 10px 0; font-size: 0.86rem; overflow-wrap: anywhere; }
+#plot-controls > .rail-card, #plot-context > .rail-card { flex: 0 0 auto; }
+.plot-field select, .plot-field input { min-width: 0; width: 100%; }
+.plot-panel-control { padding: 8px 0 12px; border-bottom: 1px solid var(--line); }
+.plot-order { display: flex; gap: 8px; }
+.plot-order button { flex: 1; padding: 6px; font-size: 0.78rem; }
+#plot-arrange-toggle { margin-top: 14px; width: 100%; }
+.plot-disclosure { margin-top: 12px; }
+.plot-disclosure > button { width: 100%; }
+.plot-data-notes { margin-top: 12px; }
+.plot-data-notes summary { cursor: pointer; }
+#plot-ranges { font-size: 0.82rem; }
+.plot-curve-row { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.plot-compare-choice { display: flex; align-items: flex-start; gap: 8px; }
+.plot-compare-choice input { width: auto; margin-top: 3px; flex: 0 0 auto; }
+.plot-compare-actions { position: sticky; top: 0; background: var(--panel); padding: 8px 0; z-index: 2; }
+.plot-compare-actions button { width: 100%; }
+.plot-compare-actions p { font-size: 0.8rem; margin: 6px 0; }
+.page-main:has(.curve-editor) { position: relative; }
+.plot-editing { overflow: clip; }
+.plot-editing #plotArea { position: absolute; inset: 0 0 auto; pointer-events: none; opacity: 0; }
+.curve-editor { min-height: calc(100vh - var(--bar) - 2 * var(--content-gap)); box-sizing: border-box; position: relative; z-index: 1; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 16px; }
+.curve-editor-bar { position: sticky; top: calc(var(--bar) + var(--content-gap)); z-index: 3; background: var(--panel); padding: 8px 0; border-bottom: 1px solid var(--line); }
+.curve-editor-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.curve-editor-actions h2 { font-size: 1.1rem; margin: 0 auto 0 0; }
+.curve-editor-bar p { font-size: 0.82rem; margin: 6px 0; }
+.curve-editor #plot-curve-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); column-gap: 20px; }
+.curve-editor .plot-curve-row { align-content: start; }
+.plot-export-actions { display: grid; gap: 10px; }
+#plot-source-list details { margin-top: 14px; overflow-wrap: anywhere; }
+#plot-source-list summary { cursor: pointer; padding: 6px 0; }
+#plot-source-list p, #plot-notes p { font-size: 0.82rem; overflow-wrap: anywhere; }
+
 /* -- the rails on a narrow screen -------------------------------------- */
 
 /* Below the breakpoint there is no room for three tracks, so each rail

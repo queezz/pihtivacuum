@@ -6,14 +6,13 @@ import csv
 import json
 import os
 import secrets
+from io import BytesIO
+from zipfile import ZipFile, ZIP_DEFLATED
 from hashlib import sha256
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.io as pio
 from flask import (
     Flask,
     Response,
@@ -28,10 +27,11 @@ from flask import (
     session,
     url_for,
 )
-from plotly.subplots import make_subplots
 from pihti import __version__
 from pihti import neighbours as ensemble
 from pihti import plumbing as plumbing_map
+from pihti.recordings import load_recording, companion_paths
+from plotly.offline import get_plotlyjs
 from pihti.roster import default_private_dir as _default_private_dir
 from pihti.roster import env_path as _env_path
 from pihti.roster import resolve_operators, roster_path
@@ -512,71 +512,6 @@ def group_files_by_day(files: list[str]) -> list[dict]:
     return groups
 
 
-def get_cu_columns(file_path: Path) -> list[str]:
-    with file_path.open("r", encoding="utf-8") as file:
-        for line in file:
-            if line.startswith("# Columns"):
-                return line.split(",", 1)[1].strip().split(", ")
-    raise ValueError(f"No '# Columns' header found in {file_path.name}.")
-
-
-def generate_plot_html(dataframe, columns_linear, columns_log):
-    figure = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.08,
-        subplot_titles=("Linear channels", "Log channels"),
-    )
-    colors = iter(PLOT_SERIES_COLORS)
-    for row, columns in ((1, columns_linear), (2, columns_log)):
-        for column in columns:
-            figure.add_trace(
-                go.Scatter(
-                    x=dataframe["date"],
-                    y=dataframe[column],
-                    mode="lines",
-                    name=column,
-                    line={"width": 2, "color": next(colors, None)},
-                    hovertemplate="%{y:.3g}<extra>" + column + "</extra>",
-                ),
-                row=row,
-                col=1,
-            )
-    axis = {
-        "gridcolor": PLOT_GRID,
-        "zerolinecolor": PLOT_GRID,
-        "linecolor": PLOT_GRID,
-        "tickfont": {"color": PLOT_MUTED},
-        "title_font": {"color": PLOT_MUTED},
-    }
-    figure.update_layout(
-        # No fixed height: the plot is framed, and the frame decides how tall
-        # it is. A fixed height gave the frame its own scrollbars.
-        autosize=True,
-        margin={"l": 60, "r": 20, "t": 40, "b": 40},
-        paper_bgcolor=PLOT_SURFACE,
-        plot_bgcolor=PLOT_SURFACE,
-        font={"color": PLOT_INK, "family": "Aptos, Calibri, system-ui, sans-serif"},
-        hovermode="x unified",
-        hoverlabel={"bgcolor": "#1b222c", "font": {"color": PLOT_INK}},
-        legend={"orientation": "h", "y": -0.06, "font": {"color": PLOT_INK}},
-        xaxis={**axis},
-        xaxis2={**axis, "title": "Time"},
-        yaxis={**axis, "title": "Value (linear)", "type": "linear"},
-        yaxis2={**axis, "title": "Value (log)", "type": "log", "tickformat": ".1e"},
-    )
-    for annotation in figure.layout.annotations:
-        annotation.font.color = PLOT_MUTED
-        annotation.font.size = 12
-    return pio.to_html(
-        figure,
-        full_html=False,
-        default_height="100%",
-        config={"displaylogo": False, "responsive": True},
-    )
-
-
 def create_app(test_config: dict | None = None) -> Flask:
     runtime_root = _env_path("PIHTI_DATA_ROOT", Path.cwd()).resolve()
     supplied_secret = (test_config or {}).get("SECRET_KEY")
@@ -682,7 +617,11 @@ def create_app(test_config: dict | None = None) -> Flask:
             or file_name not in available_cu_files()
         ):
             abort(404)
-        return load_settings() / file_name
+        directory = load_settings()
+        path = (directory / file_name).resolve()
+        if path.parent != directory:
+            abort(404)
+        return path
 
     @app.context_processor
     def inject_page_context():
@@ -718,7 +657,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         # These two JSON documents are release-owned too. Rig settings and
         # all recorded/predicted state remain fresh on every request.
         versioned = (
-            request.endpoint in {"static", "serve_config", "serve_plumbing"}
+            request.endpoint in {"static", "serve_config", "serve_plumbing", "plotly_bundle"}
             and request.args.get("v") == __version__
         )
         if versioned:
@@ -1468,29 +1407,60 @@ def create_app(test_config: dict | None = None) -> Flask:
     PLOT_LINEAR_CHANNELS = ["Ip_c"]
     PLOT_LOG_CHANNELS = ["Pu_c", "Pd_c", "Bu_c"]
 
+    def recording_document(file_path):
+        recording = load_recording(file_path)
+        recording["file"] = file_path.name
+        return recording, render_template("plot_document.html", recording=recording)
+
+    @app.route("/plot/view")
+    def plot_view():
+        """A file-specific, read-only plot; other readers cannot replace it."""
+        file_path = resolve_cu_file(request.args.get("file"))
+        try:
+            _, document = recording_document(file_path)
+            return Response(document, mimetype="text/html")
+        except (ValueError, UnicodeError, OSError):
+            return render_template("plot_document.html", recording={
+                "file": file_path.name,
+                "error": "This recording could not be read. Check its CSV header and rows.",
+            }), 422
+
+    @app.route("/plot/plotly.js")
+    def plotly_bundle():
+        return Response(get_plotlyjs(), mimetype="application/javascript")
+
+    @app.route("/plot/export")
+    def export_recording():
+        file_path = resolve_cu_file(request.args.get("file"))
+        archive = BytesIO()
+        try:
+            paths = companion_paths(file_path)
+            with ZipFile(archive, "w", ZIP_DEFLATED) as zipped:
+                for path in paths:
+                    zipped.write(path, arcname=path.name)
+        except (ValueError, OSError):
+            return jsonify(error="The recording files could not be exported."), 422
+        archive.seek(0)
+        return send_file(archive, mimetype="application/zip", as_attachment=True,
+                         download_name=file_path.stem + ".zip")
+
     @app.route("/plot", methods=["POST"])
     def plot_file():
         nonlocal last_plot_html, last_plot_meta
         file_name = request.form.get("file")
         file_path = resolve_cu_file(file_name)
         try:
-            columns = get_cu_columns(file_path)
-            dataframe = pd.read_csv(file_path, skiprows=10, names=columns)
-        except (ValueError, UnicodeDecodeError, pd.errors.ParserError) as exc:
-            return jsonify({"error": f"This file is not a readable control-unit log: {exc}"}), 422
-        missing = [
-            column
-            for column in PLOT_LINEAR_CHANNELS + PLOT_LOG_CHANNELS
-            if column not in dataframe.columns
-        ]
-        if missing:
-            return jsonify({"error": f"Missing channels in this file: {', '.join(missing)}"}), 422
-        last_plot_html = generate_plot_html(dataframe, PLOT_LINEAR_CHANNELS, PLOT_LOG_CHANNELS)
+            recording, last_plot_html = recording_document(file_path)
+        except (ValueError, UnicodeError, OSError):
+            return jsonify({"error": "This file is not a readable control-unit log."}), 422
+        columns = recording["sources"][0]["columns"]
         last_plot_meta = {
             "file": file_name,
             "generated_at": datetime.now().strftime(TIMESTAMP_FORMAT),
-            "linear": PLOT_LINEAR_CHANNELS,
-            "log": PLOT_LOG_CHANNELS,
+            "linear": [name for name in PLOT_LINEAR_CHANNELS if name in columns],
+            "log": [name for name in PLOT_LOG_CHANNELS if name in columns],
+            "sources": recording["sources"],
+            "notes": recording["notes"],
         }
         plot_path = Path(app.config["LAST_PLOT_FILE"])
         plot_path.parent.mkdir(parents=True, exist_ok=True)

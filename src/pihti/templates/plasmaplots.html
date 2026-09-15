@@ -6,7 +6,7 @@
 <div class="page">
     <aside class="rail rail-left" id="plot-controls" aria-label="Plot controls">
         <button class="drawer-close" type="button">Close</button>
-        <section class="rail-card rail-card--growing">
+        <section class="rail-card">
             <h2 class="rail-label">Recordings <span class="count">{{ files|length }} files</span></h2>
             {% if files %}
             <div class="cal-nav">
@@ -23,9 +23,10 @@
             {% endif %}
         </section>
         {% if files %}
-        <section class="rail-card rail-card--growing">
+        <section class="rail-card">
             <h2 class="rail-label" id="day-files-label">Files</h2>
-            <div class="scrolls">
+            <div>
+                <label class="plot-field">Find a recording <input id="plot-file-find" type="search" placeholder="Time or filename"></label>
                 <div id="file-list" class="filelist" role="group" aria-label="Control-unit CSV files on the selected day"></div>
                 <p id="day-files-empty" class="muted" hidden>No recordings on this day.</p>
             </div>
@@ -33,14 +34,20 @@
         <script type="application/json" id="archive-data">{{ {"months": months, "month": opening_month, "days": opening_days, "latest": latest_file}|tojson }}</script>
         {% endif %}
         <section class="rail-card">
-            <h2 class="rail-label">Export</h2>
-            <a id="downloadBtn" class="button" style="width: 100%;" href="#" aria-disabled="true">Download selected CSV</a>
+            <h2 class="rail-label">Explore</h2>
+            <label class="plot-field">Drag to <select id="plot-drag"><option value="zoom">Zoom</option><option value="pan">Pan</option></select></label>
+            <button id="plot-reset" type="button">Fit all axes</button>
+            <div class="plot-disclosure">
+                <button id="plot-axes-toggle" type="button" aria-expanded="false" aria-controls="plot-panels">Chart axes &amp; order</button>
+                <div id="plot-panels" hidden></div>
+            </div>
+            <button id="plot-arrange-toggle" type="button" aria-expanded="false" aria-controls="plot-arrange">Compare &amp; arrange curves</button>
         </section>
     </aside>
 
     <main class="page-main">
         <div class="rail-toggles" aria-label="Side panels">
-            <button type="button" data-drawer="plot-controls" aria-controls="plot-controls" aria-expanded="false">Files</button>
+            <button type="button" data-drawer="plot-controls" aria-controls="plot-controls" aria-expanded="false">Files & curves</button>
             <button type="button" data-drawer="plot-context" aria-controls="plot-context" aria-expanded="false">This plot</button>
         </div>
         {% if not data_path_configured %}
@@ -48,6 +55,19 @@
         {% elif not files %}
         <p class="notice" style="margin-bottom: 16px;"><strong>No control-unit CSV files found.</strong> The configured directory holds no files beginning with <code>cu_</code>.</p>
         {% endif %}
+        <section id="plot-arrange" class="curve-editor" aria-label="Choose curves" hidden>
+            <div class="curve-editor-bar">
+                <div class="curve-editor-actions">
+                    <h2>Choose curves</h2>
+                    <button id="plot-arrange-close" type="button">Back to plots</button>
+                    <button id="plot-compare" type="button" disabled>Plot together</button>
+                </div>
+                <label class="plot-field">Find a curve <input id="plot-curve-find" type="search" placeholder="Name or unit"></label>
+                <p id="plot-compare-note" class="muted">Select curves to compare.</p>
+            </div>
+            <div id="plot-curve-list"></div>
+            <button id="plot-defaults" type="button">Restore default view</button>
+        </section>
         <div id="plotArea">
             <p id="plot-status" class="plot-empty">Loading the last plot…</p>
             <iframe id="plot-frame" title="Control-unit plot" hidden></iframe>
@@ -62,11 +82,20 @@
             <dl id="plot-facts" class="facts" hidden>
                 <dt>File</dt><dd id="plot-file" class="mono"></dd>
                 <dt>Recorded</dt><dd id="plot-recorded"></dd>
-                <dt>Plotted</dt><dd id="plot-generated"></dd>
-                <dt>Linear</dt><dd id="plot-linear" class="mono"></dd>
-                <dt>Log</dt><dd id="plot-log" class="mono"></dd>
+                <dt>Time axis</dt><dd id="plot-time-basis">Recorder local time</dd>
             </dl>
-            <p class="muted" style="margin-top: 12px;">Channel codes are the control unit's own. Units, instrument identity, and background subtraction are not recorded yet.</p>
+            <div id="plot-source-list"></div>
+            <div id="plot-ranges" class="muted"></div>
+            <details class="plot-data-notes"><summary>Data notes</summary><div id="plot-notes" class="muted"></div></details>
+        </section>
+        <section class="rail-card">
+            <h2 class="rail-label">Export</h2>
+            <div class="plot-export-actions">
+                <a id="downloadBtn" class="button" href="#" aria-disabled="true">All original data · ZIP</a>
+                <a id="download-adc" class="button" href="#" aria-disabled="true">ADC file · CSV</a>
+                <button id="plot-curves-export" type="button">Displayed curves · CSV</button>
+                <button id="plot-image" type="button">Chart images · PNG</button>
+            </div>
         </section>
     </aside>
 </div>

@@ -8,6 +8,13 @@
     const status = document.getElementById("plot-status");
     const frame = document.getElementById("plot-frame");
     const download = document.getElementById("downloadBtn");
+    const adcDownload = document.getElementById("download-adc");
+    let workspace = null;
+    let workspaceSignature = "";
+    const comparison = new Set();
+    let plotScroll = 0;
+    let comparing = false;
+    let selectionTicket = 0;
     const calendar = window.pihtiCalendar;
 
     /* The archive is read one month at a time. Thirteen hundred recordings
@@ -71,7 +78,8 @@
             return storeMonth(key, payload.days);
         } catch (error) {
             console.error("That month could not be read", error);
-            return storeMonth(key, []);
+            showStatus("That month could not be read. Try selecting it again.");
+            throw error;
         } finally {
             if (note) note.hidden = true;
         }
@@ -132,9 +140,26 @@
         }
         document.getElementById("plot-file").textContent = meta.file;
         document.getElementById("plot-recorded").textContent = recordedFromName(meta.file);
-        document.getElementById("plot-generated").textContent = meta.generated_at || "—";
-        document.getElementById("plot-linear").textContent = (meta.linear || []).join(", ") || "—";
-        document.getElementById("plot-log").textContent = (meta.log || []).join(", ") || "—";
+        document.getElementById("plot-time-basis").textContent = meta.time_label || "Recorder local time";
+        const sources = document.getElementById("plot-source-list");
+        sources.replaceChildren(...(meta.sources || []).map((source) => {
+            const group = document.createElement("details");
+            const title = document.createElement("summary");
+            title.textContent = `${source.name} · ${source.rows} rows · ${source.columns.length} columns`;
+            const columns = document.createElement("p");
+            columns.className = "muted";
+            columns.textContent = source.columns.join(", ");
+            group.append(title, columns);
+            return group;
+        }));
+        const notes = document.getElementById("plot-notes");
+        document.getElementById("plot-ranges").replaceChildren(...(meta.series || []).filter(s => s.summary).map(s => {
+            const p = document.createElement("p"); p.textContent = `${s.label}: ${s.summary}`; return p;
+        }));
+        notes.replaceChildren(...(meta.notes || []).map((text) => {
+            const p = document.createElement("p"); p.textContent = text; return p;
+        }));
+        renderCompareState();
     }
 
     function renderCalendar() {
@@ -162,7 +187,9 @@
         const empty = document.getElementById("day-files-empty");
         const label = document.getElementById("day-files-label");
         if (!list || !empty) return;
-        const entries = selectedDate ? daysOf(monthKey)[selectedDate] || [] : [];
+        const query = document.getElementById("plot-file-find")?.value.toLowerCase() || "";
+        const entries = (selectedDate ? daysOf(monthKey)[selectedDate] || [] : [])
+            .filter((entry) => `${entry.name} ${entry.time}`.toLowerCase().includes(query));
         if (label) label.textContent = selectedDate ? `Files · ${selectedDate}` : "Files";
         empty.hidden = entries.length > 0;
         list.replaceChildren(...entries.map((entry) => {
@@ -173,8 +200,7 @@
             button.textContent = entry.time;
             button.setAttribute("aria-pressed", String(entry.name === selectedFile));
             button.addEventListener("click", () => {
-                selectFile(entry.name);
-                fetchPlot(entry.name);
+                openRecording(entry.name);
                 window.pihtiRails?.closeDrawers();
             });
             return button;
@@ -184,7 +210,9 @@
     function renderDownload() {
         if (!download) return;
         download.setAttribute("aria-disabled", String(!selectedFile));
-        download.href = selectedFile ? `/download_controlunit_csv?file=${encodeURIComponent(selectedFile)}` : "#";
+        download.href = selectedFile ? `/plot/export?file=${encodeURIComponent(selectedFile)}` : "#";
+        adcDownload.setAttribute("aria-disabled", String(!selectedFile));
+        adcDownload.href = selectedFile ? `/download_controlunit_csv?file=${encodeURIComponent(selectedFile)}` : "#";
     }
 
     function writeAddress() {
@@ -195,47 +223,58 @@
         renderCalendar();
         renderDayList();
         renderDownload();
-        writeAddress();
+
     }
 
     function selectDate(dateStr) {
         selectedDate = dateStr;
         if (dateStr !== "undated") currentMonth = calendar.monthOf(dateStr);
-        if (selectedFile && dayOfFile(selectedFile) !== dateStr) selectedFile = null;
         redraw();
+        updateMonthSteps();
+        return true;
+    }
+
+    async function openRecording(file) {
+        try {
+            if (await selectFile(file)) {
+                const address = `/plasmaplots?file=${encodeURIComponent(file)}`;
+                if (location.pathname + location.search !== address) history.pushState(null, "", address);
+                fetchPlot(file);
+            }
+        } catch (_) { /* loadMonth already explains the failure. */ }
     }
 
     /* Selecting a file may be the first sight of a month the page never
      * carried — a deep link into last winter, say — so the month is fetched
      * before the day is shown. */
     async function selectFile(file) {
+        const ticket = ++selectionTicket;
         const day = dayOfFile(file);
         const month = monthOfFile(file);
         if (month !== monthKey) {
             await loadMonth(month);
+            if (ticket !== selectionTicket) return false;
             monthKey = month;
         }
         selectedFile = file;
         selectedDate = day;
         if (day !== "undated") currentMonth = calendar.monthOf(day);
         redraw();
+        updateMonthSteps();
+        return true;
     }
 
     async function fetchPlot(file) {
-        // The previous plot stays on screen while this one is drawn, so the
-        // page never empties out under the reader.
+        closeEditor();
         showStatus(`Plotting ${file}…`);
-        try {
-            const response = await fetch("/plot", {method: "POST", body: new URLSearchParams({file})});
-            const payload = await readAnswer(response);
-            if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
-            showPlot(payload.generated);
-            showStatus("");
-            renderContext(payload);
-        } catch (error) {
-            console.error("The plot could not be generated", error);
-            showEmpty(error.message || "This recording could not be plotted.");
-        }
+        workspace = null;
+        comparison.clear();
+        workspaceSignature = "";
+        renderPanelControls();
+        renderContext({file});
+        frame.hidden = false;
+        frame.src = `/plot/view?file=${encodeURIComponent(file)}`;
+        try { localStorage.setItem("pihti.plot.last-file", file); } catch (_) { /* Optional memory. */ }
     }
 
     /* Only the few hundred bytes of "what is the last plot" are read here. The
@@ -251,10 +290,8 @@
                 renderContext(null);
                 return;
             }
-            showPlot(payload.generated);
-            showStatus("");
-            renderContext(payload);
-            if (payload.file && dayOfFile(payload.file)) selectFile(payload.file);
+            if (payload.file) openRecording(payload.file);
+            else { showPlot(payload.generated); showStatus(""); renderContext(payload); }
         } catch (error) {
             console.error("The last plot could not be loaded", error);
             showEmpty("The last plot could not be loaded.");
@@ -302,16 +339,209 @@
     }
     document.getElementById("calendar-latest")?.addEventListener("click", () => {
         if (!latestFile) return;
-        selectFile(latestFile);
-        fetchPlot(latestFile);
+        openRecording(latestFile);
     });
     download?.addEventListener("click", (event) => {
         if (!selectedFile) event.preventDefault();
     });
+    adcDownload?.addEventListener("click", (event) => {
+        if (!selectedFile) event.preventDefault();
+    });
+
+    function command(action, values = {}) {
+        if (workspace) frame.contentWindow.postMessage({type: "pihti-plot-command", action, ...values}, location.origin);
+    }
+
+    function renderPanelControls() {
+        for (const id of ["plot-reset", "plot-defaults", "plot-image", "plot-curves-export", "plot-drag", "plot-arrange-toggle"]) {
+            document.getElementById(id).disabled = !workspace;
+        }
+        const container = document.getElementById("plot-panels");
+        container.replaceChildren(...(workspace?.panels || []).filter((p) => p.active).map((panel) => {
+            const row = document.createElement("div"); row.className = "plot-panel-control";
+            const label = document.createElement("label"); label.className = "plot-field";
+            label.append(document.createTextNode(`${panel.label}${panel.secondaryUnit ? ` · left ${panel.unit}` : ""}`));
+            const scale = document.createElement("select");
+            scale.setAttribute("aria-label", `${panel.label} scale`);
+            for (const [value, name] of [["linear", "Linear"], ["log", "Log"]]) {
+                scale.add(new Option(name, value));
+            }
+            scale.value = panel.scale;
+            scale.addEventListener("change", () => command("scale", {panel: panel.id, value: scale.value}));
+            label.append(scale); row.append(label);
+            if (panel.secondaryUnit) {
+                const right = document.createElement("label"); right.className = "plot-field";
+                right.append(document.createTextNode(`Right axis · ${panel.secondaryUnit}`));
+                const rightScale = document.createElement("select");
+                rightScale.setAttribute("aria-label", `${panel.label} right scale`);
+                rightScale.add(new Option("Linear", "linear")); rightScale.add(new Option("Log", "log"));
+                rightScale.value = panel.secondaryScale || "linear";
+                rightScale.addEventListener("change", () => command("scale", {panel: panel.id, axis: "right", value: rightScale.value}));
+                right.append(rightScale); row.append(right);
+            }
+            const order = document.createElement("div"); order.className = "plot-order";
+            for (const [direction, name] of [[-1, "Move up"], [1, "Move down"]]) {
+                const button = document.createElement("button"); button.type = "button";
+                button.textContent = name; button.setAttribute("aria-label", `${panel.label}: ${name}`);
+                button.addEventListener("click", () => command("reorder", {panel: panel.id, direction}));
+                order.append(button);
+            }
+            row.append(order); return row;
+        }));
+        renderCurveControls();
+    }
+
+    function renderCurveControls() {
+        const query = document.getElementById("plot-curve-find").value.toLowerCase();
+        const list = document.getElementById("plot-curve-list");
+        list.replaceChildren(...(workspace?.series || []).filter((s) =>
+            `${s.label} ${s.unit} ${s.source}`.toLowerCase().includes(query)).map((series) => {
+            const row = document.createElement("div"); row.className = "plot-field plot-curve-row";
+            const choose = document.createElement("label"); choose.className = "plot-compare-choice";
+            const checkbox = document.createElement("input"); checkbox.type = "checkbox";
+            checkbox.checked = comparison.has(series.id);
+            checkbox.setAttribute("aria-label", `Compare ${series.label}`);
+            checkbox.addEventListener("change", () => {
+                if (checkbox.checked) comparison.add(series.id); else comparison.delete(series.id);
+                renderCompareState();
+            });
+            choose.append(checkbox, document.createTextNode(`${series.label} · ${series.unit}`));
+            row.append(choose);
+            if (series.meaning) row.title = series.meaning;
+            const select = document.createElement("select");
+            select.setAttribute("aria-label", `${series.label} chart`);
+            select.add(new Option("Hidden", "hidden"));
+            for (const panel of workspace.panels.filter((p) => p.unit === series.unit || p.secondaryUnit === series.unit)) {
+                select.add(new Option(panel.label, panel.id));
+            }
+            select.add(new Option("Separate chart", "new"));
+            select.value = series.visible ? series.panel : "hidden";
+            select.addEventListener("change", () => {
+                if (select.value === "hidden") command("visibility", {series: series.id, visible: false});
+                else command("move", {series: series.id, panel: select.value});
+            });
+            row.append(select);
+            if (["Bu_c", "Bd_c"].includes(series.column)) {
+                const zero = document.createElement("details");
+                const title = document.createElement("summary");
+                title.textContent = series.zero_applied ? `Zero offset · ${series.zero_offset.toExponential()} ${series.unit}` : "Zero offset";
+                const label = document.createElement("label"); label.className = "plot-field";
+                label.append(document.createTextNode(`Subtract offset · ${series.unit}`));
+                const input = document.createElement("input"); input.type = "text"; input.inputMode = "text";
+                input.value = String(series.zero_offset || 0);
+                input.setAttribute("aria-label", `${series.label} zero offset`);
+                label.append(input);
+                const actions = document.createElement("div"); actions.className = "plot-order";
+                const apply = document.createElement("button"); apply.type = "button"; apply.textContent = "Apply";
+                apply.addEventListener("click", () => {
+                    const value = Number(input.value.trim());
+                    input.setCustomValidity(input.value.trim() && Number.isFinite(value) ? "" : "Enter a finite number, such as -1e-6.");
+                    if (input.reportValidity()) command("zero", {series: series.id, offset: value});
+                });
+                const reset = document.createElement("button"); reset.type = "button"; reset.textContent = "Reset zero";
+                reset.disabled = !series.zero_applied;
+                reset.addEventListener("click", () => command("reset-zero", {series: series.id}));
+                actions.append(apply, reset);
+                const hint = document.createElement("small"); hint.textContent = "Displayed = recorded − offset. Use Linear to see negative values.";
+                zero.append(title, label, actions, hint); row.append(zero);
+            }
+            return row;
+        }));
+        renderCompareState();
+    }
+
+    function renderCompareState() {
+        const chosen = (workspace?.series || []).filter((s) => comparison.has(s.id));
+        const units = new Set(chosen.map((s) => s.unit));
+        document.getElementById("plot-compare").disabled = chosen.length < 2 || units.size > 2;
+        document.getElementById("plot-compare-note").textContent = units.size > 2
+            ? "Use up to two units per comparison; each gets its own axis."
+            : chosen.length ? `${chosen.length} curves · ${[...units].join(" + ")}${units.size === 2 ? " · two axes" : ""}` : "Select curves to compare.";
+    }
+
+    window.addEventListener("message", (event) => {
+        if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
+        const payload = event.data;
+        if (!payload || (payload.file && payload.file !== selectedFile)) return;
+        if (payload.type === "pihti-plot-error") {
+            comparing = false;
+            document.getElementById("plot-compare-note").textContent = payload.error;
+            showStatus(payload.error || "This recording could not be plotted.");
+        } else if (payload.type === "pihti-plot-ready") {
+            workspace = payload;
+            showStatus("");
+            const signature = JSON.stringify([payload.file, payload.panels, payload.series, payload.drag]);
+            if (signature !== workspaceSignature) {
+                workspaceSignature = signature;
+                renderContext(payload);
+                renderPanelControls();
+                document.getElementById("plot-drag").value = payload.drag || "zoom";
+            }
+            if (comparing) {
+                comparing = false;
+                comparison.clear();
+                closeEditor(true);
+            }
+            if (Number.isFinite(payload.height)) frame.style.height = `${Math.max(380, payload.height)}px`;
+        }
+    });
+    frame.addEventListener("load", () => {
+        if (frame.src.includes("/plot/view") && !frame.contentDocument?.getElementById("recording-data")) {
+            showStatus("That recording is unavailable. Choose another file.");
+        }
+    });
+    window.addEventListener("popstate", () => {
+        const file = new URLSearchParams(location.search).get("file");
+        if (file) openRecording(file);
+        else { selectedFile = null; renderDownload(); showEmpty("Choose a recording."); }
+    });
+    document.getElementById("plot-drag").addEventListener("change", (event) => command("drag", {value: event.target.value}));
+    document.getElementById("plot-reset").addEventListener("click", () => command("reset"));
+    document.getElementById("plot-defaults").addEventListener("click", () => command("defaults"));
+    document.getElementById("plot-curves-export").addEventListener("click", () => command("export-curves"));
+    document.getElementById("plot-image").addEventListener("click", () => command("image"));
+    document.getElementById("plot-compare").addEventListener("click", () => {
+        comparing = true;
+        closeEditor(true);
+        showStatus("Arranging curves…");
+        command("compare", {series: [...comparison]});
+    });
+    document.getElementById("plot-file-find")?.addEventListener("input", renderDayList);
+    document.getElementById("plot-curve-find").addEventListener("input", renderCurveControls);
+    document.getElementById("plot-arrange-toggle").addEventListener("click", (event) => {
+        const panel = document.getElementById("plot-arrange");
+        if (!panel.hidden) { closeEditor(); return; }
+        plotScroll = window.scrollY;
+        panel.hidden = false;
+        document.getElementById("plotArea").inert = true;
+        document.querySelector(".page-main").classList.add("plot-editing");
+        event.target.setAttribute("aria-expanded", "true");
+        window.pihtiRails?.closeDrawers();
+        window.scrollTo(0, 0);
+        document.getElementById("plot-curve-find").focus({preventScroll: true});
+    });
+    function closeEditor(toTop = false) {
+        const panel = document.getElementById("plot-arrange");
+        if (panel.hidden) return;
+        panel.hidden = true;
+        document.getElementById("plotArea").inert = false;
+        document.querySelector(".page-main").classList.remove("plot-editing");
+        document.getElementById("plot-arrange-toggle").setAttribute("aria-expanded", "false");
+        window.scrollTo(0, toTop ? 0 : plotScroll);
+    }
+    document.getElementById("plot-arrange-close").addEventListener("click", () => closeEditor());
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeEditor(); });
+    document.getElementById("plot-axes-toggle").addEventListener("click", (event) => {
+        const panel = document.getElementById("plot-panels"); panel.hidden = !panel.hidden;
+        event.target.setAttribute("aria-expanded", String(!panel.hidden));
+    });
 
     // Read the address before the first render writes it back.
-    const requested = new URLSearchParams(window.location.search).get("file");
+    let remembered = "";
+    try { remembered = localStorage.getItem("pihti.plot.last-file") || ""; } catch (_) { /* Optional memory. */ }
+    const requested = new URLSearchParams(window.location.search).get("file") || remembered;
     (async function start() {
+        renderPanelControls();
         if (monthKey) {
             storeMonth(monthKey, archive.days);
             currentMonth = calendar.monthOf(`${monthKey}-01`);
@@ -320,8 +550,7 @@
         }
         updateMonthSteps();
         if (requested) {
-            await selectFile(requested);
-            fetchPlot(requested);
+            openRecording(requested);
         } else {
             fetchLastPlot();
         }

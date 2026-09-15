@@ -140,9 +140,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.23.6"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.23.6"}
-    assert b"v0.23.6" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.24.5"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.24.5"}
+    assert b"v0.24.5" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -546,7 +546,7 @@ def test_plot_finds_recordings_by_calendar_day_not_by_one_long_list(client, tmp_
     assert 'id="plot-calendar"' in page and 'id="calendar-latest"' in page
     assert 'id="file-list"' in page and "calendar.js" in page
     # The archive reaches the browser as data, never as thirteen hundred buttons.
-    assert "<details" not in page and 'data-file="cu_' not in page
+    assert 'data-file="cu_' not in page
     payload = json.loads(page.split('id="archive-data">', 1)[1].split("</script>", 1)[0])
     # Since 0.9.1 the page carries the newest month and the index of months,
     # not the whole archive; the rest is fetched a month at a time.
@@ -3939,3 +3939,40 @@ def test_advisories_do_not_block_practice_autosave_or_record_mistakes(client, ap
     assert client.post("/warning-attempt", json={"id": "gasline-h", "status": "active"}).json["warnings"] == []
     assert client.post("/update", json={"id": "gasline-h", "status": "active"}).status_code == 200
     assert not Path(app.config["LOG_FILE"]).with_name("warning_attempts.jsonl").exists()
+
+
+def test_recording_view_is_file_specific_and_export_is_lossless(client, app):
+    from io import BytesIO
+    from zipfile import ZipFile
+
+    folder = Path(app.config['CUDATA_DIRECTORY'])
+    files = {
+        'cu_20260915_120000.csv': '# Columns,date,Ip_c,Pu_c,IGmode\n2026-09-15 12:00:00,0.2,0.001,0\n',
+        'kikusui_20260915_120000.csv': 'date,voltage_v,current_a,status,error,identity\n2026-09-15T12:00:00+09:00,300,0.4,ok,,synthetic\n',
+        'pid_20260915_120000.csv': 'date,error_a,state\n2026-09-15 12:00:00,0.1,idle\n',
+    }
+    for name, content in files.items():
+        (folder / name).write_bytes(content.encode())
+    (folder / 'kikusui_20260915_120001.csv').write_text('unrelated')
+    view = client.get('/plot/view?file=cu_20260915_120000.csv')
+    assert view.status_code == 200
+    assert view.headers['Cache-Control'] == 'no-store'
+    assert b'Cathode current (Ic)' in view.data
+    assert b'error_a' in view.data
+    assert not Path(app.config['LAST_PLOT_FILE']).exists()
+    exported = client.get('/plot/export?file=cu_20260915_120000.csv')
+    assert exported.status_code == 200
+    with ZipFile(BytesIO(exported.data)) as archive:
+        assert set(archive.namelist()) == set(files)
+        for name, content in files.items():
+            assert archive.read(name) == content.encode()
+    assert client.get('/plot/export?file=../cu_20260915_120000.csv').status_code == 404
+    assert client.get('/plot/view?file=missing.csv').status_code == 404
+    assert client.get('/plot/view?file=cu_20260101_120000.csv').status_code == 422
+
+
+def test_plot_bundle_uses_release_cache(client):
+    response = client.get('/plot/plotly.js?v=' + __version__)
+    assert response.status_code == 200
+    assert 'immutable' in response.headers['Cache-Control']
+    assert client.get('/plot/plotly.js?v=old').headers['Cache-Control'] == 'no-store'

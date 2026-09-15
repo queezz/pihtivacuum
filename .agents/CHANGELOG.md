@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.24.5
+
+- Read upstream ion-gauge channels and same-run Kikusui telemetry, preserving
+  recorder-local time, recorded ranges and instrument-off gaps.
+- Choose and arrange all numeric curves in the main view. Compare pressure,
+  current, or pressure with MFC signal/setpoint using independent unit axes.
+  Add log/linear scales, chart order, linked time zoom/pan and PNG export.
+- Apply a manual Baratron zero offset per recording. Show signed values on
+  linear axes and mark corrected curves; keep original samples unchanged.
+- Keep exports in the right rail: original same-run CSVs as ZIP, ADC CSV,
+  displayed-curve CSV with original/offset/corrected values, and chart PNG.
+  Collapse data notes and remove repeated explanatory text.
+
 ## 0.23.6
 
 - Reuse release-stamped equipment configuration and plumbing JSON between

@@ -1,0 +1,10 @@
+:root { color-scheme: dark; font-family: Aptos, Calibri, system-ui, sans-serif; color: #d2d8df; background: #161b22; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 100%; }
+#charts { padding: 8px; }
+.plot-panel { margin: 0 0 16px; border-bottom: 1px solid #303946; padding-bottom: 8px; }
+.plot-panel:last-child { margin-bottom: 0; border-bottom: 0; }
+.plot-panel-heading { margin: 8px 12px; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.plot-chart { width: 100%; min-height: 350px; }
+.plot-panel-note, .plot-workspace-empty { margin: 12px; font-size: 13px; color: #b6c0cc; }
+body > svg { position: absolute; top: 0; left: 0; visibility: hidden; }

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recording · PIHTI</title>
+    <link rel="stylesheet" href="{{ asset('css/plot-workspace.css') }}">
+</head>
+<body>
+    <div id="charts" aria-label="Recorded measurements"></div>
+    <script type="application/json" id="recording-data">{{ recording|tojson }}</script>
+    <script src="{{ url_for('plotly_bundle', v=app_version) }}"></script>
+    <script src="{{ asset('js/plot-workspace.js') }}"></script>
+</body>
+</html>
