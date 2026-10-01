@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.0
+
+- Link Plasma/QMS IG filament state between Power and Vacuum. Vacuum-on implies
+  controller power and plug; Power unplug/off clears the Vacuum IG. Each
+  diagram records its own related changes in its separate history.
+- Apply the existing Vacuum exposure check to Power IG activation, including
+  Practice review and blocked automatic saving of warned sequences.
+- Colour a powered IG card blue with filament off and green with filament on.
+
 ## 0.26.4
 
 - Tint the whole powered-on device card green in live, Practice and History.

@@ -28,8 +28,9 @@ if (typeof document !== 'undefined') (async function () {
       const card = host.querySelector('#' + (cards[entry.device] || entry.device) + ' > rect.device');
       if (card) {
         const on = state[entry.id] === 'active';
-        card.style.fill = on ? '#234b40' : '';
-        card.style.stroke = on ? '#36be82' : '';
+        const filamentOff = config.some(item => item.device === entry.device && item.kind === 'filament') && state[entry.device + '-gauge'] !== 'active';
+        card.style.fill = on ? filamentOff ? '#233f58' : '#234b40' : '';
+        card.style.stroke = on ? filamentOff ? '#35aaff' : '#36be82' : '';
       }
     });
     controls.forEach(el => {
@@ -79,21 +80,24 @@ if (typeof document !== 'undefined') (async function () {
   async function request(url, payload) {
     const response = await fetch(url, payload === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const result = await response.json();
-    if (!response.ok) {if (response.status === 428) identified = false; throw Error(result.error || 'Recording failed');}
+    if (!response.ok) {if (response.status === 428) identified = false; const error = Error(result.error || 'Recording failed'); error.result = result; throw error;}
     return result;
   }
   function rebuild() {
     state = {...recorded.state};
     presses.forEach(item => {state = pihtiPowerTransition(state,item,config);});
   }
-  async function save(auto=false) {
+  async function save(auto=false, acknowledge=false) {
     if (busy || !identified || !presses.length) return;
     busy = true; paint();
     try {
-      recorded = await request('/power/practice/save',{presses,auto});
+      recorded = await request('/power/practice/save',{presses,auto,acknowledge_warnings:acknowledge});
       state = {...recorded.state}; presses = []; deadline = 0;
       busy = false; paint();
-    } catch(error) {busy = false; deadline = 0; paint(); message(error.message);}
+    } catch(error) {
+      busy = false; deadline = 0; paint(); message(error.message);
+      if (!auto && error.result?.warnings?.length && window.confirm(error.message + '\nRecord this sequence after reviewing the warning?')) save(false,true);
+    }
   }
   try {
     const version = encodeURIComponent(document.body.dataset.assetVersion);
@@ -121,7 +125,11 @@ if (typeof document !== 'undefined') (async function () {
           deadline = Date.now() + seconds*1000; busy=false; paint(); return;
         }
         try {recorded = await request('/power/update',item); state = {...recorded.state};busy=false;paint();}
-        catch(error) {busy=false;paint();message(error.message);}
+        catch(error) {
+          busy=false;
+          if (error.result?.requires_practice) {practice=true;presses.push(item);state=pihtiPowerTransition(state,item,config);deadline=0;}
+          paint();message(error.message);
+        }
       }
       el.addEventListener('click',press);
       el.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();press();}});

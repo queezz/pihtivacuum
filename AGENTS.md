@@ -418,3 +418,12 @@ Owner amendment the same session: ordinary Power clicks need no confirmation
 dialog. Practice is the deliberate rehearsal. A whole equipment card highlights
 when its power is on, not merely plugged. Every icon control needs a filled
 button-sized hit area; clicking only the drawn power-symbol stroke is a defect.
+
+The two IG filaments are shared annotations between the diagrams: Plasma IG
+maps to bypass-ionization-gauge and QMS IG to downstream-ionization-gauge.
+Vacuum IG-on implies Power filament/power/plug on. Power unplug or power-off
+clears the corresponding Vacuum IG. Filament-off leaves controller power on.
+Each history records only its own control IDs for the linked change; unrelated
+records remain separate. Practice stays local until saved. Power activation
+must use the same Vacuum exposure check and warning-review gate. A powered IG
+card is blue while its filament is off, green while on; power-off is grey.

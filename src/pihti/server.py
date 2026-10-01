@@ -687,6 +687,26 @@ def create_app(test_config: dict | None = None) -> Flask:
     power_controls = _load_json(PKG_DIR / "static" / "powerControls.json", [])
     power_config = {item["id"]: item for item in power_controls}
     power_lock = Lock()
+    power_gauges = {"plasma-ig": "bypass-ionization-gauge", "qms-ig": "downstream-ionization-gauge"}
+
+    def sync_power_from_vacuum(changes, timestamp, note=""):
+        relevant = [change for change in changes if change["id"] in power_gauges.values()]
+        if not relevant:
+            return
+        with power_lock:
+            state = power_snapshot()["state"]
+            linked = []
+            for change in relevant:
+                device = next(name for name, gauge in power_gauges.items() if gauge == change["id"])
+                linked.extend(power_changes(state, {"id": device + "-gauge", "status": change["status"]}))
+                if change["status"] == "active":
+                    for suffix in ("-power", "-plug-switch"):
+                        key = device + suffix
+                        if not any(item["id"] == key and item["status"] == "active" for item in linked):
+                            linked.append({"id": key, "status": "active"})
+            save_log_csv({"timestamp": timestamp, "id": linked[-1]["id"], "status": linked[-1]["status"],
+                          "user": session["username"], "changes": json.dumps(linked),
+                          "note": note or "linked from Vacuum"}, Path(app.config["POWER_HISTORY_FILE"]))
 
     def power_events():
         # Preserve the initial snapshot release without mixing vacuum events.
@@ -715,6 +735,12 @@ def create_app(test_config: dict | None = None) -> Flask:
         for event in events:
             for change in event["changes"]:
                 state[change["id"]] = "active" if change["state"] else "inactive"
+        for device, gauge in power_gauges.items():
+            if gauge in elements_state:
+                state[device + "-gauge"] = elements_state[gauge]
+                if elements_state[gauge] == "active":
+                    state[device + "-power"] = "active"
+                    state[device + "-plug-switch"] = "active"
         return {"state": state, "timestamp": events[-1]["ts"] if events else None}
 
     def power_changes(state, item):
@@ -739,7 +765,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             state[change["id"]] = change["status"]
         return changes
 
-    def record_power(presses, practice=False, auto=False):
+    def record_power(presses, practice=False, auto=False, acknowledge=False):
         with power_lock:
             snapshot = power_snapshot()
             state = snapshot["state"]
@@ -751,13 +777,39 @@ def create_app(test_config: dict | None = None) -> Flask:
                     changes.extend(power_changes(state, item))
             except ValueError as error:
                 return jsonify(error=str(error)), 400
+            linked = [{"id": power_gauges[power_config[change["id"]]["device"]], "status": change["status"]}
+                      for change in changes if power_config[change["id"]]["kind"] == "filament"]
+            rehearsed = dict(elements_state)
+            warnings = []
+            for change in linked:
+                warnings.extend(item for item in plumbing_map.press_warnings(plumbing, rehearsed, change["id"], change["status"], current_line_mode()) if not item.get("advisory"))
+                rehearsed[change["id"]] = change["status"]
+            if warnings and (not practice or auto or not acknowledge):
+                if not practice:
+                    change = linked[-1]
+                    record_warning_attempt(change["id"], change["status"], elements_state, warnings)
+                # Names, rather than component keys, explain the same warning on Power.
+                labels = {item["id"]: item.get("label", "Ion gauge") for item in element_config}
+                warning_text = "; ".join(f"{labels.get(item['id'], 'Ion gauge')}: diagram predicts {item['state']} exposure" for item in warnings)
+                return jsonify(requires_practice=True, warnings=warnings, error=warning_text + ". Review in Practice before saving."), 409
             timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
             note = f"practice sequence, {len(presses)} presses" if practice else ""
             if auto:
                 note += ", saved by the timer"
+            if warnings:
+                note += ", warnings reviewed"
             save_log_csv({"timestamp": timestamp, "id": changes[-1]["id"],
                           "status": changes[-1]["status"], "user": session["username"],
                           "changes": json.dumps(changes), "note": note}, Path(app.config["POWER_HISTORY_FILE"]))
+            if linked:
+                for change in linked:
+                    elements_state[change["id"]] = change["status"]
+                save_state()
+                entry = {"timestamp": timestamp, "id": linked[-1]["id"], "status": linked[-1]["status"],
+                         "user": session["username"], "changes": json.dumps(linked), "note": note or "linked from Power"}
+                logs.append(entry)
+                del logs[:-MAX_LOGS]
+                save_log_csv(entry, Path(app.config["LOG_FILE"]))
             touch_operator()
             return jsonify(state=state, timestamp=timestamp)
 
@@ -781,7 +833,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict) or not isinstance(data.get("presses"), list) or not 0 < len(data["presses"]) <= MAX_PRACTICE_PRESSES:
             return jsonify(error="presses must be a non-empty list within the practice limit"), 400
-        return record_power(data["presses"], practice=True, auto=bool(data.get("auto")))
+        return record_power(data["presses"], practice=True, auto=bool(data.get("auto")), acknowledge=data.get("acknowledge_warnings") is True)
 
     @app.route("/power/history")
     def power_history():
@@ -1057,6 +1109,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         logs.append(log_entry)
         del logs[:-MAX_LOGS]
         save_log_csv(log_entry, Path(app.config["LOG_FILE"]))
+        sync_power_from_vacuum([{"id": element_id, "status": status}], timestamp)
         # The new prediction travels back with the press. It is the same walk
         # `/predicted-vacuum` would answer with a moment later, and sending it
         # here is what lets the page redraw in one round trip instead of two.
@@ -1284,6 +1337,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         logs.append(log_entry)
         del logs[:-MAX_LOGS]
         save_log_csv(log_entry, Path(app.config["LOG_FILE"]))
+        sync_power_from_vacuum(changes, timestamp, note)
         return jsonify(
             {
                 "message": "Practice sequence recorded",

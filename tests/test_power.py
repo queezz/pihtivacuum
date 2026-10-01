@@ -70,3 +70,41 @@ def test_legacy_power_snapshots_remain_in_power_history(tmp_path):
     assert len(client.get('/power/history/events').json) == 1
     assert client.get('/history/events').json == []
     assert path.read_bytes() == before
+
+
+def test_ig_linkage_both_tabs_and_practice(tmp_path):
+    client = power_app(tmp_path).test_client()
+    identify(client)
+    result = client.post('/power/update', json={'id':'plasma-ig-gauge','status':'active'})
+    assert result.status_code == 200
+    assert client.get('/state').json['bypass-ionization-gauge'] == 'active'
+    assert client.get('/history/events').json[-1]['id'] == 'bypass-ionization-gauge'
+    client.post('/power/update', json={'id':'plasma-ig-plug-switch','status':'inactive'})
+    assert client.get('/state').json['bypass-ionization-gauge'] == 'inactive'
+    result = client.post('/update', json={'id':'downstream-ionization-gauge','status':'active'})
+    assert result.status_code == 200
+    state = client.get('/power/state').json['state']
+    assert state['qms-ig-gauge'] == state['qms-ig-power'] == state['qms-ig-plug-switch'] == 'active'
+    changes = client.get('/power/history/events').json[-1]['changes']
+    assert {change['id'] for change in changes} == {'qms-ig-gauge','qms-ig-power','qms-ig-plug-switch'}
+    client.post('/practice/save', json={'presses':[{'id':'downstream-ionization-gauge','status':'inactive'}]})
+    state = client.get('/power/state').json['state']
+    assert state['qms-ig-gauge'] == 'inactive'
+    assert state['qms-ig-power'] == 'active'
+    result = client.post('/power/practice/save', json={'presses':[{'id':'qms-ig-gauge','status':'active'}]})
+    assert result.status_code == 200
+    assert client.get('/state').json['downstream-ionization-gauge'] == 'active'
+
+
+def test_power_ig_link_cannot_bypass_vacuum_exposure_warning(tmp_path):
+    (tmp_path / 'elements_state.json').write_text(json.dumps({
+        'hydrogen-bottle':'active','rect44907-1':'active','gasline-h':'active','gasline-main':'active'}))
+    client = power_app(tmp_path).test_client()
+    identify(client)
+    result = client.post('/power/update', json={'id':'plasma-ig-gauge','status':'active'})
+    assert result.status_code == 409 and result.json['requires_practice']
+    assert client.get('/power/history/events').json == []
+    assert client.get('/state').json.get('bypass-ionization-gauge') != 'active'
+    presses = [{'id':'plasma-ig-gauge','status':'active'}]
+    assert client.post('/power/practice/save', json={'presses':presses,'auto':True}).status_code == 409
+    assert client.post('/power/practice/save', json={'presses':presses,'acknowledge_warnings':True}).status_code == 200
