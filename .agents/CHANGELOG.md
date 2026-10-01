@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.2
+
+- Remove small break marks from unplugged pictograms; separated plug halves and muted colour communicate disconnection.
+
 ## 0.27.1
 
 - Dim unplugged device cards while keeping controls readable.

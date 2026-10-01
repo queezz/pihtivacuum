@@ -27,7 +27,6 @@
         <path d="M2 20H12M52 20H62" fill="none" stroke="currentColor" stroke-width="3" />
         <path d="M12 11H23V29H12ZM43 11H52V29H43Z" fill="currentColor" />
         <path d="M23 15H29M23 25H29" stroke="currentColor" stroke-width="3" />
-        <path d="M35 6L32 12M35 28L32 34" stroke="currentColor" stroke-width="2" />
       </symbol>
       <symbol id="plug-connected-icon" viewBox="0 0 64 40">
         <path d="M2 20H17M47 20H62" fill="none" stroke="currentColor" stroke-width="3" />
