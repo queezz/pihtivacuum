@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}History · PIHTI{% endblock %}
+{% block title %}{{ "Power history" if power_history else "History" }} · PIHTI{% endblock %}
 
-{% block extra_head %}{% include 'diagram_preloads.html' %}{% endblock %}
+{% block extra_head %}{% if power_history %}<link rel="stylesheet" href="{{ asset('css/power.css') }}">{% else %}{% include 'diagram_preloads.html' %}{% endif %}{% endblock %}
 
 {% block content %}
-<script>window.historyMode = true;</script>
+<script>window.historyMode = true; window.powerHistory = {{ "true" if power_history else "false" }};</script>
 <div class="page">
     <aside class="rail rail-left" id="history-controls" aria-label="History controls">
         <button class="drawer-close" type="button">Close</button>
@@ -35,8 +35,10 @@
             <button type="button" data-drawer="history-controls" aria-controls="history-controls" aria-expanded="false">Calendar &amp; timeline</button>
             <button type="button" data-drawer="history-context" aria-controls="history-context" aria-expanded="false">State &amp; moment</button>
         </div>
+        {% if power_history %}<p><a href="/power">Back to Power</a> · Power history</p>{% endif %}
         <p id="history-status" class="muted" role="status">Loading recorded history…</p>
-        <div id="diagram-container" data-paint="loading" aria-busy="true" aria-label="Diagram state at the selected moment" hidden>
+        <div id="diagram-container" {% if power_history %}class="power-history-drawing"{% endif %} data-paint="loading" aria-busy="true" aria-label="Diagram state at the selected moment" hidden>
+{% if power_history %}<div id="power-drawing" aria-label="Recorded power diagram"></div>{% endif %}
             <p class="diagram-load-status" role="status">Loading diagram…</p>
         </div>
         <div id="tooltip"></div>
@@ -44,7 +46,7 @@
 
     <aside class="rail rail-right" id="history-context" aria-label="Predicted state and selected moment">
         <button class="drawer-close" type="button">Close</button>
-        <section class="rail-card" id="history-state-card" aria-label="What the drawing predicts" hidden>
+        <section class="rail-card" id="history-state-card" {% if power_history %}style="display:none"{% endif %} aria-label="What the drawing predicts" hidden>
             <h2 class="rail-label">Predicted state</h2>
             <p class="rail-lead">Predicted from the valve positions at the selected moment, not measured.</p>
             <p id="oil-warning" class="oil-warning" role="status" hidden></p>
@@ -71,8 +73,8 @@
         <section class="rail-card">
             <h2 class="rail-label">Export</h2>
             <div class="export-actions">
-                <a class="button" href="{{ url_for('download_logs') }}">Download history (CSV)</a>
-                <a class="button" href="{{ url_for('download_warning_attempts') }}">Download warning attempts</a>
+                <a class="button" href="{{ url_for('download_power_logs') if power_history else url_for('download_logs') }}">Download history (CSV)</a>
+                {% if not power_history %}<a class="button" href="{{ url_for('download_warning_attempts') }}">Download warning attempts</a>{% endif %}
             </div>
         </section>
     </aside>
@@ -81,6 +83,6 @@
 
 {% block extra_js %}
 <script src="{{ asset('js/calendar.js') }}"></script>
-<script src="{{ asset('js/diagram.js') }}"></script>
+{% if power_history %}<script src="{{ asset('js/power.js') }}"></script>{% else %}<script src="{{ asset('js/diagram.js') }}"></script>{% endif %}
 <script src="{{ asset('js/history.js') }}"></script>
 {% endblock %}

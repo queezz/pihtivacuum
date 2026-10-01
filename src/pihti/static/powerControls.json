@@ -1,0 +1,140 @@
+[
+  {
+    "id": "anode-power-switch",
+    "label": "Anode power",
+    "device": "anode",
+    "kind": "power"
+  },
+  {
+    "id": "anode-plug-switch",
+    "label": "Anode plug",
+    "device": "anode",
+    "kind": "plug"
+  },
+  {
+    "id": "preanode-power-switch",
+    "label": "Preanode power",
+    "device": "preanode",
+    "kind": "power"
+  },
+  {
+    "id": "preanode-plug-switch",
+    "label": "Preanode plug",
+    "device": "preanode",
+    "kind": "plug"
+  },
+  {
+    "id": "cathode-power-switch",
+    "label": "Cathode power",
+    "device": "cathode",
+    "kind": "power"
+  },
+  {
+    "id": "cathode-plug-switch",
+    "label": "Cathode plug",
+    "device": "cathode",
+    "kind": "plug"
+  },
+  {
+    "id": "target-power-switch",
+    "label": "Sputtering target power",
+    "device": "target",
+    "kind": "power"
+  },
+  {
+    "id": "target-plug-switch",
+    "label": "Sputtering target plug",
+    "device": "target",
+    "kind": "plug"
+  },
+  {
+    "id": "controlunit-power-switch",
+    "label": "ControlUnit power",
+    "device": "controlunit",
+    "kind": "power"
+  },
+  {
+    "id": "instrument-box-power-switch",
+    "label": "Baratrons / MFCs power",
+    "device": "instrument-box",
+    "kind": "power"
+  },
+  {
+    "id": "ni-logger-power-switch",
+    "label": "NI logger power",
+    "device": "ni-logger",
+    "kind": "power"
+  },
+  {
+    "id": "langmuir-supplies-power-switch",
+    "label": "Langmuir supplies power",
+    "device": "langmuir-supplies",
+    "kind": "power"
+  },
+  {
+    "id": "membrane-heater-power-switch",
+    "label": "Membrane heater power",
+    "device": "membrane-heater",
+    "kind": "power"
+  },
+  {
+    "id": "membrane-heater-plug-switch",
+    "label": "Membrane heater plug",
+    "device": "membrane-heater",
+    "kind": "plug"
+  },
+  {
+    "id": "plasma-ig-power",
+    "label": "Plasma ion gauge power",
+    "device": "plasma-ig",
+    "kind": "power"
+  },
+  {
+    "id": "plasma-ig-plug-switch",
+    "label": "Plasma ion gauge plug",
+    "device": "plasma-ig",
+    "kind": "plug"
+  },
+  {
+    "id": "plasma-ig-gauge",
+    "label": "Plasma ion gauge filament",
+    "device": "plasma-ig",
+    "kind": "filament"
+  },
+  {
+    "id": "qms-ig-power",
+    "label": "QMS ion gauge power",
+    "device": "qms-ig",
+    "kind": "power"
+  },
+  {
+    "id": "qms-ig-plug-switch",
+    "label": "QMS ion gauge plug",
+    "device": "qms-ig",
+    "kind": "plug"
+  },
+  {
+    "id": "qms-ig-gauge",
+    "label": "QMS ion gauge filament",
+    "device": "qms-ig",
+    "kind": "filament"
+  },
+  {
+    "id": "single-gauge-power",
+    "label": "SingleGauge power",
+    "device": "single-gauge",
+    "kind": "power"
+  },
+  {
+    "id": "single-gauge-plug-switch",
+    "label": "SingleGauge plug",
+    "device": "single-gauge",
+    "kind": "plug"
+  },
+  {
+    "id": "cathode-water",
+    "label": "Cathode cooling water",
+    "device": "cathode-water",
+    "kind": "water"
+  }
+]

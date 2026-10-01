@@ -533,6 +533,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         SETTINGS_FILE=_env_path("PIHTI_SETTINGS_FILE", runtime_root / "settings.json"),
         LOG_FILE=runtime_root / "logs.csv",
         POWER_LOG_FILE=runtime_root / "power_snapshots.jsonl",
+        POWER_HISTORY_FILE=runtime_root / "power_history.csv",
         STATE_FILE=runtime_root / "elements_state.json",
         OPERATION_CONTEXT_FILE=runtime_root / "operation_context.json",
         OPERATION_CONTEXT_LOG_FILE=runtime_root / "operation_context_log.csv",
@@ -683,75 +684,129 @@ def create_app(test_config: dict | None = None) -> Flask:
     def home():
         return render_template("index.html")
 
-    power_keys = {
-        name + suffix
-        for name in ("anode", "preanode", "cathode", "target", "controlunit",
-                     "instrument-box", "ni-logger", "langmuir-supplies", "membrane-heater")
-        for suffix in ("-power-switch",)
-    } | {name + "-plug-switch" for name in ("anode", "preanode", "cathode", "target", "membrane-heater", "plasma-ig", "qms-ig", "single-gauge")} | {
-        name + suffix for name in ("plasma-ig", "qms-ig", "single-gauge")
-        for suffix in ("-power", "-gauge")
-    }
-    power_keys.discard("single-gauge-gauge")
-    power_keys.add("cathode-water")
+    power_controls = _load_json(PKG_DIR / "static" / "powerControls.json", [])
+    power_config = {item["id"]: item for item in power_controls}
+    power_lock = Lock()
+
+    def power_events():
+        # Preserve the initial snapshot release without mixing vacuum events.
+        result = []
+        legacy = Path(app.config["POWER_LOG_FILE"])
+        if legacy.exists():
+            with legacy.open(encoding="utf-8") as stream:
+                for line in stream:
+                    if not line.strip():
+                        continue
+                    snapshot = json.loads(line)
+                    changes = [{"id": key, "state": value in ("on", "plugged")}
+                               for key, value in snapshot["state"].items() if key in power_config]
+                    if changes:
+                        result.append({"ts": datetime.fromisoformat(snapshot["timestamp"]).strftime(TIMESTAMP_FORMAT),
+                                       "id": changes[-1]["id"], "state": changes[-1]["state"],
+                                       "user": snapshot.get("operator", ""), "changes": changes,
+                                       "note": "power snapshot"})
+        for event in load_history_events(Path(app.config["POWER_HISTORY_FILE"])):
+            result.append({**event, "ts": event["ts"].strftime(TIMESTAMP_FORMAT)})
+        return result
 
     def power_snapshot():
-        path = Path(app.config["POWER_LOG_FILE"])
-        if not path.exists():
-            return {"state": {}, "timestamp": None}
-        latest = {"state": {}, "timestamp": None}
-        with path.open(encoding="utf-8") as stream:
-            for line in stream:
-                if line.strip():
-                    latest = json.loads(line)
-        return latest
+        state = {}
+        events = power_events()
+        for event in events:
+            for change in event["changes"]:
+                state[change["id"]] = "active" if change["state"] else "inactive"
+        return {"state": state, "timestamp": events[-1]["ts"] if events else None}
+
+    def power_changes(state, item):
+        if not isinstance(item, dict) or item.get("id") not in power_config or item.get("status") not in ("active", "inactive"):
+            raise ValueError("Invalid power control or status")
+        key, status = item["id"], item["status"]
+        config = power_config[key]
+        changes = [{"id": key, "status": status}]
+        device = config["device"]
+        siblings = {entry["kind"]: entry["id"] for entry in power_controls if entry["device"] == device}
+        if status == "active" and config["kind"] in ("power", "filament"):
+            for kind in ("plug", "power"):
+                other = siblings.get(kind)
+                if other and other != key and state.get(other) != "active":
+                    changes.append({"id": other, "status": "active"})
+        if status == "inactive" and config["kind"] in ("plug", "power"):
+            for kind in ("power", "filament"):
+                other = siblings.get(kind)
+                if other and other != key and state.get(other) != "inactive":
+                    changes.append({"id": other, "status": "inactive"})
+        for change in changes:
+            state[change["id"]] = change["status"]
+        return changes
+
+    def record_power(presses, practice=False, auto=False):
+        with power_lock:
+            snapshot = power_snapshot()
+            state = snapshot["state"]
+            if not practice and len(presses) == 1 and isinstance(presses[0], dict) and presses[0].get("id") in power_config and state.get(presses[0]["id"]) == presses[0].get("status"):
+                return jsonify(snapshot)
+            changes = []
+            try:
+                for item in presses:
+                    changes.extend(power_changes(state, item))
+            except ValueError as error:
+                return jsonify(error=str(error)), 400
+            timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
+            note = f"practice sequence, {len(presses)} presses" if practice else ""
+            if auto:
+                note += ", saved by the timer"
+            save_log_csv({"timestamp": timestamp, "id": changes[-1]["id"],
+                          "status": changes[-1]["status"], "user": session["username"],
+                          "changes": json.dumps(changes), "note": note}, Path(app.config["POWER_HISTORY_FILE"]))
+            touch_operator()
+            return jsonify(state=state, timestamp=timestamp)
 
     @app.route("/power")
     def power():
         return render_template("power.html")
 
-    power_lock = Lock()
-
-    def serialize_power(view):
-        @wraps(view)
-        def wrapped(*args, **kwargs):
-            with power_lock:
-                return view(*args, **kwargs)
-        return wrapped
-
-    @app.route("/power/state", methods=["GET", "POST"])
-    @serialize_power
+    @app.route("/power/state")
     def power_state():
-        if request.method == "GET":
+        with power_lock:
             return jsonify(power_snapshot())
-        if "username" not in session:
-            return jsonify(error="Select an operator before recording."), 428
-        payload = request.get_json(silent=True) or {}
-        if not isinstance(payload, dict):
-            return jsonify(error="Invalid power snapshot."), 400
-        state = payload.get("state")
-        if not isinstance(state, dict) or any(
-            key not in power_keys or value not in ("on", "off", "plugged", "unplugged")
-            or (value in ("plugged", "unplugged")) != key.endswith("-plug-switch")
-            for key, value in state.items()
-        ):
-            return jsonify(error="Invalid power snapshot."), 400
-        if power_snapshot().get("timestamp") != payload.get("base_timestamp"):
-            return jsonify(error="Another operator saved. Reload before saving."), 409
-        for name in ("anode", "preanode", "cathode", "target", "membrane-heater", "plasma-ig", "qms-ig", "single-gauge"):
-            key = name + ("-power" if name in ("plasma-ig", "qms-ig", "single-gauge") else "-power-switch")
-            if state.get(key) == "on" and state.get(name + "-plug-switch") != "plugged":
-                return jsonify(error="Power on requires plugged state."), 400
-            if name in ("plasma-ig", "qms-ig") and state.get(name + "-gauge") == "on" and state.get(key) != "on":
-                return jsonify(error="Filament on requires controller power."), 400
-        snapshot = {"state": state, "timestamp": datetime.now().astimezone().isoformat(),
-                    "operator": session["username"]}
-        path = Path(app.config["POWER_LOG_FILE"])
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(snapshot) + "\n")
-        touch_operator()
-        return jsonify(snapshot)
+
+    @app.route("/power/update", methods=["POST"])
+    @operator_required
+    def power_update():
+        return record_power([request.get_json(silent=True)])
+
+    @app.route("/power/practice/save", methods=["POST"])
+    @operator_required
+    def power_practice_save():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict) or not isinstance(data.get("presses"), list) or not 0 < len(data["presses"]) <= MAX_PRACTICE_PRESSES:
+            return jsonify(error="presses must be a non-empty list within the practice limit"), 400
+        return record_power(data["presses"], practice=True, auto=bool(data.get("auto")))
+
+    @app.route("/power/history")
+    def power_history():
+        return render_template("history.html", power_history=True)
+
+    @app.route("/power/history/events")
+    def power_history_events():
+        with power_lock:
+            return jsonify(power_events())
+
+    @app.route("/power/elements-state")
+    def power_elements_state():
+        return jsonify(power_snapshot()["state"])
+
+    @app.route("/power/download_logs")
+    def download_power_logs():
+        from io import StringIO
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=LOG_FIELDS)
+        writer.writeheader()
+        for event in power_events():
+            writer.writerow({"timestamp": event["ts"], "id": event["id"],
+                             "status": "active" if event["state"] else "inactive", "user": event["user"],
+                             "changes": json.dumps([{"id": c["id"], "status": "active" if c["state"] else "inactive"} for c in event["changes"]]), "note": event["note"]})
+        return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=power-history.csv"})
 
     @app.route("/history")
     def serve_history_view():

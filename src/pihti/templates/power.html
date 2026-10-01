@@ -6,14 +6,20 @@
   <aside class="rail rail-left" id="power-controls">
     <button class="drawer-close" type="button">Close</button>
     <section class="rail-card">
-      <h2 class="rail-label">Power snapshot</h2>
-      <button id="power-save" type="button" disabled>Save snapshot</button>
-      <button id="power-discard" type="button">Discard</button>
+      <h2 class="rail-label">Practice</h2>
+      <label><input type="checkbox" id="practice-toggle" disabled> Practice</label>
       <p id="power-status" role="status">Loading…</p>
+      <div id="practice-actions" hidden>
+        <button id="practice-save" type="button">Save to history</button>
+        <button id="practice-undo" type="button">Undo</button>
+        <button id="practice-discard" type="button">Discard</button>
+        <p id="practice-timer" class="muted" role="status"></p>
+      </div>
+      <a href="/power/history">Power history</a>
     </section>
   </aside>
   <main class="page-main">
-    <div class="rail-toggles"><button data-drawer="power-controls" aria-controls="power-controls" aria-expanded="false">Snapshot</button><button data-drawer="power-context" aria-controls="power-context" aria-expanded="false">State</button></div>
+    <div class="rail-toggles"><button data-drawer="power-controls" aria-controls="power-controls" aria-expanded="false">Practice</button><button data-drawer="power-context" aria-controls="power-context" aria-expanded="false">State</button></div>
     <div id="power-drawing" aria-label="Power diagram"></div>
   </main>
   <aside class="rail rail-right" id="power-context">

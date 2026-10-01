@@ -4,3 +4,5 @@
 @media (max-width: 700px) {
   #power-drawing svg { min-width: 780px; }
 }
+
+#diagram-container.power-history-drawing { max-width: none; border: 0; background: none; }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.26.1
+
+- Apply Vacuum's operator click rules to Power: read-only controls are disabled,
+  confirmed presses record immediately, and Practice offers Undo, Discard,
+  one-event Save and the configured fallback timer. Pending Practice survives
+  tab navigation without a leaving-page prompt.
+- Keep Power history separate from Vacuum history while reusing the calendar,
+  grouped timeline, selected-moment replay and CSV export. Earlier power
+  snapshots remain readable in Power history without rewriting their source.
+- Move the water control below the target wire, above Baratrons/MFCs; remove
+  the redundant Power heading.
+
 ## 0.25.6
 
 - Give the water control clearance from the cathode-box label and upper

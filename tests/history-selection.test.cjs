@@ -9,7 +9,7 @@ const events = [
     {ts: '2026-09-10 12:00:00', id: 'valve', state: true, user: 'Example'},
 ];
 
-async function open({search = '', saved, rows = events, fail = false, storageThrows = false, cachedDiagram = false} = {}) {
+async function open({search = '', saved, rows = events, fail = false, storageThrows = false, cachedDiagram = false, powerHistory = false, stateNow = {valve: 'active'}} = {}) {
     const nodes = new Map(), listeners = {};
     const element = () => ({
         children: [], textContent: '', hidden: false, value: '', dataset: {},
@@ -20,6 +20,7 @@ async function open({search = '', saved, rows = events, fail = false, storageThr
     });
     const get = id => { if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); };
     let address, calendar, applied;
+    const requested = [];
     const context = {
         URLSearchParams, console: {error() {}},
         document: {
@@ -31,17 +32,18 @@ async function open({search = '', saved, rows = events, fail = false, storageThr
             setItem(_, value) { if (storageThrows) throw Error('unavailable'); saved = value; },
         },
         window: {
+            powerHistory,
             location: {search}, history: {replaceState(_, __, url) { address = url; }},
             pihtiCalendar: {render(value) { calendar = value; }},
             applyState(state, moment) { applied = {state, moment}; },
         },
-        fetch: async url => ({ok: !fail, json: async () => url === '/history/events' ? rows : {valve: 'active'}}),
+        fetch: async url => {requested.push(url); return {ok: !fail, json: async () => url.endsWith('/history/events') ? rows : stateNow};},
     };
     vm.runInNewContext(source, context);
     if (cachedDiagram) context.window.pihtiDiagramReady = true;
     await listeners.DOMContentLoaded();
     if (!cachedDiagram) listeners['pihti:diagram-ready']();
-    return {get, address: () => address, applied: () => applied, selectDay: day => calendar.onSelect(day)};
+    return {get, requested, address: () => address, applied: () => applied, selectDay: day => calendar.onSelect(day)};
 }
 
 test('History paints when cached diagram resources finish before its load listener', async () => {
@@ -79,4 +81,18 @@ test('before history, empty history and failed loads do not masquerade as a reco
     }
     assert.match((await open({fail: true})).get('history-status').textContent, /could not be loaded/);
     assert.match((await open({rows: []})).get('history-status').textContent, /No recorded changes/);
+});
+
+
+test('Power history uses separate endpoints and keeps later controls unrecorded at earlier moments', async () => {
+    const rows = [
+        {ts:'2026-10-01 10:00:00',id:'anode-power-switch',state:true,user:'Preview'},
+        {ts:'2026-10-01 11:00:00',id:'cathode-water',state:true,user:'Preview'},
+    ];
+    const page = await open({powerHistory:true,rows,search:'?at=2026-10-01T10:00:00',stateNow:{'anode-power-switch':'active','cathode-water':'active'}});
+    assert.deepEqual(page.requested,['/power/history/events','/power/elements-state']);
+    assert.match(page.address(),/^\/power\/history\?/);
+    assert.equal(page.applied().state['anode-power-switch'],'active');
+    assert.equal(page.applied().state['cathode-water'],undefined);
+    assert.equal(page.get('moment-image').hidden,true);
 });

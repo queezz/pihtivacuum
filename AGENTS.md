@@ -396,3 +396,20 @@ diagram pages preload them. Unstamped/stale URLs stay no-store. Never extend thi
 to live state, prediction, history, identity, operation context or rig settings.
 The diagram-ready flag and event both matter: History may start after a cached
 SVG finishes, and must still paint the selected historical moment.
+
+## Power click rules and history (owner, 2026-10-01; 0.26.1)
+
+Power follows Vacuum's operator interaction model: Read only disables diagram
+controls and Practice, a confirmed ordinary press records immediately, and
+Practice keeps local presses with Undo/Discard and one-event Save plus the
+configured fallback timer. Pending Power Practice survives navigation in the
+same browser tab; it does not trap navigation with an unload prompt.
+
+The diagrams have separate state and histories. Power uses power_history.csv
+outside the repository and /power/history, reusing the calendar, grouped
+timeline, remembered selection and replay UI. Never mix its records into
+Vacuum's log or interpret controller power as a vacuum gauge reading. Earlier
+power_snapshots.jsonl entries are preserved and read only as Power history.
+Power controls and their readable labels live in powerControls.json. Power on
+implies plugged; unplugging clears power and ULVAC filament. SingleGauge has
+no filament toggle. Manual cathode cooling water is independent of electricity.

@@ -33,7 +33,9 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
     let pendingState = null;
     let diagramReady = false;
     let loadFailed = false;
-    const SELECTION_KEY = "pihti-history-moment";
+    const POWER_HISTORY = typeof window !== "undefined" && Boolean(window.powerHistory);
+    const HISTORY_PATH = POWER_HISTORY ? "/power/history" : "/history";
+    const SELECTION_KEY = POWER_HISTORY ? "pihti-power-history-moment" : "pihti-history-moment";
     /* Component names arrive with the diagram's own element configuration,
      * which diagram.js fetches. Until it reports ready, nothing here can tell
      * a named component from one the diagram no longer carries, so the rows
@@ -95,7 +97,8 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
             const changes = changesOf(events[eventIdx]);
             for (let changeIdx = changes.length - 1; changeIdx >= 0; changeIdx -= 1) {
                 const before = previous[eventIdx][changeIdx];
-                state[changes[changeIdx].id] = before === undefined ? false : before;
+                if (POWER_HISTORY && before === undefined) delete state[changes[changeIdx].id];
+                else state[changes[changeIdx].id] = before === undefined ? false : before;
             }
         }
         return state;
@@ -132,7 +135,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         else if (unavailableMoment) params.set("at", unavailableMoment);
         else if (selectedDate) params.set("day", selectedDate);
         const query = params.toString();
-        window.history.replaceState(null, "", query ? `/history?${query}` : "/history");
+        window.history.replaceState(null, "", query ? `${HISTORY_PATH}?${query}` : HISTORY_PATH);
     }
 
     function renderCalendar() {
@@ -268,7 +271,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         if (!event) return;
         const link = document.getElementById("moment-link");
         link.textContent = event.ts;
-        link.href = `/history?at=${encodeURIComponent(event.ts)}`;
+        link.href = `${HISTORY_PATH}?at=${encodeURIComponent(event.ts)}`;
         const changes = changesOf(event);
         const grouped = changes.length > 1;
         const component = componentLabel(event.id);
@@ -284,6 +287,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
             ? (event.note || `${changes.length} presses`)
             : (event.state ? "active" : "inactive");
         document.getElementById("moment-user").textContent = event.user || "—";
+        if (POWER_HISTORY) document.getElementById("moment-image").hidden = true;
         document.getElementById("moment-image-link").href = `/state.svg?at=${encodeURIComponent(event.ts)}`;
         window.pihtiUpdateImageLink?.();
     }
@@ -360,7 +364,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         attachListeners();
         try {
             const [eventsResponse, stateResponse] = await Promise.all([
-                fetch("/history/events"), fetch("/elements-state"),
+                fetch(HISTORY_PATH + "/events"), fetch(POWER_HISTORY ? "/power/elements-state" : "/elements-state"),
             ]);
             if (!eventsResponse.ok || !stateResponse.ok) throw new Error("History request failed");
             events = await eventsResponse.json();
