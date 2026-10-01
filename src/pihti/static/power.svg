@@ -427,4 +427,11 @@
 <g id="membrane-heater-icon"><rect x="439" y="873" width="25" height="30" rx="5" fill="#b5b3a9" stroke="#c15242" stroke-width="2"/><path d="M444 889H459M444 893H459M444 897H459" stroke="#666e70" stroke-width="1.5"/></g>
 <g id="membrane-heater-power-switch"><title>Power</title><rect x="647" y="867" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#power-off-icon" x="651" y="869" width="32" height="32" color="#89939d"/></g>
 <g id="membrane-heater-plug-switch"><title>Plug</title><rect x="697" y="867" width="64" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#plug-disconnected-icon" x="704" y="869" width="50" height="32" color="#89939d"/></g>
+</g><g id="cathode-water-pipes" fill="#66727d" stroke="#a5b1bc" stroke-width="2">
+<circle cx="515" cy="320" r="12"/><circle cx="515" cy="510" r="12"/>
+</g>
+<g id="cathode-water" role="button" tabindex="0">
+<title>Cathode cooling water</title><rect x="418" y="228" width="216" height="43" rx="6" fill="#283440" stroke="#758797"/>
+<path id="water-valve" d="M430 244L442 252L430 260ZM454 244L442 252L454 260ZM442 252V237M435 237H449" fill="#66727d" stroke="#a5b1bc" stroke-width="2"/>
+<text id="water-label" x="468" y="256" class="label" style="font-size:18px">WATER —</text>
 </g></svg>

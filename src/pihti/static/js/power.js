@@ -7,6 +7,12 @@
   function paint() {
     controls.forEach(el => {
       const value = state[el.id];
+      if (el.id === 'cathode-water') {
+        const color = value === 'on' ? '#35aaff' : '#66727d';
+        host.querySelector('#cathode-water-pipes').setAttribute('fill', color);
+        host.querySelector('#water-valve').setAttribute('fill', color);
+        host.querySelector('#water-label').textContent = 'WATER ' + (value ? value.toUpperCase() : '—');
+      }
       const active = value === 'on' || value === 'plugged';
       const icon = el.querySelector('use');
       if (icon) {
@@ -39,9 +45,9 @@
     recorded = response; state = {...recorded.state}; host.innerHTML = svg;
     host.querySelector('svg').style.width = '100%'; host.querySelector('svg').removeAttribute('role');
     const names = {anode:'Anode',preanode:'Preanode',cathode:'Cathode',target:'Sputtering target',controlunit:'ControlUnit','instrument-box':'Baratrons / MFCs','ni-logger':'NI logger','langmuir-supplies':'Langmuir supplies','plasma-ig':'Plasma ion gauge','qms-ig':'QMS ion gauge','single-gauge':'SingleGauge'};
-    names['membrane-heater'] = 'Membrane heater';
+    names['membrane-heater'] = 'Membrane heater'; names['cathode-water'] = 'Cathode cooling water';
     Object.keys(names).forEach(name => {
-      ['-power-switch','-plug-switch','-power','-gauge'].forEach(suffix => {
+      (name === 'cathode-water' ? [''] : ['-power-switch','-plug-switch','-power','-gauge']).forEach(suffix => {
         const el = host.querySelector('#' + name + suffix); if (!el) return;
         controls.push(el); el.dataset.name = names[name] + (suffix.includes('plug') ? ' plug' : suffix === '-gauge' ? ' gauge' : ' power');
         el.setAttribute('role','button'); el.setAttribute('tabindex','0');

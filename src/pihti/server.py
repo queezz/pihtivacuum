@@ -693,6 +693,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         for suffix in ("-power", "-gauge")
     }
     power_keys.discard("single-gauge-gauge")
+    power_keys.add("cathode-water")
 
     def power_snapshot():
         path = Path(app.config["POWER_LOG_FILE"])

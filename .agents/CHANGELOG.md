@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.4
+
+- Add manually recorded cathode cooling water to Power snapshots. The valve
+  label and two pipe circles show blue for on, grey for off and unrecorded
+  until an operator records the state.
+
 ## 0.25.3
 
 - Add the owner-reviewed electrical diagram on a dark Power tab, with separate

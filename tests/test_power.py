@@ -7,7 +7,7 @@ def test_power_snapshot_identity_validation_and_conflict(tmp_path):
     assert client.get('/power').status_code == 200
     assert client.get('/power/state').json['state'] == {}
     assert not path.exists()
-    payload = {'state': {'anode-power-switch': 'on', 'anode-plug-switch': 'plugged'}, 'base_timestamp': None}
+    payload = {'state': {'anode-power-switch': 'on', 'anode-plug-switch': 'plugged', 'cathode-water': 'on'}, 'base_timestamp': None}
     assert client.post('/power/state', json=payload).status_code == 428
     with client.session_transaction() as session:
         session['username'] = 'Preview'
