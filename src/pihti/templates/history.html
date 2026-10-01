@@ -28,9 +28,8 @@
         </section>
         <section class="rail-card">
             <h2 class="rail-label" id="timeline-label">Timeline</h2>
-            <p class="muted tl-help">Changes by the same operator within a minute are grouped. Expand to inspect each change.</p>
             <input id="history-find" type="search" aria-label="Find in this day's timeline" placeholder="Find a change…">
-            <div>
+            <div id="history-timeline-scroll">
                 <div id="history-events" class="timeline" role="group" aria-label="Diagram changes on the selected day"></div>
                 <p id="history-no-events" class="muted" hidden>No diagram changes on this day.</p>
             </div>

@@ -710,9 +710,17 @@ details.command pre {
 
 .timeline { display: flex; flex-direction: column; gap: 3px; }
 
-/* History has one scroll surface: the rail, never a box inside its card. */
+/* Keep History navigation visible while its events scroll. */
 #history-controls > .rail-card { flex: 0 0 auto; }
-#history-controls { scrollbar-gutter: stable; }
+#history-controls { overflow-y: hidden; }
+#history-controls > .rail-card:last-child { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+#history-controls > .rail-card:last-child > :not(#history-timeline-scroll) { flex: 0 0 auto; }
+#history-timeline-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+@media (max-height: 800px) {
+  #history-controls { gap: 8px; }
+  #history-controls .rail-card { padding-top: 8px; padding-bottom: 8px; }
+  #history-controls .cal-day { padding: 3px 0; min-height: 0; }
+}
 #history-find { width: 100%; margin-bottom: 8px; }
 #history-context > .rail-card { flex: 0 0 auto; }
 .export-actions { display: grid; gap: 10px; }
@@ -851,6 +859,7 @@ details.command pre {
   .rail-left { left: 0; border-right: 1px solid var(--line); transform: translateX(-100%); }
   .rail-right { right: 0; border-left: 1px solid var(--line); transform: translateX(100%); }
   .rail.drawer-open { transform: none; visibility: visible; }
+  #history-controls { height: 100dvh; }
 
   .rail .rail-card {
     border: 0;

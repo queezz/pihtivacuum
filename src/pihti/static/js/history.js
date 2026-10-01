@@ -231,7 +231,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         // Reveal the selection inside the timeline, without scrolling the page.
         const chosen = list.querySelector('.tl-group-select[aria-pressed="true"]')
             || list.querySelector('.tl-row[aria-pressed="true"]');
-        const scroller = list.closest(".rail");
+        const scroller = document.getElementById("history-timeline-scroll");
         if (chosen && scroller) {
             const target = chosen.getBoundingClientRect(), bounds = scroller.getBoundingClientRect();
             if (target.bottom > bounds.bottom) scroller.scrollTop += target.bottom - bounds.bottom;

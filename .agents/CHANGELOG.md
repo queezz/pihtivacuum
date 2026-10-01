@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.5
+
+- Keep History's selector and calendar fixed while only timeline events scroll. Selection reveal scrolls the event list; heading and Find stay visible. Tighten short-window spacing and remove redundant timeline explanation. 0.27.4 was a local layout preview.
+
 ## 0.27.3
 
 - Link Vacuum CC Pi to Power SingleGauge power in both directions, including Practice saves. Power on also plugs it in; unplugging switches the linked gauge off. Each history keeps its own names.

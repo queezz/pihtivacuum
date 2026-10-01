@@ -1,5 +1,13 @@
 # PIHTI interactive diagram agent guide
 
+## History navigation stays visible (owner correction, 2026-10-01; 0.27.5)
+
+Supersedes the 0.23.3 whole-left-rail scroll rule: History's diagram selector and calendar remain fixed in the rail. Only the event list scrolls, including automatic selection reveal. The timeline heading and Find remain above that list. The same arrangement applies in its drawer. Short windows tighten calendar spacing; right-rail scrolling is unchanged.
+
+## History navigation stays visible (owner correction, 2026-10-01; 0.27.5)
+
+Supersedes the 0.23.3 whole-left-rail scroll rule: History's diagram selector and calendar remain fixed in the rail. Only the event list scrolls, including automatic selection reveal. The timeline heading and Find remain above that list. The same arrangement applies in its drawer. Short windows tighten calendar spacing; right-rail scrolling is unchanged.
+
 ## Power cards and History selection (owner, 2026-10-01; 0.27.1)
 
 CC Pi (`upstream-single-gauge`) is the Pfeiffer SingleGauge (owner, 0.27.3). Its Vacuum active state links to SingleGauge power, with no filament control. Activation implies plugged; unplugging turns it off. Practice saves synchronize the related states and each diagram records only its own component identities.
