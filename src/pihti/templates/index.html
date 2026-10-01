@@ -46,17 +46,12 @@
             <button type="button" class="tiny" id="line-mode-more" aria-expanded="false" aria-controls="line-mode-detail">More</button>
             <div class="scrolls"><div id="line-mode-detail" hidden></div></div>
         </section>
-        <section class="rail-card rail-card--growing rail-card--fit">
-            <h2 class="rail-label">Operations</h2>
-            <div class="scrolls"><div id="operation-choices" class="stack"></div></div>
-            <button id="clear-guide" type="button" style="margin-top: 8px; width: 100%;" hidden>Clear guide</button>
-        </section>
     </aside>
 
     <main class="page-main">
         <div class="rail-toggles" aria-label="Side panels">
             <button type="button" data-drawer="guide-controls" aria-controls="guide-controls" aria-expanded="false">Controls</button>
-            <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">State &amp; guide</button>
+            <button type="button" data-drawer="guide-steps" aria-controls="guide-steps" aria-expanded="false">State</button>
         </div>
         <p class="practice-banner" id="practice-banner" role="status" hidden>Practising. This drawing is a copy, not the record.</p>
         <p id="warning-banner" class="oil-warning" role="alert" hidden></p>
@@ -73,7 +68,7 @@
        place in the rail, no? And not hiding in small sizes, shying away." The
        predicted state is context, which is what the right rail is for, and it
        is here at every width — a card, not a breakpoint casualty. #}
-    <aside class="rail rail-right" id="guide-steps" aria-label="Predicted state and current guide">
+    <aside class="rail rail-right" id="guide-steps" aria-label="Predicted state">
         <button class="drawer-close" type="button">Close</button>
         <section class="rail-card rail-card--collapsible" id="state-card">
             <h2 class="rail-label">
@@ -94,23 +89,6 @@
                     <p class="band-switch" id="vacuum-band"></p>
                     <div id="vacuum-meanings"></div>
                 </div>
-            </div>
-        </section>
-        <section class="rail-card rail-card--collapsible" id="guide-card">
-            <h2 class="rail-label">
-                <button type="button" class="card-toggle" id="guide-card-toggle"
-                        aria-expanded="true" aria-controls="guide-card-body">
-                    <span>Current guide</span>
-                    <span class="card-toggle__mark" aria-hidden="true"></span>
-                </button>
-            </h2>
-            <p id="guide-compact" class="card-compact" hidden></p>
-            <div id="guide-card-body">
-                <h3 id="guide-title">No guide selected</h3>
-                <p id="guide-summary" class="muted">Choose an operation on the left to place numbered steps on the diagram.</p>
-                <div id="guide-alert" class="notice brick guide-alert" role="alert" hidden></div>
-                <ol id="guide-step-list" class="guide-steps"></ol>
-                <p class="muted" style="margin-top: 12px;">Operator guidance only. It does not operate hardware or replace an interlock.</p>
             </div>
         </section>
     </aside>

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.28.0
+
+- Withdraw Operations and Current guide from Vacuum; retain Practice, line configuration and predicted state.
+- Warn when running turbos reach gas or air, including remembered unroughed contents. Preserve that warning across prediction/memory updates instead of allowing the turbo's high-vacuum colour to erase it. Show accurate gas/air wording in the shared warning banner.
+
 ## 0.27.6
 
 - Preserve the existing plug state when switching a gauge off from Vacuum or switching power off. Capture the pre-press state so legacy implied plugs cannot fall back to older unplugged records. Activation records its implied plug explicitly. Unplugging remains an operator press.

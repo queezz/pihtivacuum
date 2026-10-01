@@ -1,5 +1,17 @@
 # PIHTI interactive diagram agent guide
 
+## Withdrawn operations and unroughed turbo exposure (owner, 2026-10-01; 0.28.0)
+
+Operation guides are withdrawn from the Vacuum surface: no Operations controls, Current guide card or guide fetch. Earlier claims that the guides are confirmed no longer authorize exposing them. Line configuration and Practice remain.
+
+A running turbo warns for reachable air or gas, including remembered air/gas in connected unroughed volumes. Its own high-vacuum prediction must not erase that remembered exposure. Prediction lists `unroughed` connected volumes so memory updates retain their air/gas evidence while the warning remains. Closed valves still block; a reachable running rough pump or rough-vacuum memory clears the remembered unroughed case. Existing warning/Practice/audit rules apply; this remains diagram evidence, not a pressure measurement.
+
+## Withdrawn operations and unroughed turbo exposure (owner, 2026-10-01; 0.28.0)
+
+Operation guides are withdrawn from the Vacuum surface: no Operations controls, Current guide card or guide fetch. Earlier claims that the guides are confirmed no longer authorize exposing them. Line configuration and Practice remain.
+
+A running turbo warns for reachable air or gas, including remembered air/gas in connected unroughed volumes. Its own high-vacuum prediction must not erase that remembered exposure. Prediction lists `unroughed` connected volumes so memory updates retain their air/gas evidence while the warning remains. Closed valves still block; a reachable running rough pump or rough-vacuum memory clears the remembered unroughed case. Existing warning/Practice/audit rules apply; this remains diagram evidence, not a pressure measurement.
+
 Power-off never implies unplugged (owner correction, 2026-10-01; 0.27.6). Preserve the pre-press plug state across Vacuum sync and power-off, including legacy active-gauge states whose implied plug has not been persisted. Only an explicit unplug press records unplugged; activation still implies plugged.
 
 ## History navigation stays visible (owner correction, 2026-10-01; 0.27.5)

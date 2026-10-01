@@ -128,7 +128,9 @@
             )}, ${gauges.length > 1 ? "which are" : "which is"} switched on. Switch it off before admitting gas or air.`);
         }
         if (turbos.length) {
-            sentences.push(`Warning, predicted from the valve positions: vent air reaches the ${joinWords(
+            const states = new Set(turbos.map(item => item.state));
+            const exposure = states.has('air') && states.has('gas') ? 'air or unroughed gas' : states.has('air') ? 'air' : 'unroughed gas';
+            sentences.push(`Warning, predicted from the valve positions: ${exposure} reaches the ${joinWords(
                 turbos.map((item) => inSentence(displayName(item.id)))
             )}, ${turbos.length > 1 ? "which are" : "which is"} marked running.`);
         }
@@ -1800,7 +1802,7 @@
             readDiagramJSON(`/elements-config?v=${encodeURIComponent(stamp)}`),
             readDiagramJSON(`/plumbing?v=${encodeURIComponent(stamp)}`),
             window.historyMode ? null : readDiagramJSON("/diagram-state"),
-            window.historyMode ? null : readDiagramJSON("/operation-guides"),
+            null,
             window.historyMode ? null : readDiagramJSON("/get_current_user"),
             window.historyMode ? null : readDiagramJSON("/operation-context"),
             window.historyMode ? null : readDiagramJSON("/practice/settings").catch(() => ({}))
@@ -1830,7 +1832,7 @@
             document.dispatchEvent(new CustomEvent("pihti:diagram-ready"));
             return;
         }
-        guideConfig = guides;
+        guideConfig = {guides: []};
         guideFacts = guideConfig.facts || {};
         operatorIdentified = user.is_identified;
         setupGuideControls();

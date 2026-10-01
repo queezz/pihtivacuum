@@ -518,6 +518,8 @@ def update_memory(plumbing: dict, memory: dict | None, prediction: dict, now) ->
         if volume.get("always"):
             continue
         verdict = (prediction.get("volumes") or {}).get(name, ISOLATED)
+        if name in prediction.get("unroughed", []) and (out.get(name) or {}).get("state") in (AIR, GAS):
+            continue
         if verdict != ISOLATED:
             entry = {"state": verdict, "since": None}
             symbols = (prediction.get("gases") or {}).get(name) or []
@@ -1018,7 +1020,15 @@ def predict(
     for name, item in connections.items():
         if name in sealed:
             item["sealed"] = sealed[name]
+    warnings = equipment_warnings(plumbing, state, by_volume, sealed, memory, edges, names)
+    unroughed = set()
+    for warning in warnings:
+        if warning["kind"] == "turbo":
+            component = next((part for part in _components(list(dict.fromkeys(names)), edges)
+                              if warning["volume"] in part), [warning["volume"]])
+            unroughed.update(component)
     return {
+        "unroughed": sorted(unroughed),
         "volumes": by_volume,
         "mixes": mix_of,
         "gases": gases_of,
@@ -1026,7 +1036,7 @@ def predict(
         "elements": elements,
         "air": air,
         "connections": connections,
-        "warnings": equipment_warnings(plumbing, state, by_volume, sealed, memory),
+        "warnings": warnings,
         "gas_symbols": _gas_symbols(volumes, connections, sealed),
         "line_mode": line_mode or "unknown",
         "linked_valve": linked_valve_status(plumbing, line_mode),
@@ -1216,7 +1226,7 @@ def mass_flow_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict
     return found
 
 
-def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict) -> list[dict]:
+def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict, edges=(), names=()) -> list[dict]:
     """Standing advisories, shared by the drawing and press comparisons."""
     found = oil_warnings(plumbing, state, verdicts, sealed, memory)
     for kind, items, wanted in [("gauge", plumbing.get("gauges", []), IONIZATION),
@@ -1228,7 +1238,14 @@ def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict
             verdict = verdicts.get(volume, ISOLATED)
             if verdict == ISOLATED:
                 verdict = (sealed.get(volume) or {}).get("was", (memory.get(volume) or {}).get("state", ISOLATED))
-            level = _exposure(verdict) if kind == "gauge" else (2 if verdict == AIR else 0)
+            if kind == "turbo" and verdict not in (AIR, GAS):
+                component = next((part for part in _components(list(dict.fromkeys(names)), edges) if volume in part), [volume])
+                roughing = any(pump.get("kind") != TURBO and pump.get("volume") in component
+                               and _is(state, pump["id"], "active") for pump in plumbing.get("pumps", []))
+                if not roughing:
+                    held = [(memory.get(name) or {}).get("state") for name in component]
+                    verdict = AIR if AIR in held else GAS if GAS in held else verdict
+            level = _exposure(verdict)
             if level:
                 found.append({"kind": kind, "id": item["id"], "volume": volume,
                               "state": verdict, "level": level})

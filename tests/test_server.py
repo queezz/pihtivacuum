@@ -140,9 +140,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.27.6"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.27.6"}
-    assert b"v0.27.6" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.28.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.28.0"}
+    assert b"v0.28.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -177,8 +177,8 @@ def test_every_page_shares_the_rail_grid_and_marks_its_tab(client):
     assert b'id="guide-steps"' in home
     # The guides stopped being a prototype when queezz corrected them in his own
     # words (2026-09-08); the half of the sentence that matters stayed.
-    assert b"Operator guidance only" in home
-    assert b"does not operate hardware or replace an interlock" in home
+    assert b"Operator guidance only" not in home
+    assert b"operation-choices" not in home
     assert b"Prototype" not in home
 
 
@@ -1558,6 +1558,32 @@ def test_a_press_that_would_reach_a_live_ion_gauge_warns(client):
     assert [item["id"] for item in into_air] == ["downstream-ionization-gauge"]
 
 
+@pytest.mark.parametrize("held", ["air", "gas"])
+def test_turbo_opened_onto_unroughed_volume_warns_and_stays_warned(client, held):
+    mapping = client.get('/plumbing').json
+    state = {'TMPU':'active', plumbing_map.MEMORY_KEY:{'plasma-vessel':{'state':held,'since':None}}}
+    warnings = plumbing_map.press_warnings(mapping, state, 'GVU', 'active')
+    assert any(w['id'] == 'TMPU' and w['state'] == held for w in warnings)
+    state['GVU'] = 'active'
+    prediction = plumbing_map.predict(mapping, state)
+    memory = plumbing_map.update_memory(mapping, plumbing_map.read_memory(state), prediction, datetime.now())
+    assert memory['plasma-vessel']['state'] == held
+    assert any(w['id'] == 'TMPU' for w in plumbing_map.predict(mapping, state, memory=memory)['warnings'])
+    state['GVU'] = 'inactive'
+    assert not any(w['id'] == 'TMPU' for w in plumbing_map.predict(mapping, state, memory=memory)['warnings'])
+    state['GVU'] = 'active'
+    memory['plasma-vessel']['state'] = 'rough-vacuum'
+    assert not any(w['id'] == 'TMPU' for w in plumbing_map.predict(mapping, state, memory=memory)['warnings'])
+
+
+def test_gas_reaching_running_turbo_warns(client):
+    mapping = client.get('/plumbing').json
+    state = {'TMPU':'active','hydrogen-bottle':'active','rect44907-1':'active',
+             'gasline-h':'active','gasline-main':'active'}
+    assert any(w['id'] == 'TMPU' and w['state'] == 'gas'
+               for w in plumbing_map.press_warnings(mapping, state, 'GVU', 'active'))
+
+
 def test_a_press_that_would_vent_a_running_turbo_warns(client):
     """queezz, 2026-09-08: "and when vent goes on to TMP".
 
@@ -2279,6 +2305,7 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     live = client.get("/predicted-vacuum")
     assert live.status_code == 200
     assert set(live.json) == {
+        "unroughed",
         "volumes",
         "mixes",
         "gases",
@@ -3321,9 +3348,6 @@ def test_the_predicted_state_is_a_right_rail_card_on_the_vacuum_page(client):
         'id="vacuum-connections"',
         'id="vacuum-legend"',
         'id="vacuum-more"',
-        'id="guide-card"',
-        'id="guide-card-toggle"',
-        'id="guide-step-list"',
     ):
         assert marker in rail, marker
     # And nothing of it is left under the drawing on this page.
@@ -3331,7 +3355,7 @@ def test_the_predicted_state_is_a_right_rail_card_on_the_vacuum_page(client):
     assert "vacuum-connections" not in main
     assert "diagram-legend" not in main
     # The drawer button that summons the rail says what is in it now.
-    assert "State &amp; guide" in page
+    assert ">State</button>" in page
 
 
 def test_both_right_rail_cards_collapse_to_a_headline_and_never_vanish(client):
@@ -3344,8 +3368,8 @@ def test_both_right_rail_cards_collapse_to_a_headline_and_never_vanish(client):
     remembered per browser and wins over it.
     """
     page = client.get("/").data.decode("utf-8")
-    assert page.count('class="card-toggle"') == 2
-    assert page.count('aria-expanded="true"') >= 2
+    assert page.count('class="card-toggle"') == 1
+    assert page.count('aria-expanded="true"') >= 1
     script = diagram_script()
     assert 'state: "pihti.rail.stateCard"' in script
     assert 'guide: "pihti.rail.guideCard"' in script
