@@ -1,11 +1,13 @@
 # Changelog
 
-## 0.25.2
+## 0.25.3
 
 - Add the owner-reviewed electrical diagram on a dark Power tab, with separate
   power, plug and gauge annotations. Rehearse locally, discard, or save one
   operator-attributed snapshot. Unknown states remain unrecorded.
 - Store power snapshots separately from vacuum history; reject stale saves.
+- Arrange setup equipment in two rows of three equal cards, including the
+  membrane heater. Power on implies plugged; SingleGauge has no filament toggle.
 
 ## 0.24.5
 
