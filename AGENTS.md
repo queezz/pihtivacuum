@@ -1,5 +1,13 @@
 # PIHTI interactive diagram agent guide
 
+## Power cards and History selection (owner, 2026-10-01; 0.27.1)
+
+Explicitly unplugged device cards dim their body, labels and pictogram; controls remain readable. Unknown plug state stays unrecorded. History is one tab at `/history`, with Vacuum/Power selection in its left rail (and the same drawer on phones). Power uses `diagram=power`; logs, exports and remembered moments remain separate. No breadcrumb or extra Power-history link belongs on the live Power page.
+
+## Power cards and History selection (owner, 2026-10-01; 0.27.1)
+
+Explicitly unplugged device cards dim their body, labels and pictogram; controls remain readable. Unknown plug state stays unrecorded. History is one tab at `/history`, with Vacuum/Power selection in its left rail (and the same drawer on phones). Power uses `diagram=power`; logs, exports and remembered moments remain separate. No breadcrumb or extra Power-history link belongs on the live Power page.
+
 ## Purpose and boundary
 
 This repository provides the local PIHTI vacuum-system state diagram, operator guidance, and control-unit plots. It replaces the earlier static diagram workflow. The diagram is an operator aid, not a pressure measurement, safety interlock, control panel, or source of hardware truth.

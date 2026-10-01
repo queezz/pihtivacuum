@@ -91,7 +91,7 @@ test('Power history uses separate endpoints and keeps later controls unrecorded 
     ];
     const page = await open({powerHistory:true,rows,search:'?at=2026-10-01T10:00:00',stateNow:{'anode-power-switch':'active','cathode-water':'active'}});
     assert.deepEqual(page.requested,['/power/history/events','/power/elements-state']);
-    assert.match(page.address(),/^\/power\/history\?/);
+    assert.match(page.address(),/^\/history\?diagram=power&/);
     assert.equal(page.applied().state['anode-power-switch'],'active');
     assert.equal(page.applied().state['cathode-water'],undefined);
     assert.equal(page.get('moment-image').hidden,true);

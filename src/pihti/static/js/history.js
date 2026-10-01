@@ -34,7 +34,8 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
     let diagramReady = false;
     let loadFailed = false;
     const POWER_HISTORY = typeof window !== "undefined" && Boolean(window.powerHistory);
-    const HISTORY_PATH = POWER_HISTORY ? "/power/history" : "/history";
+    const HISTORY_PATH = "/history";
+    const EVENTS_PATH = POWER_HISTORY ? "/power/history/events" : "/history/events";
     const SELECTION_KEY = POWER_HISTORY ? "pihti-power-history-moment" : "pihti-history-moment";
     /* Component names arrive with the diagram's own element configuration,
      * which diagram.js fetches. Until it reports ready, nothing here can tell
@@ -127,6 +128,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
 
     function writeAddress() {
         const params = new URLSearchParams();
+        if (POWER_HISTORY) params.set("diagram", "power");
         if (selectedIdx !== null) {
             params.set("at", events[selectedIdx].ts);
             if (selectedDate !== dateOf(events[selectedIdx].ts)) params.set("day", selectedDate);
@@ -271,7 +273,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         if (!event) return;
         const link = document.getElementById("moment-link");
         link.textContent = event.ts;
-        link.href = `${HISTORY_PATH}?at=${encodeURIComponent(event.ts)}`;
+        link.href = `${HISTORY_PATH}?${POWER_HISTORY ? 'diagram=power&' : ''}at=${encodeURIComponent(event.ts)}`;
         const changes = changesOf(event);
         const grouped = changes.length > 1;
         const component = componentLabel(event.id);
@@ -364,7 +366,7 @@ function pihtiGroupHistoryEvents(rows, gapSeconds = 60) {
         attachListeners();
         try {
             const [eventsResponse, stateResponse] = await Promise.all([
-                fetch(HISTORY_PATH + "/events"), fetch(POWER_HISTORY ? "/power/elements-state" : "/elements-state"),
+                fetch(EVENTS_PATH), fetch(POWER_HISTORY ? "/power/elements-state" : "/elements-state"),
             ]);
             if (!eventsResponse.ok || !stateResponse.ok) throw new Error("History request failed");
             events = await eventsResponse.json();

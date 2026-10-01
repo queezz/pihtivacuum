@@ -717,6 +717,9 @@ details.command pre {
 #history-context > .rail-card { flex: 0 0 auto; }
 .export-actions { display: grid; gap: 10px; }
 .export-actions > .button { width: 100%; margin: 0; padding: 10px 12px; }
+.history-diagrams { display: flex; gap: 8px; }
+.history-diagrams > .button { flex: 1; text-align: center; }
+.history-diagrams > .button[aria-current="page"] { border-color: var(--accent); background: var(--surface-2, #263646); }
 
 .tl-row {
   display: grid;

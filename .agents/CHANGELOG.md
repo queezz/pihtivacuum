@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.1
+
+- Dim unplugged device cards while keeping controls readable.
+- Select Vacuum or Power History in the left rail, retaining separate logs and remembered moments. Remove redundant history links and breadcrumbs; redirect old Power-history URLs with their moment preserved.
+
 ## 0.27.0
 
 - Link Plasma/QMS IG filament state between Power and Vacuum. Vacuum-on implies

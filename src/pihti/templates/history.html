@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ "Power history" if power_history else "History" }} · PIHTI{% endblock %}
+{% block title %}History · PIHTI{% endblock %}
 
 {% block extra_head %}{% if power_history %}<link rel="stylesheet" href="{{ asset('css/power.css') }}">{% else %}{% include 'diagram_preloads.html' %}{% endif %}{% endblock %}
 
@@ -9,6 +9,13 @@
 <div class="page">
     <aside class="rail rail-left" id="history-controls" aria-label="History controls">
         <button class="drawer-close" type="button">Close</button>
+        <section class="rail-card">
+            <h2 class="rail-label">Diagram</h2>
+            <div class="history-diagrams" aria-label="Diagram history">
+                <a class="button" href="{{ url_for('serve_history_view') }}" {% if not power_history %}aria-current="page"{% endif %}>Vacuum</a>
+                <a class="button" href="{{ url_for('serve_history_view', diagram='power') }}" {% if power_history %}aria-current="page"{% endif %}>Power</a>
+            </div>
+        </section>
         <section class="rail-card">
             <h2 class="rail-label">Calendar</h2>
             <div class="cal-nav">
@@ -35,7 +42,6 @@
             <button type="button" data-drawer="history-controls" aria-controls="history-controls" aria-expanded="false">Calendar &amp; timeline</button>
             <button type="button" data-drawer="history-context" aria-controls="history-context" aria-expanded="false">State &amp; moment</button>
         </div>
-        {% if power_history %}<p><a href="/power">Back to Power</a> · Power history</p>{% endif %}
         <p id="history-status" class="muted" role="status">Loading recorded history…</p>
         <div id="diagram-container" {% if power_history %}class="power-history-drawing"{% endif %} data-paint="loading" aria-busy="true" aria-label="Diagram state at the selected moment" hidden>
 {% if power_history %}<div id="power-drawing" aria-label="Recorded power diagram"></div>{% endif %}

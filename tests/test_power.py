@@ -16,7 +16,12 @@ def test_read_only_and_separate_history(tmp_path):
     app = power_app(tmp_path)
     client = app.test_client()
     assert client.get('/power').status_code == 200
-    assert client.get('/power/history').status_code == 200
+    assert client.get('/power/history').status_code == 302
+    page = client.get('/history?diagram=power').data
+    assert b'aria-label="Diagram history"' in page
+    assert b'window.powerHistory = true' in page
+    assert b'Back to Power' not in page
+    assert b'Power history</a>' not in client.get('/power').data
     assert client.get('/power/state').json['state'] == {}
     assert client.post('/power/update', json={'id': 'cathode-water', 'status': 'active'}).status_code == 428
     assert client.post('/power/practice/save', json={'presses': [{'id': 'cathode-water', 'status': 'active'}]}).status_code == 428

@@ -140,9 +140,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.27.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.27.0"}
-    assert b"v0.27.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.27.1"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.27.1"}
+    assert b"v0.27.1" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -170,7 +170,7 @@ def test_every_page_shares_the_rail_grid_and_marks_its_tab(client):
         assert page.count('class="rail rail-left"') == 1
         assert page.count('class="rail rail-right"') == 1
         assert f'aria-current="page">{endpoint_label}<' in page
-        assert page.count('aria-current="page"') == 1
+        assert page.split('</nav>', 1)[0].count('aria-current="page"') == 1
         assert "cdn." not in page
     home = client.get("/").data
     assert b'id="guide-controls"' in home

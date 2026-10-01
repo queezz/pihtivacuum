@@ -837,7 +837,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.route("/power/history")
     def power_history():
-        return render_template("history.html", power_history=True)
+        return redirect(url_for("serve_history_view", **dict(request.args, diagram="power")))
 
     @app.route("/power/history/events")
     def power_history_events():
@@ -862,7 +862,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.route("/history")
     def serve_history_view():
-        return render_template("history.html")
+        return render_template("history.html", power_history=request.args.get("diagram") == "power")
 
     @app.route("/history/events")
     def get_history_events():

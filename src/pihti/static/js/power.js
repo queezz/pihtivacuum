@@ -27,6 +27,8 @@ if (typeof document !== 'undefined') (async function () {
     config.filter(entry => entry.kind === 'power').forEach(entry => {
       const card = host.querySelector('#' + (cards[entry.device] || entry.device) + ' > rect.device');
       if (card) {
+        const plug = config.find(item => item.device === entry.device && item.kind === 'plug');
+        card.parentElement.classList.toggle('device-unplugged', Boolean(plug && state[plug.id] === 'inactive'));
         const on = state[entry.id] === 'active';
         const filamentOff = config.some(item => item.device === entry.device && item.kind === 'filament') && state[entry.device + '-gauge'] !== 'active';
         card.style.fill = on ? filamentOff ? '#233f58' : '#234b40' : '';
