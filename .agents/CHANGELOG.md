@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.26.4
+
+- Tint the whole powered-on device card green in live, Practice and History.
+  Plug state alone does not highlight the card.
+- Enlarge equipment pictograms, arrange gauge controls beside the icons and
+  give gauge power buttons a filled, fully clickable button area.
+- Record ordinary Power clicks without a confirmation dialog, per owner.
+  Practice remains available; recent-edit mode is deferred.
+
 ## 0.26.1
 
 - Apply Vacuum's operator click rules to Power: read-only controls are disabled,

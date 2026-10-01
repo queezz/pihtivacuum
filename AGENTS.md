@@ -413,3 +413,8 @@ power_snapshots.jsonl entries are preserved and read only as Power history.
 Power controls and their readable labels live in powerControls.json. Power on
 implies plugged; unplugging clears power and ULVAC filament. SingleGauge has
 no filament toggle. Manual cathode cooling water is independent of electricity.
+
+Owner amendment the same session: ordinary Power clicks need no confirmation
+dialog. Practice is the deliberate rehearsal. A whole equipment card highlights
+when its power is on, not merely plugged. Every icon control needs a filled
+button-sized hit area; clicking only the drawn power-symbol stroke is a defect.

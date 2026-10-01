@@ -23,6 +23,15 @@ if (typeof document !== 'undefined') (async function () {
   const draftKey = 'pihtiPowerPractice';
   function message(text) {if (status) status.textContent = text;}
   function paint() {
+    const cards = {anode:'anode-psu', preanode:'preanode-psu', cathode:'kikusui', target:'target-bias-psu'};
+    config.filter(entry => entry.kind === 'power').forEach(entry => {
+      const card = host.querySelector('#' + (cards[entry.device] || entry.device) + ' > rect.device');
+      if (card) {
+        const on = state[entry.id] === 'active';
+        card.style.fill = on ? '#234b40' : '';
+        card.style.stroke = on ? '#36be82' : '';
+      }
+    });
     controls.forEach(el => {
       const own = config.find(entry => entry.id === el.id);
       const value = state[el.id];
@@ -42,7 +51,7 @@ if (typeof document !== 'undefined') (async function () {
       if (box) box.setAttribute('stroke-dasharray', value ? '' : '3 3');
       if (own.kind === 'filament') {
         box.setAttribute('fill', active ? '#36be82' : '#c5cbd0');
-        el.querySelector('circle').setAttribute('cx', Number(box.getAttribute('x')) + (active ? 57 : 15));
+        el.querySelector('circle').setAttribute('cx', Number(box.getAttribute('x')) + (active ? Number(box.getAttribute('width')) - 12 : 12));
       }
       if (own.kind === 'water') {
         const water = active ? '#35aaff' : '#66727d';
@@ -101,12 +110,12 @@ if (typeof document !== 'undefined') (async function () {
     config.forEach(own => {
       const el = host.querySelector('#'+own.id); if (!el) return;
       controls.push(el); el.setAttribute('role','button');
+      el.style.pointerEvents = 'all';
+      el.querySelectorAll('use').forEach(icon => {icon.style.pointerEvents = 'none';});
       async function press() {
         if (historical || !identified || busy) return;
         const item = {id:own.id,status:state[own.id] === 'active' ? 'inactive' : 'active'};
-        const word = own.kind === 'plug' ? item.status === 'active' ? 'plugged' : 'unplugged' : item.status === 'active' ? 'on' : 'off';
         busy = true;
-        if (!window.confirm(`Mark ${own.label} ${word}?`)) {busy=false; return;}
         if (practice) {
           presses.push(item); state = pihtiPowerTransition(state,item,config);
           deadline = Date.now() + seconds*1000; busy=false; paint(); return;

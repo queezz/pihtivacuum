@@ -51,7 +51,7 @@
           <circle cx="56" cy="41" r="3" />
         </g>
       </symbol>
-      <symbol id="kikusui-icon" viewBox="0 0 88 52">
+      <symbol id="kikusui-icon" viewBox="26 0 36 52">
         <rect x="27" y="1" width="34" height="50" rx="2" fill="#d8d0bd" stroke="#57636c" />
         <rect x="31" y="6" width="22" height="17" fill="#25352f" />
         <path d="M34 10H48M34 17H48" stroke="#7ecb80" stroke-width="2" />
@@ -59,7 +59,7 @@
         <circle cx="39" cy="46" r="3" fill="#fffdf4" stroke="#8d897c" stroke-width="1" />
         <circle cx="51" cy="46" r="3" fill="#bd4d40" />
       </symbol>
-      <symbol id="matsusada-icon" viewBox="0 0 88 52">
+      <symbol id="matsusada-icon" viewBox="25 0 39 52">
         <rect x="26" y="1" width="37" height="50" rx="2" fill="#e0dfd3" stroke="#59676e" />
         <rect x="40" y="7" width="19" height="20" fill="#243038" />
         <circle cx="36" cy="34" r="5" fill="#c2c5bd" stroke="#717b7c" />
@@ -91,7 +91,7 @@
           </g>
         </g>
       </symbol>
-      <symbol id="pfeiffer-icon" viewBox="0 0 88 52">
+      <symbol id="pfeiffer-icon" viewBox="26 0 36 52">
         <rect x="27" y="1" width="34" height="50" rx="2" fill="#ded5bd" stroke="#676e68" />
         <rect x="30" y="14" width="28" height="19" fill="#53584a" />
         <path d="M35 23H53" stroke="#b9ca57" stroke-width="3" />
@@ -202,35 +202,35 @@
   </g>
   <g id="kikusui" transform="translate(0 290)">
     <rect class="device" x="770" y="125" width="380" height="100" rx="8" id="rect37" />
-    <text x="910" y="156" class="label" id="text38">Cathode</text>
-    <text x="910" y="176" class="small">Kikusui</text>
-    <use xmlns="http://www.w3.org/2000/svg" href="#kikusui-icon" x="788" y="130" width="106" height="80" />
-    <text x="910" y="195" class="small">PWR401L</text>
+    <text x="930" y="156" class="label" id="text38">Cathode</text>
+    <text x="930" y="176" class="small">Kikusui</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#kikusui-icon" x="782" y="130" width="140" height="85" />
+    <text x="930" y="195" class="small">PWR401L</text>
   </g>
   <path d="M690 442H700V495H770" class="wire cathode" id="path40" sodipodi:nodetypes="cccccccc" />
   <path d="M700 495V570H770" class="wire cathode" id="path40-8-2" style="fill:none;stroke:#a74639;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" sodipodi:nodetypes="ccc" />
   <g id="preanode-psu" transform="translate(0,25)">
     <rect class="device" x="770" y="265" width="380" height="95" rx="8" id="rect41" />
-    <text x="910" y="296" class="label" id="text41">Preanode</text>
-    <text x="910" y="316" class="small">Takasago</text>
-    <use xmlns="http://www.w3.org/2000/svg" href="#preanode-face" x="788" y="270" width="106" height="80" />
-    <text x="910" y="335" class="small">GP0110-5R</text>
+    <text x="930" y="296" class="label" id="text41">Preanode</text>
+    <text x="930" y="316" class="small">Takasago</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#preanode-face" x="782" y="270" width="140" height="85" />
+    <text x="930" y="335" class="small">GP0110-5R</text>
   </g>
   <path d="M680 388H700V315H770" class="wire preanode" id="path44" sodipodi:nodetypes="cccc" />
   <path d="M700 315V255H770" class="wire preanode" id="path44-5" sodipodi:nodetypes="ccc" style="fill:none;stroke:#b56297;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />
   <g id="anode-psu" transform="translate(0,-220)">
     <rect class="device" x="770" y="400" width="380" height="95" rx="8" id="rect45" />
-    <text x="910" y="431" class="label" id="text46">Anode</text>
-    <text x="910" y="451" class="small">Takasago</text>
-    <use xmlns="http://www.w3.org/2000/svg" href="#takasago-icon" x="788" y="405" width="106" height="80" />
-    <text x="910" y="470" class="small">GP060-3</text>
+    <text x="930" y="431" class="label" id="text46">Anode</text>
+    <text x="930" y="451" class="small">Takasago</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#takasago-icon" x="782" y="405" width="140" height="85" />
+    <text x="930" y="470" class="small">GP060-3</text>
   </g>
   <path d="M40 415V205H770" class="wire anode" id="path48" sodipodi:nodetypes="ccc" />
   <g id="target-bias-psu" transform="translate(0,15)">
     <rect class="device" x="770" y="535" width="380" height="95" rx="8" id="rect50" />
-    <text x="910" y="566" class="label" id="text51">Sputtering target</text>
-    <text x="910" y="581" class="small">Matsusada</text>
-    <use xmlns="http://www.w3.org/2000/svg" href="#matsusada-icon" x="788" y="540" width="106" height="80" />
+    <text x="930" y="566" class="label" id="text51">Sputtering target</text>
+    <text x="930" y="581" class="small">Matsusada</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#matsusada-icon" x="782" y="540" width="140" height="85" />
   </g>
   <path d="M223 568V610H770" class="wire target" id="path54" sodipodi:nodetypes="ccc" />
   <!-- Radial target port opposite the top window, at the plasma-box
@@ -318,19 +318,19 @@
     <text x="36" y="1010" class="label">Vacuum gauges</text>
     <g xmlns="http://www.w3.org/2000/svg" id="plasma-ig">
       <rect x="36" y="1030" width="350" height="126" rx="8" class="device" />
-      <text x="186" y="1057" class="label">Plasma ion gauge</text>
-      <text x="186" y="1080" class="small">ULVAC</text>
-      <use href="#ulvac-icon" x="48" y="1042" width="120" height="65" />
-      <g id="plasma-ig-power" transform="translate(-66,0)">
+      <text x="210" y="1057" class="label">Plasma ion gauge</text>
+      <text x="210" y="1080" class="small">ULVAC</text>
+      <use href="#ulvac-icon" x="48" y="1042" width="150" height="102" />
+      <g id="plasma-ig-power" >
         <title>Controller power</title>
-        <use href="#power-off-icon" x="320" y="1110" width="32" height="32" color="#89939d" />
+        <rect x="262" y="1108" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" /><use href="#power-off-icon" x="266" y="1110" width="32" height="32" color="#89939d" />
       </g>
-      <g id="plasma-ig-gauge" transform="translate(24,0)">
+      <g id="plasma-ig-gauge">
         <title>Gauge on/off</title>
-        <rect x="52" y="1112" width="72" height="28" rx="14" fill="#c5cbd0" />
-        <circle cx="67" cy="1126" r="10" fill="#fff" />
+        <rect x="210" y="1112" width="44" height="28" rx="14" fill="#c5cbd0" />
+        <circle cx="222" cy="1126" r="10" fill="#fff" />
       </g>
-      <text x="186" y="1100" class="small">GI-TL3</text>
+      <text x="210" y="1100" class="small">GI-TL3</text>
       <g xmlns="http://www.w3.org/2000/svg" id="plasma-ig-plug-switch">
         <title>Plug</title>
         <rect x="310" y="1108" width="60" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
@@ -339,19 +339,19 @@
     </g>
     <g xmlns="http://www.w3.org/2000/svg" id="qms-ig">
       <rect x="425" y="1030" width="350" height="126" rx="8" class="device" />
-      <text x="575" y="1057" class="label">QMS ion gauge</text>
-      <text x="575" y="1080" class="small">ULVAC</text>
-      <use href="#ulvac-icon" x="437" y="1042" width="120" height="65" />
-      <g id="qms-ig-power" transform="translate(-66,0)">
+      <text x="599" y="1057" class="label">QMS ion gauge</text>
+      <text x="599" y="1080" class="small">ULVAC</text>
+      <use href="#ulvac-icon" x="437" y="1042" width="150" height="102" />
+      <g id="qms-ig-power" >
         <title>Controller power</title>
-        <use href="#power-off-icon" x="709" y="1110" width="32" height="32" color="#89939d" />
+        <rect x="651" y="1108" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" /><use href="#power-off-icon" x="655" y="1110" width="32" height="32" color="#89939d" />
       </g>
-      <g id="qms-ig-gauge" transform="translate(24,0)">
+      <g id="qms-ig-gauge">
         <title>Gauge on/off</title>
-        <rect x="441" y="1112" width="72" height="28" rx="14" fill="#c5cbd0" />
-        <circle cx="456" cy="1126" r="10" fill="#fff" />
+        <rect x="599" y="1112" width="44" height="28" rx="14" fill="#c5cbd0" />
+        <circle cx="611" cy="1126" r="10" fill="#fff" />
       </g>
-      <text x="575" y="1100" class="small">GI-TL3</text>
+      <text x="599" y="1100" class="small">GI-TL3</text>
       <g xmlns="http://www.w3.org/2000/svg" id="qms-ig-plug-switch">
         <title>Plug</title>
         <rect x="699" y="1108" width="60" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
@@ -360,12 +360,12 @@
     </g>
     <g xmlns="http://www.w3.org/2000/svg" id="single-gauge">
       <rect x="814" y="1030" width="350" height="126" rx="8" class="device" />
-      <text x="964" y="1057" class="label">SingleGauge</text>
-      <text x="964" y="1080" class="small">Pfeiffer</text>
-      <use href="#pfeiffer-icon" x="826" y="1042" width="120" height="65" />
-      <g id="single-gauge-power" transform="translate(-66,0)">
+      <text x="988" y="1057" class="label">SingleGauge</text>
+      <text x="988" y="1080" class="small">Pfeiffer</text>
+      <use href="#pfeiffer-icon" x="826" y="1042" width="150" height="102" />
+      <g id="single-gauge-power" >
         <title>Controller power</title>
-        <use href="#power-off-icon" x="1098" y="1110" width="32" height="32" color="#89939d" />
+        <rect x="1040" y="1108" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" /><use href="#power-off-icon" x="1044" y="1110" width="32" height="32" color="#89939d" />
       </g>
       <g xmlns="http://www.w3.org/2000/svg" id="single-gauge-plug-switch">
         <title>Plug</title>
