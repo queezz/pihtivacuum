@@ -693,16 +693,21 @@ def create_app(test_config: dict | None = None) -> Flask:
     def linked_power_control(device):
         return device + ("-power" if device == "single-gauge" else "-gauge")
 
-    def sync_power_from_vacuum(changes, timestamp, note=""):
+    def sync_power_from_vacuum(changes, timestamp, note="", previous_power=None):
         relevant = [change for change in changes if change["id"] in power_gauges.values()]
         if not relevant:
             return
         with power_lock:
-            state = power_snapshot()["state"]
+            state = dict(previous_power) if previous_power is not None else power_snapshot()["state"]
             linked = []
             for change in relevant:
                 device = next(name for name, gauge in power_gauges.items() if gauge == change["id"])
                 linked.extend(power_changes(state, {"id": linked_power_control(device), "status": change["status"]}))
+                # Preserve the plug shown before the Vacuum press, including
+                # legacy active gauges whose implied plug was not yet logged.
+                plug = device + "-plug-switch"
+                if change["status"] == "inactive" and plug in state and not any(item["id"] == plug for item in linked):
+                    linked.append({"id": plug, "status": state[plug]})
                 if change["status"] == "active":
                     for suffix in ("-power", "-plug-switch"):
                         key = device + suffix
@@ -758,13 +763,16 @@ def create_app(test_config: dict | None = None) -> Flask:
         if status == "active" and config["kind"] in ("power", "filament"):
             for kind in ("plug", "power"):
                 other = siblings.get(kind)
-                if other and other != key and state.get(other) != "active":
+                if other and other != key:
                     changes.append({"id": other, "status": "active"})
         if status == "inactive" and config["kind"] in ("plug", "power"):
             for kind in ("power", "filament"):
                 other = siblings.get(kind)
                 if other and other != key and state.get(other) != "inactive":
                     changes.append({"id": other, "status": "inactive"})
+            if config["kind"] == "power" and siblings.get("plug") in state:
+                plug = siblings["plug"]
+                changes.append({"id": plug, "status": state[plug]})
         for change in changes:
             state[change["id"]] = change["status"]
         return changes
@@ -1100,6 +1108,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # Preserve inlet vacuum even on the first press of a legacy state file.
         remember_now()
+        previous_power = power_snapshot()["state"] if element_id in power_gauges.values() else None
         elements_state[element_id] = status
         # What each volume was last under is updated from the state this press
         # just made, and saved in the one file beside the valve positions.
@@ -1114,7 +1123,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         logs.append(log_entry)
         del logs[:-MAX_LOGS]
         save_log_csv(log_entry, Path(app.config["LOG_FILE"]))
-        sync_power_from_vacuum([{"id": element_id, "status": status}], timestamp)
+        sync_power_from_vacuum([{"id": element_id, "status": status}], timestamp, previous_power=previous_power)
         # The new prediction travels back with the press. It is the same walk
         # `/predicted-vacuum` would answer with a moment later, and sending it
         # here is what lets the page redraw in one round trip instead of two.
@@ -1321,6 +1330,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         touch_operator()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         remember_now()
+        previous_power = power_snapshot()["state"]
         for change in changes:
             elements_state[change["id"]] = change["status"]
             remember_now()
@@ -1342,7 +1352,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         logs.append(log_entry)
         del logs[:-MAX_LOGS]
         save_log_csv(log_entry, Path(app.config["LOG_FILE"]))
-        sync_power_from_vacuum(changes, timestamp, note)
+        sync_power_from_vacuum(changes, timestamp, note, previous_power)
         return jsonify(
             {
                 "message": "Practice sequence recorded",

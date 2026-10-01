@@ -119,6 +119,19 @@ def test_single_gauge_link_both_tabs_and_practice(tmp_path):
     assert all(c['id'].startswith('single-gauge-') for c in client.get('/power/history/events').json[-1]['changes'])
 
 
+def test_legacy_active_cc_power_off_preserves_implied_plug(tmp_path):
+    (tmp_path / 'elements_state.json').write_text(json.dumps({'upstream-single-gauge':'active'}))
+    (tmp_path / 'legacy.jsonl').write_text(json.dumps({'timestamp':'2026-10-01T10:00:00','operator':'Preview',
+        'state':{'single-gauge-power':'off','single-gauge-plug-switch':'unplugged'}})+'\n')
+    client = power_app(tmp_path).test_client()
+    identify(client)
+    assert client.get('/power/state').json['state']['single-gauge-plug-switch'] == 'active'
+    assert client.post('/update', json={'id':'upstream-single-gauge','status':'inactive'}).status_code == 200
+    state = client.get('/power/state').json['state']
+    assert state['single-gauge-power'] == 'inactive'
+    assert state['single-gauge-plug-switch'] == 'active'
+
+
 def test_power_ig_link_cannot_bypass_vacuum_exposure_warning(tmp_path):
     (tmp_path / 'elements_state.json').write_text(json.dumps({
         'hydrogen-bottle':'active','rect44907-1':'active','gasline-h':'active','gasline-main':'active'}))

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.6
+
+- Preserve the existing plug state when switching a gauge off from Vacuum or switching power off. Capture the pre-press state so legacy implied plugs cannot fall back to older unplugged records. Activation records its implied plug explicitly. Unplugging remains an operator press.
+
 ## 0.27.5
 
 - Keep History's selector and calendar fixed while only timeline events scroll. Selection reveal scrolls the event list; heading and Find stay visible. Tighten short-window spacing and remove redundant timeline explanation. 0.27.4 was a local layout preview.
