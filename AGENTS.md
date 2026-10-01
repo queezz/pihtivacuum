@@ -2,6 +2,8 @@
 
 ## Power cards and History selection (owner, 2026-10-01; 0.27.1)
 
+CC Pi (`upstream-single-gauge`) is the Pfeiffer SingleGauge (owner, 0.27.3). Its Vacuum active state links to SingleGauge power, with no filament control. Activation implies plugged; unplugging turns it off. Practice saves synchronize the related states and each diagram records only its own component identities.
+
 Explicitly unplugged device cards dim their body, labels and pictogram; controls remain readable. Unknown plug state stays unrecorded. History is one tab at `/history`, with Vacuum/Power selection in its left rail (and the same drawer on phones). Power uses `diagram=power`; logs, exports and remembered moments remain separate. No breadcrumb or extra Power-history link belongs on the live Power page.
 
 ## Power cards and History selection (owner, 2026-10-01; 0.27.1)

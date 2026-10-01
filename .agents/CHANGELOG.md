@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.3
+
+- Link Vacuum CC Pi to Power SingleGauge power in both directions, including Practice saves. Power on also plugs it in; unplugging switches the linked gauge off. Each history keeps its own names.
+
 ## 0.27.2
 
 - Remove small break marks from unplugged pictograms; separated plug halves and muted colour communicate disconnection.

@@ -101,6 +101,24 @@ def test_ig_linkage_both_tabs_and_practice(tmp_path):
     assert client.get('/state').json['downstream-ionization-gauge'] == 'active'
 
 
+def test_single_gauge_link_both_tabs_and_practice(tmp_path):
+    client = power_app(tmp_path).test_client()
+    identify(client)
+    assert client.post('/update', json={'id':'upstream-single-gauge','status':'active'}).status_code == 200
+    state = client.get('/power/state').json['state']
+    assert state['single-gauge-power'] == state['single-gauge-plug-switch'] == 'active'
+    assert 'single-gauge-gauge' not in state
+    assert client.post('/power/update', json={'id':'single-gauge-plug-switch','status':'inactive'}).status_code == 200
+    assert client.get('/state').json['upstream-single-gauge'] == 'inactive'
+    assert client.post('/power/practice/save', json={'presses':[{'id':'single-gauge-power','status':'active'}]}).status_code == 200
+    assert client.get('/state').json['upstream-single-gauge'] == 'active'
+    assert client.post('/practice/save', json={'presses':[{'id':'upstream-single-gauge','status':'inactive'}]}).status_code == 200
+    assert client.get('/power/state').json['state']['single-gauge-power'] == 'inactive'
+    assert client.get('/power/state').json['state']['single-gauge-plug-switch'] == 'active'
+    assert client.get('/history/events').json[-1]['changes'] == [{'id':'upstream-single-gauge','state':False}]
+    assert all(c['id'].startswith('single-gauge-') for c in client.get('/power/history/events').json[-1]['changes'])
+
+
 def test_power_ig_link_cannot_bypass_vacuum_exposure_warning(tmp_path):
     (tmp_path / 'elements_state.json').write_text(json.dumps({
         'hydrogen-bottle':'active','rect44907-1':'active','gasline-h':'active','gasline-main':'active'}))

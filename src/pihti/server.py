@@ -687,7 +687,11 @@ def create_app(test_config: dict | None = None) -> Flask:
     power_controls = _load_json(PKG_DIR / "static" / "powerControls.json", [])
     power_config = {item["id"]: item for item in power_controls}
     power_lock = Lock()
-    power_gauges = {"plasma-ig": "bypass-ionization-gauge", "qms-ig": "downstream-ionization-gauge"}
+    power_gauges = {"plasma-ig": "bypass-ionization-gauge", "qms-ig": "downstream-ionization-gauge",
+                    "single-gauge": "upstream-single-gauge"}
+
+    def linked_power_control(device):
+        return device + ("-power" if device == "single-gauge" else "-gauge")
 
     def sync_power_from_vacuum(changes, timestamp, note=""):
         relevant = [change for change in changes if change["id"] in power_gauges.values()]
@@ -698,7 +702,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             linked = []
             for change in relevant:
                 device = next(name for name, gauge in power_gauges.items() if gauge == change["id"])
-                linked.extend(power_changes(state, {"id": device + "-gauge", "status": change["status"]}))
+                linked.extend(power_changes(state, {"id": linked_power_control(device), "status": change["status"]}))
                 if change["status"] == "active":
                     for suffix in ("-power", "-plug-switch"):
                         key = device + suffix
@@ -737,7 +741,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 state[change["id"]] = "active" if change["state"] else "inactive"
         for device, gauge in power_gauges.items():
             if gauge in elements_state:
-                state[device + "-gauge"] = elements_state[gauge]
+                state[linked_power_control(device)] = elements_state[gauge]
                 if elements_state[gauge] == "active":
                     state[device + "-power"] = "active"
                     state[device + "-plug-switch"] = "active"
@@ -778,7 +782,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             except ValueError as error:
                 return jsonify(error=str(error)), 400
             linked = [{"id": power_gauges[power_config[change["id"]]["device"]], "status": change["status"]}
-                      for change in changes if power_config[change["id"]]["kind"] == "filament"]
+                      for change in changes if power_config[change["id"]]["device"] in power_gauges
+                      and change["id"] == linked_power_control(power_config[change["id"]]["device"])]
             rehearsed = dict(elements_state)
             warnings = []
             for change in linked:
