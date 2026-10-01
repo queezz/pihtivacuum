@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.6
+
+- Give the water control clearance from the cathode-box label and upper
+  electrical wire. Verified the rendered label gap after owner caught the
+  collision missed in the previous visual review.
+
 ## 0.25.4
 
 - Add manually recorded cathode cooling water to Power snapshots. The valve
