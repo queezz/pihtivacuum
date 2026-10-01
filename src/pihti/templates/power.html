@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Power · PIHTI{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ asset('css/power.css') }}">{% endblock %}
+{% block content %}
+<div class="page">
+  <aside class="rail rail-left" id="power-controls">
+    <button class="drawer-close" type="button">Close</button>
+    <section class="rail-card">
+      <h2 class="rail-label">Power snapshot</h2>
+      <button id="power-save" type="button" disabled>Save snapshot</button>
+      <button id="power-discard" type="button">Discard</button>
+      <p id="power-status" role="status">Loading…</p>
+    </section>
+  </aside>
+  <main class="page-main">
+    <div class="rail-toggles"><button data-drawer="power-controls" aria-controls="power-controls" aria-expanded="false">Snapshot</button><button data-drawer="power-context" aria-controls="power-context" aria-expanded="false">State</button></div>
+    <h1>Power</h1>
+    <div id="power-drawing" aria-label="Power diagram"></div>
+  </main>
+  <aside class="rail rail-right" id="power-context">
+    <button class="drawer-close" type="button">Close</button>
+    <section class="rail-card"><h2 class="rail-label">Recorded state</h2><p id="power-recorded">Loading…</p><p>Operator annotations. No hardware commands.</p><p>Green: on or plugged. Grey: off or unplugged. Dashed: unrecorded.</p></section>
+  </aside>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ asset('js/power.js') }}"></script>{% endblock %}

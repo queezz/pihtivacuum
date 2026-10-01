@@ -1,0 +1,6 @@
+#power-drawing { overflow-x: auto; border-radius: 8px; background: #1c2732; }
+#power-drawing svg { display: block; }
+#power-drawing [role="button"]:focus-visible { outline: 3px solid #e4ba65; }
+@media (max-width: 700px) {
+  #power-drawing svg { min-width: 780px; }
+}

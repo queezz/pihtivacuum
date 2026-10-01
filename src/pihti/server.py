@@ -11,6 +11,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from hashlib import sha256
 from datetime import datetime, timedelta
 from functools import wraps
+from threading import Lock
 from pathlib import Path
 
 from flask import (
@@ -531,6 +532,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         MAX_CONTENT_LENGTH=64 * 1024,
         SETTINGS_FILE=_env_path("PIHTI_SETTINGS_FILE", runtime_root / "settings.json"),
         LOG_FILE=runtime_root / "logs.csv",
+        POWER_LOG_FILE=runtime_root / "power_snapshots.jsonl",
         STATE_FILE=runtime_root / "elements_state.json",
         OPERATION_CONTEXT_FILE=runtime_root / "operation_context.json",
         OPERATION_CONTEXT_LOG_FILE=runtime_root / "operation_context_log.csv",
@@ -680,6 +682,75 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.route("/")
     def home():
         return render_template("index.html")
+
+    power_keys = {
+        name + suffix
+        for name in ("anode", "preanode", "cathode", "target", "controlunit",
+                     "instrument-box", "ni-logger", "langmuir-supplies", "membrane-heater")
+        for suffix in ("-power-switch",)
+    } | {name + "-plug-switch" for name in ("anode", "preanode", "cathode", "target", "membrane-heater", "plasma-ig", "qms-ig", "single-gauge")} | {
+        name + suffix for name in ("plasma-ig", "qms-ig", "single-gauge")
+        for suffix in ("-power", "-gauge")
+    }
+    power_keys.discard("single-gauge-gauge")
+
+    def power_snapshot():
+        path = Path(app.config["POWER_LOG_FILE"])
+        if not path.exists():
+            return {"state": {}, "timestamp": None}
+        latest = {"state": {}, "timestamp": None}
+        with path.open(encoding="utf-8") as stream:
+            for line in stream:
+                if line.strip():
+                    latest = json.loads(line)
+        return latest
+
+    @app.route("/power")
+    def power():
+        return render_template("power.html")
+
+    power_lock = Lock()
+
+    def serialize_power(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            with power_lock:
+                return view(*args, **kwargs)
+        return wrapped
+
+    @app.route("/power/state", methods=["GET", "POST"])
+    @serialize_power
+    def power_state():
+        if request.method == "GET":
+            return jsonify(power_snapshot())
+        if "username" not in session:
+            return jsonify(error="Select an operator before recording."), 428
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return jsonify(error="Invalid power snapshot."), 400
+        state = payload.get("state")
+        if not isinstance(state, dict) or any(
+            key not in power_keys or value not in ("on", "off", "plugged", "unplugged")
+            or (value in ("plugged", "unplugged")) != key.endswith("-plug-switch")
+            for key, value in state.items()
+        ):
+            return jsonify(error="Invalid power snapshot."), 400
+        if power_snapshot().get("timestamp") != payload.get("base_timestamp"):
+            return jsonify(error="Another operator saved. Reload before saving."), 409
+        for name in ("anode", "preanode", "cathode", "target", "membrane-heater", "plasma-ig", "qms-ig", "single-gauge"):
+            key = name + ("-power" if name in ("plasma-ig", "qms-ig", "single-gauge") else "-power-switch")
+            if state.get(key) == "on" and state.get(name + "-plug-switch") != "plugged":
+                return jsonify(error="Power on requires plugged state."), 400
+            if name in ("plasma-ig", "qms-ig") and state.get(name + "-gauge") == "on" and state.get(key) != "on":
+                return jsonify(error="Filament on requires controller power."), 400
+        snapshot = {"state": state, "timestamp": datetime.now().astimezone().isoformat(),
+                    "operator": session["username"]}
+        path = Path(app.config["POWER_LOG_FILE"])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(snapshot) + "\n")
+        touch_operator()
+        return jsonify(snapshot)
 
     @app.route("/history")
     def serve_history_view():

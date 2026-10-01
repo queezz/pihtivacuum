@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.2
+
+- Add the owner-reviewed electrical diagram on a dark Power tab, with separate
+  power, plug and gauge annotations. Rehearse locally, discard, or save one
+  operator-attributed snapshot. Unknown states remain unrecorded.
+- Store power snapshots separately from vacuum history; reject stale saves.
+
 ## 0.24.5
 
 - Read upstream ion-gauge channels and same-run Kikusui telemetry, preserving

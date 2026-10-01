@@ -1,0 +1,427 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg viewBox="20 165 1150 955" role="img" aria-labelledby="title desc" version="1.1" id="svg66" sodipodi:docname="power-rack-draft.svg" inkscape:version="1.4 (86a8ad7, 2024-10-11)" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview id="namedview66" pagecolor="#ffffff" bordercolor="#000000" borderopacity="0.25" inkscape:showpageshadow="2" inkscape:pageopacity="0.0" inkscape:pagecheckerboard="0" inkscape:deskcolor="#d1d1d1" inkscape:zoom="1.815" inkscape:cx="471.62534" inkscape:cy="492.2865" inkscape:window-width="3840" inkscape:window-height="2054" inkscape:window-x="-11" inkscape:window-y="-11" inkscape:window-maximized="1" inkscape:current-layer="svg66" />
+  <title id="title">PIHTI electrical connections — layout draft</title>
+  <desc id="desc">Operator-authored reference: Kikusui heats the cathode, the preanode supply raises preanode 100 volts above cathode, GP060-3 raises anode 60 volts above preanode, and Matsusada biases the target minus 600 volts relative to cathode. Wiring and readings must be confirmed at the rig.</desc>
+  <defs id="defs1">
+    <style id="style1">
+      text {font-family:Arial,sans-serif;fill:#24323f;font-size:18px}
+      .heading {font-size:24px;font-weight:bold}
+      .small {font-size:15px;fill:#516273}
+      .label {font-weight:bold}
+      .wire {fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+      .cathode {stroke:#a74639}
+      .preanode {stroke:#b56297}
+      .anode {stroke:#008b78}
+      .target {stroke:#7056ae}
+      .signal {stroke:#52718d;stroke-dasharray:7 5}
+      .device {fill:#fff;stroke:#627485;stroke-width:2}
+      .terminal {fill:#fff;stroke:#24323f;stroke-width:2}
+    
+ text{fill:#e2e8ee} .small{fill:#abb8c5} .device{fill:#283440;stroke:#758797} .terminal{fill:#283440;stroke:#c3ced8}</style>
+    <g xmlns="http://www.w3.org/2000/svg">
+      <symbol id="power-off-icon" viewBox="0 0 40 40">
+        <path d="M20 5V20M11 10A14 14 0 1 0 29 10" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+      </symbol>
+      <symbol id="plug-disconnected-icon" viewBox="0 0 64 40">
+        <path d="M2 20H12M52 20H62" fill="none" stroke="currentColor" stroke-width="3" />
+        <path d="M12 11H23V29H12ZM43 11H52V29H43Z" fill="currentColor" />
+        <path d="M23 15H29M23 25H29" stroke="currentColor" stroke-width="3" />
+        <path d="M35 6L32 12M35 28L32 34" stroke="currentColor" stroke-width="2" />
+      </symbol>
+      <symbol id="plug-connected-icon" viewBox="0 0 64 40">
+        <path d="M2 20H17M47 20H62" fill="none" stroke="currentColor" stroke-width="3" />
+        <rect x="17" y="11" width="30" height="18" rx="3" fill="currentColor" />
+        <path d="M32 12V28" stroke="#fff" stroke-width="2" />
+      </symbol>
+    </g>
+    <g xmlns="http://www.w3.org/2000/svg">
+      <symbol id="takasago-icon" viewBox="0 0 88 52">
+        <rect x="1" y="1" width="86" height="50" rx="3" fill="#514b43" stroke="#30383e" />
+        <g fill="#eee4c9">
+          <rect x="14" y="7" width="25" height="23" />
+          <rect x="47" y="7" width="25" height="23" />
+        </g>
+        <path d="M26.5 27L21 13M59.5 27L65 12" stroke="#514b43" stroke-width="2" />
+        <g fill="#20272c">
+          <circle cx="17" cy="41" r="6" />
+          <circle cx="70" cy="41" r="6" />
+          <circle cx="38" cy="41" r="3" />
+          <circle cx="47" cy="41" r="3" />
+          <circle cx="56" cy="41" r="3" />
+        </g>
+      </symbol>
+      <symbol id="kikusui-icon" viewBox="0 0 88 52">
+        <rect x="27" y="1" width="34" height="50" rx="2" fill="#d8d0bd" stroke="#57636c" />
+        <rect x="31" y="6" width="22" height="17" fill="#25352f" />
+        <path d="M34 10H48M34 17H48" stroke="#7ecb80" stroke-width="2" />
+        <path d="M30 29H58M30 34H58M30 39H58" stroke="#7d8079" />
+        <circle cx="39" cy="46" r="3" fill="#fffdf4" stroke="#8d897c" stroke-width="1" />
+        <circle cx="51" cy="46" r="3" fill="#bd4d40" />
+      </symbol>
+      <symbol id="matsusada-icon" viewBox="0 0 88 52">
+        <rect x="26" y="1" width="37" height="50" rx="2" fill="#e0dfd3" stroke="#59676e" />
+        <rect x="40" y="7" width="19" height="20" fill="#243038" />
+        <circle cx="36" cy="34" r="5" fill="#c2c5bd" stroke="#717b7c" />
+        <circle cx="54" cy="34" r="5" fill="#c2c5bd" stroke="#717b7c" />
+        <circle cx="37" cy="46" r="3" fill="#326c9a" />
+        <circle cx="55" cy="46" r="3" fill="#b5473e" />
+        <circle cx="46" cy="46" r="3" fill="#242b30" />
+      </symbol>
+      <symbol id="ulvac-icon" viewBox="0 0 88 52">
+        <rect x="1" y="1" width="86" height="50" rx="3" fill="#d1c7ae" stroke="#5e625b" />
+        <rect x="28" y="8" width="38" height="30" fill="#eee4ce" stroke="#737265" />
+        <path d="M47 35L56 16" stroke="#716b59" stroke-width="2" />
+        <rect x="7" y="31" width="12" height="12" fill="#eee4ce" />
+        <g fill="#cab44b">
+          <rect x="73" y="11" width="7" height="7" />
+          <rect x="73" y="23" width="7" height="7" />
+          <rect x="73" y="35" width="7" height="7" />
+        </g>
+        <g xmlns="http://www.w3.org/2000/svg">
+          <rect x="69" y="5" width="9" height="10" fill="#282d2c" />
+          <path d="M71 7H76L71 12H76" fill="none" stroke="#df5868" stroke-width="1.5" />
+          <g fill="#d7bd51" stroke="#7b7460" stroke-width="0.5">
+            <rect x="69" y="20" width="5" height="5" />
+            <rect x="78" y="20" width="5" height="5" />
+            <rect x="69" y="29" width="5" height="5" />
+            <rect x="78" y="29" width="5" height="5" />
+            <rect x="69" y="38" width="5" height="5" />
+            <rect x="78" y="38" width="5" height="5" />
+          </g>
+        </g>
+      </symbol>
+      <symbol id="pfeiffer-icon" viewBox="0 0 88 52">
+        <rect x="27" y="1" width="34" height="50" rx="2" fill="#ded5bd" stroke="#676e68" />
+        <rect x="30" y="14" width="28" height="19" fill="#53584a" />
+        <path d="M35 23H53" stroke="#b9ca57" stroke-width="3" />
+        <g fill="#4a4e46">
+          <rect x="31" y="40" width="6" height="7" />
+          <rect x="42" y="40" width="6" height="7" />
+          <rect x="52" y="40" width="6" height="7" />
+        </g>
+      </symbol>
+    </g>
+    <symbol xmlns="http://www.w3.org/2000/svg" id="preanode-face" viewBox="0 0 116 60">
+      <rect x="1" y="5" width="114" height="50" rx="3" fill="#252826" stroke="#566068" />
+      <g fill="#eee4c9">
+        <rect x="25" y="13" width="25" height="22" />
+        <rect x="57" y="13" width="25" height="22" />
+      </g>
+      <path d="M37.5 32L32 18M69.5 32L75 17" stroke="#514b43" stroke-width="2" />
+      <rect x="7" y="25" width="12" height="17" fill="#11181e" />
+      <g fill="#141b20">
+        <circle cx="95" cy="20" r="6" />
+        <circle cx="95" cy="39" r="6" />
+        <circle cx="43" cy="44" r="3" />
+        <circle cx="56" cy="44" r="3" />
+        <circle cx="69" cy="44" r="3" />
+      </g>
+    </symbol>
+  </defs>
+  <rect width="1200" height="1200" fill="#1c2732" id="rect1" />
+  <!-- CAD-derived proportions: x = 640 - 3*z_mm; y = 265 + 3*r_mm.
+       Both axes use 3 SVG units/mm. Actual cathode tube OD55, rather than
+       the simulation envelope OD70. Thin parts retain measured thickness. -->
+  <g id="electrode-assembly" transform="translate(0 150)">
+    <g transform="translate(640 265) scale(-3 3)" id="g22">
+      <g id="plasma-box" fill="#a6a9ac">
+        <rect x="94.08" y="-35" width="90" height="6" id="rect2" />
+        <rect x="94.08" y="29" width="90" height="6" id="rect3" />
+        <rect x="184.08" y="-35" width="3" height="70" id="rect4" />
+      </g>
+      <g id="cathode-housing" fill="#3f4246">
+        <rect x="5" y="-27.5" width="82.08" height="7.5" id="rect5" />
+        <rect x="5" y="20" width="82.08" height="7.5" id="rect6" />
+        <rect x="2" y="-40" width="3" height="20" id="rect7" />
+        <rect x="2" y="20" width="3" height="20" id="rect8" />
+        <rect x="87.08" y="-35" width="6" height="15" id="rect9" />
+        <rect x="87.08" y="20" width="6" height="15" id="rect10" />
+      </g>
+      <g id="kapton" fill="#d1b83b">
+        <rect x="93.08" y="-35" width="1" height="6" id="rect11" />
+        <rect x="93.08" y="29" width="1" height="6" id="rect12" />
+      </g>
+      <g id="grounded-slit" fill="#777f85">
+        <rect x="93.08" y="-27.5" width="1" height="15" id="rect13" />
+        <rect x="93.08" y="12.5" width="1" height="15" id="rect14" />
+      </g>
+      <rect id="anode" x="163.08" y="-25" width="1" height="50" fill="#008b78" style="stroke-width:2.33333333;stroke-dasharray:none;stroke:#008b78;stroke-opacity:1" />
+      <g id="preanode" fill="#b56297" stroke="#b56297" stroke-width="0.65">
+        <rect x="85.63" y="-17.5" width="1.04" height="8.5" id="rect15" />
+        <rect x="85.63" y="9" width="1.04" height="8.5" id="rect16" />
+        <rect x="86.67" y="-10" width="7.96" height="1" id="rect17" />
+        <rect x="86.67" y="9" width="7.96" height="1" id="rect18" />
+      </g>
+      <g id="grounded-cup" fill="#777f85">
+        <rect x="69.56" y="-11" width="3.1" height="22" id="rect19" />
+        <rect x="72.66" y="-11" width="6.9" height="1" id="rect20" />
+        <rect x="72.66" y="10" width="6.9" height="1" id="rect21" />
+      </g>
+      <!-- Diagram symbol: a hot zigzag joins both heater leads.
+           Centre and radial extent retain the CAD-derived filament location. -->
+      <g id="hot-cathode" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M54.92 -15L51.92 -12L57.92 -9L51.92 -6L57.92 -3L51.92 0L57.92 3L51.92 6L57.92 9L51.92 12L54.92 15" stroke="#a74639" stroke-width="1.5" id="path21" />
+        <path d="M54.92 -15L51.92 -12L57.92 -9L51.92 -6L57.92 -3L51.92 0L57.92 3L51.92 6L57.92 9L51.92 12L54.92 15" stroke="#efac55" stroke-width="0.55" id="path22" />
+      </g>
+    </g>
+    <rect id="cathode-box-cap" x="625" y="145" width="9" height="240" fill="#3f4246" />
+    <path d="M475.24 220H510V265H690" class="wire cathode" id="path23" style="stroke:#cf7630" />
+    <path id="cathode-return-internal" d="M475.24 310H510V292H690" class="wire cathode" />
+    <path d="M383.11 212.5H560V238H690" class="wire preanode" id="path24" />
+    <path d="M150.76 265H40" class="wire anode" id="path25" />
+    <!-- Simplified feedthrough sleeves: anode exits left; three electrical
+         feeds exit right. Sleeve sizes are symbolic; electrode geometry above
+         retains the measured proportions. Internal leads are schematic. -->
+    <g id="anode-feedthrough">
+      <rect x="58" y="256" width="36" height="18" rx="2" fill="#e4dfcd" stroke="#65717a" stroke-width="2" id="rect25" />
+      <path d="M40 265H150.76" class="wire anode" id="path26" />
+      <path d="M59 253V277M92 253V277" stroke="#65717a" stroke-width="3" id="path27" />
+    </g>
+    <g id="rear-feedthroughs">
+      <g fill="#e4dfcd" stroke="#65717a" stroke-width="2" id="g29">
+        <rect x="609" y="229" width="62" height="18" rx="2" id="rect27" />
+        <rect x="609" y="256" width="62" height="18" rx="2" id="rect28" />
+        <rect x="609" y="283" width="62" height="18" rx="2" id="rect29" />
+      </g>
+      <path d="M609 226V304M670 226V304" stroke="#65717a" stroke-width="3" id="path29" />
+      <path d="M598 292H690" class="wire cathode" id="path30" />
+      <path d="M598 238H690" class="wire preanode" id="path31" />
+      <path id="heater-feedthrough-upper" d="M598 265H690" class="wire" style="stroke:#cf7630" />
+    </g>
+    <text x="140" y="416" class="label" id="text31" text-anchor="middle" style="fill:#008b78;font-size:18px;font-weight:bold">Anode</text>
+    <text x="360" y="416" class="label" id="text32" inkscape:label="Preanode label" text-anchor="middle" style="fill:#b56297;font-size:18px;font-weight:bold">Preanode</text>
+    <text x="485" y="416" class="label" id="text33" inkscape:label="filament label" style="fill:#a74639;font-size:18px;font-weight:bold" text-anchor="middle">Filament</text>
+    <text x="162.82921" y="130.28375" class="small" id="text34" inkscape:label="Plasma box label">Plasma box</text>
+    <text x="426.99725" y="130.28375" class="small" id="text35" style="-inkscape-font-specification:'Arial, sans-serif, Normal';font-family:Arial, sans-serif;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-size:15px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#516273" inkscape:label="Cathode box label">
+      <tspan sodipodi:role="line" id="tspan66">Cathode box</tspan>
+    </text>
+    <text x="403.34711" y="314.2562" class="small" id="text36" style="-inkscape-font-specification:'Arial, sans-serif, Normal';font-family:Arial, sans-serif;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-size:15px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#516273" inkscape:label="Baffle label">
+      <tspan sodipodi:role="line" id="tspan67">Baffle</tspan>
+    </text>
+  </g>
+  <g id="kikusui" transform="translate(0 290)">
+    <rect class="device" x="770" y="125" width="380" height="100" rx="8" id="rect37" />
+    <text x="910" y="156" class="label" id="text38">Cathode</text>
+    <text x="910" y="176" class="small">Kikusui</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#kikusui-icon" x="788" y="130" width="106" height="80" />
+    <text x="910" y="195" class="small">PWR401L</text>
+  </g>
+  <path d="M690 442H700V495H770" class="wire cathode" id="path40" sodipodi:nodetypes="cccccccc" />
+  <path d="M700 495V570H770" class="wire cathode" id="path40-8-2" style="fill:none;stroke:#a74639;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" sodipodi:nodetypes="ccc" />
+  <g id="preanode-psu" transform="translate(0,25)">
+    <rect class="device" x="770" y="265" width="380" height="95" rx="8" id="rect41" />
+    <text x="910" y="296" class="label" id="text41">Preanode</text>
+    <text x="910" y="316" class="small">Takasago</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#preanode-face" x="788" y="270" width="106" height="80" />
+    <text x="910" y="335" class="small">GP0110-5R</text>
+  </g>
+  <path d="M680 388H700V315H770" class="wire preanode" id="path44" sodipodi:nodetypes="cccc" />
+  <path d="M700 315V255H770" class="wire preanode" id="path44-5" sodipodi:nodetypes="ccc" style="fill:none;stroke:#b56297;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />
+  <g id="anode-psu" transform="translate(0,-220)">
+    <rect class="device" x="770" y="400" width="380" height="95" rx="8" id="rect45" />
+    <text x="910" y="431" class="label" id="text46">Anode</text>
+    <text x="910" y="451" class="small">Takasago</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#takasago-icon" x="788" y="405" width="106" height="80" />
+    <text x="910" y="470" class="small">GP060-3</text>
+  </g>
+  <path d="M40 415V205H770" class="wire anode" id="path48" sodipodi:nodetypes="ccc" />
+  <g id="target-bias-psu" transform="translate(0,15)">
+    <rect class="device" x="770" y="535" width="380" height="95" rx="8" id="rect50" />
+    <text x="910" y="566" class="label" id="text51">Sputtering target</text>
+    <text x="910" y="581" class="small">Matsusada</text>
+    <use xmlns="http://www.w3.org/2000/svg" href="#matsusada-icon" x="788" y="540" width="106" height="80" />
+  </g>
+  <path d="M223 568V610H770" class="wire target" id="path54" sodipodi:nodetypes="ccc" />
+  <!-- Radial target port opposite the top window, at the plasma-box
+       middle (model z≈139 mm): x=640-3*139=223. Housing grounded;
+       target electrode and its downward feed are distinct. Port details
+       are simplified from the owner's CAD section, not dimensioned here. -->
+  <g id="target-grounded-housing" transform="translate(0,138)">
+    <path d="m 187,352 v 40 h 72 v -40" fill="#89949a" stroke="#4d5b62" stroke-width="3" id="path55" />
+    <rect x="195" y="358" width="56" height="26" fill="#e4dfcd" id="rect55" />
+    <rect x="212" y="387" width="22" height="15" fill="#e4dfcd" stroke="#65717a" stroke-width="2" id="rect56" />
+  </g>
+  <g id="sputtering-target" transform="translate(0 150)">
+    <path d="M201 353H245" stroke="#7056ae" stroke-width="6" id="path56" />
+    <path d="M223 356V418" class="wire target" id="path57" />
+  </g>
+  <text x="165.39944" y="637.38293" class="label" id="text57" style="fill:#7056ae;font-size:18px;font-weight:bold">Sputtering target</text>
+  <g xmlns="http://www.w3.org/2000/svg" id="terminals-and-polarities">
+    <circle cx="770" cy="205" r="5" class="terminal" />
+    <text x="750" y="196" text-anchor="middle" style="font-size:24px">+</text>
+    <circle cx="770" cy="255" r="5" class="terminal" />
+    <text x="750" y="246" text-anchor="middle" style="font-size:24px">−</text>
+    <circle cx="770" cy="315" r="5" class="terminal" />
+    <text x="750" y="306" text-anchor="middle" style="font-size:24px">+</text>
+    <circle cx="770" cy="360" r="5" class="terminal" />
+    <text x="750" y="351" text-anchor="middle" style="font-size:24px">−</text>
+    <circle cx="770" cy="445" r="5" class="terminal" />
+    <text x="750" y="436" text-anchor="middle" style="font-size:24px">+</text>
+    <circle cx="770" cy="495" r="5" class="terminal" />
+    <text x="750" y="486" text-anchor="middle" style="font-size:24px">−</text>
+    <circle cx="770" cy="570" r="5" class="terminal" />
+    <text x="750" y="561" text-anchor="middle" style="font-size:24px">+</text>
+    <circle cx="770" cy="610" r="5" class="terminal" />
+    <text x="750" y="601" text-anchor="middle" style="font-size:24px">−</text>
+    <circle cx="700" cy="315" r="5" fill="#b56297" />
+    <circle cx="740" cy="415" r="5" fill="#cf7630" />
+    <circle cx="700" cy="495" r="5" fill="#a74639" />
+  </g>
+  <g xmlns="http://www.w3.org/2000/svg" id="power-controls">
+    <g id="anode-power-switch" data-state="off" role="button" aria-label="anode power off" transform="translate(0,-1)">
+      <title>Power off</title>
+      <rect x="1031" y="232" width="44" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#power-off-icon" x="1035" y="234" width="36" height="36" color="#89939d" />
+    </g>
+    <g id="anode-plug-switch" data-state="unplugged" role="button" aria-label="anode unplugged" transform="translate(0,-1)">
+      <title>Unplugged</title>
+      <rect x="1083" y="232" width="58" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#plug-disconnected-icon" x="1087" y="236" width="50" height="32" color="#89939d" />
+    </g>
+    <g id="preanode-power-switch" data-state="off" role="button" aria-label="preanode power off" transform="translate(0,-1)">
+      <title>Power off</title>
+      <rect x="1031" y="342" width="44" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#power-off-icon" x="1035" y="344" width="36" height="36" color="#89939d" />
+    </g>
+    <g id="preanode-plug-switch" data-state="unplugged" role="button" aria-label="preanode unplugged" transform="translate(0,-1)">
+      <title>Unplugged</title>
+      <rect x="1083" y="342" width="58" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#plug-disconnected-icon" x="1087" y="346" width="50" height="32" color="#89939d" />
+    </g>
+    <g id="cathode-power-switch" data-state="off" role="button" aria-label="cathode power off" transform="translate(0,-1)">
+      <title>Power off</title>
+      <rect x="1031" y="467" width="44" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#power-off-icon" x="1035" y="469" width="36" height="36" color="#89939d" />
+    </g>
+    <g id="cathode-plug-switch" data-state="unplugged" role="button" aria-label="cathode unplugged" transform="translate(0,-1)">
+      <title>Unplugged</title>
+      <rect x="1083" y="467" width="58" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#plug-disconnected-icon" x="1087" y="471" width="50" height="32" color="#89939d" />
+    </g>
+    <g id="target-power-switch" data-state="off" role="button" aria-label="target power off" transform="translate(0,-1)">
+      <title>Power off</title>
+      <rect x="1031" y="602" width="44" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#power-off-icon" x="1035" y="604" width="36" height="36" color="#89939d" />
+    </g>
+    <g id="target-plug-switch" data-state="unplugged" role="button" aria-label="target unplugged" transform="translate(0,-1)">
+      <title>Unplugged</title>
+      <rect x="1083" y="602" width="58" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+      <use href="#plug-disconnected-icon" x="1087" y="606" width="50" height="32" color="#89939d" />
+    </g>
+  </g>
+  <g xmlns="http://www.w3.org/2000/svg" id="heater-positive-node">
+    <path d="M690 415H740V445H770M740 415V360H770" class="wire" style="stroke:#cf7630" />
+    <circle cx="740" cy="415" r="5" fill="#cf7630" />
+  </g>
+  <g xmlns="http://www.w3.org/2000/svg" id="vacuum-gauges" transform="translate(0,-55)">
+    <text x="36" y="1010" class="label">Vacuum gauges</text>
+    <g xmlns="http://www.w3.org/2000/svg" id="plasma-ig">
+      <rect x="36" y="1030" width="350" height="126" rx="8" class="device" />
+      <text x="186" y="1057" class="label">Plasma ion gauge</text>
+      <text x="186" y="1080" class="small">ULVAC</text>
+      <use href="#ulvac-icon" x="48" y="1042" width="120" height="65" />
+      <g id="plasma-ig-power" transform="translate(-66,0)">
+        <title>Controller power</title>
+        <use href="#power-off-icon" x="320" y="1110" width="32" height="32" color="#89939d" />
+      </g>
+      <g id="plasma-ig-gauge" transform="translate(24,0)">
+        <title>Gauge on/off</title>
+        <rect x="52" y="1112" width="72" height="28" rx="14" fill="#c5cbd0" />
+        <circle cx="67" cy="1126" r="10" fill="#fff" />
+      </g>
+      <text x="186" y="1100" class="small">GI-TL3</text>
+      <g xmlns="http://www.w3.org/2000/svg" id="plasma-ig-plug-switch">
+        <title>Plug</title>
+        <rect x="310" y="1108" width="60" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+        <use href="#plug-disconnected-icon" x="315" y="1110" width="50" height="32" color="#89939d" />
+      </g>
+    </g>
+    <g xmlns="http://www.w3.org/2000/svg" id="qms-ig">
+      <rect x="425" y="1030" width="350" height="126" rx="8" class="device" />
+      <text x="575" y="1057" class="label">QMS ion gauge</text>
+      <text x="575" y="1080" class="small">ULVAC</text>
+      <use href="#ulvac-icon" x="437" y="1042" width="120" height="65" />
+      <g id="qms-ig-power" transform="translate(-66,0)">
+        <title>Controller power</title>
+        <use href="#power-off-icon" x="709" y="1110" width="32" height="32" color="#89939d" />
+      </g>
+      <g id="qms-ig-gauge" transform="translate(24,0)">
+        <title>Gauge on/off</title>
+        <rect x="441" y="1112" width="72" height="28" rx="14" fill="#c5cbd0" />
+        <circle cx="456" cy="1126" r="10" fill="#fff" />
+      </g>
+      <text x="575" y="1100" class="small">GI-TL3</text>
+      <g xmlns="http://www.w3.org/2000/svg" id="qms-ig-plug-switch">
+        <title>Plug</title>
+        <rect x="699" y="1108" width="60" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+        <use href="#plug-disconnected-icon" x="704" y="1110" width="50" height="32" color="#89939d" />
+      </g>
+    </g>
+    <g xmlns="http://www.w3.org/2000/svg" id="single-gauge">
+      <rect x="814" y="1030" width="350" height="126" rx="8" class="device" />
+      <text x="964" y="1057" class="label">SingleGauge</text>
+      <text x="964" y="1080" class="small">Pfeiffer</text>
+      <use href="#pfeiffer-icon" x="826" y="1042" width="120" height="65" />
+      <g id="single-gauge-power" transform="translate(-66,0)">
+        <title>Controller power</title>
+        <use href="#power-off-icon" x="1098" y="1110" width="32" height="32" color="#89939d" />
+      </g>
+      <g xmlns="http://www.w3.org/2000/svg" id="single-gauge-plug-switch">
+        <title>Plug</title>
+        <rect x="1088" y="1108" width="60" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+        <use href="#plug-disconnected-icon" x="1093" y="1110" width="50" height="32" color="#89939d" />
+      </g>
+    </g>
+  </g>
+  <g xmlns="http://www.w3.org/2000/svg" id="setup-equipment">
+    <text x="36" y="710" class="label">Setup equipment</text>
+    <g id="controlunit">
+      <rect x="36" y="730" width="260" height="78" rx="8" class="device" />
+      <text x="50" y="757" class="label" style="font-size:17px">ControlUnit</text>
+      <g id="controlunit-power-switch">
+        <title>Power</title>
+        <rect x="242" y="762" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+        <use href="#power-off-icon" x="246" y="764" width="32" height="32" color="#89939d" />
+      </g>
+      <rect x="50" y="768" width="51" height="30" rx="2" fill="#7f878b" />
+      <rect x="56" y="773" width="39" height="20" fill="#a6c4e1" />
+    </g>
+    <g id="instrument-box">
+      <rect x="325" y="730" width="260" height="78" rx="8" class="device" />
+      <text x="339" y="757" class="label" style="font-size:17px">Baratrons / MFCs</text>
+      <g id="instrument-box-power-switch">
+        <title>Power</title>
+        <rect x="531" y="762" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+        <use href="#power-off-icon" x="535" y="764" width="32" height="32" color="#89939d" />
+      </g>
+      <rect x="339" y="768" width="51" height="30" rx="2" fill="#252c32" />
+      <path d="M347 777H364" stroke="#d75d62" stroke-width="3" />
+    </g>
+    <g id="ni-logger">
+      <rect x="614" y="730" width="260" height="78" rx="8" class="device" />
+      <text x="628" y="757" class="label" style="font-size:17px">NI logger</text>
+      <g id="ni-logger-power-switch">
+        <title>Power</title>
+        <rect x="820" y="762" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+        <use href="#power-off-icon" x="824" y="764" width="32" height="32" color="#89939d" />
+      </g>
+    </g>
+    <g id="langmuir-supplies">
+      <rect x="903" y="730" width="260" height="78" rx="8" class="device" />
+      <text x="917" y="757" class="label" style="font-size:17px">Langmuir supplies</text>
+      <g id="langmuir-supplies-power-switch">
+        <title>Power</title>
+        <rect x="1109" y="762" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
+        <use href="#power-off-icon" x="1113" y="764" width="32" height="32" color="#89939d" />
+      </g>
+    </g>
+  </g>
+  <g xmlns="http://www.w3.org/2000/svg" id="membrane-heater">
+ <rect x="36" y="835" width="550" height="76" rx="8" class="device" />
+ <g id="membrane-heater-icon"><rect x="54" y="847" width="40" height="52" rx="8" fill="#b5b3a9" stroke="#c15242" stroke-width="3" /><path d="M60 875H88M60 880H88M60 885H88" stroke="#666e70" stroke-width="2" /></g>
+ <text x="110" y="864" class="label">Membrane heater</text><text x="110" y="887" class="small">PSU / controller</text>
+ <g id="membrane-heater-power-switch"><title>Power</title><rect x="452" y="855" width="44" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" /><use href="#power-off-icon" x="456" y="857" width="36" height="36" color="#89939d" /></g>
+ <g id="membrane-heater-plug-switch"><title>Plug</title><rect x="504" y="855" width="58" height="40" rx="5" fill="#edf0f3" stroke="#a0a8af" /><use href="#plug-disconnected-icon" x="508" y="859" width="50" height="32" color="#89939d" /></g>
+</g>
+</svg>

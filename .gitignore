@@ -8,6 +8,7 @@ elements_state.json
 logs.json
 logs.csv
 warning_attempts.jsonl
+power_snapshots.jsonl
 settings.json
 nohup.out
 pihti.log
