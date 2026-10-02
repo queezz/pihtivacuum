@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.4
+
+- Remove invented NI logger and Langmuir supplies pictograms, retaining their reserved layout space. Soften WATER OFF to muted slate with pale lettering; keep WATER ON light blue.
+
 ## 0.28.3
 
 - Make the whole water valve card prominent: light blue for ON, pale grey for OFF, with dark lettering and a contrasting valve outline. Unrecorded stays dark and dashed.

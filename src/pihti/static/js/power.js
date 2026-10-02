@@ -58,14 +58,14 @@ if (typeof document !== 'undefined') (async function () {
       }
       if (own.kind === 'water') {
         const water = active ? '#35aaff' : '#66727d';
-        box.setAttribute('fill', value ? active ? '#a8ddff' : '#d2dbe2' : '#283440');
+        box.setAttribute('fill', value ? active ? '#a8ddff' : '#647988' : '#283440');
         box.setAttribute('stroke', value ? active ? '#35aaff' : '#a5b1bc' : '#758797');
         const waterLabel = host.querySelector('#water-label');
-        waterLabel.style.fill = value ? '#172b3a' : '#e0e6ed';
+        waterLabel.style.fill = active ? '#172b3a' : '#e0e6ed';
         host.querySelector('#cathode-water-pipes').setAttribute('fill', water);
         const valve = host.querySelector('#water-valve');
         valve.setAttribute('fill', water);
-        valve.setAttribute('stroke', value ? '#28465b' : '#a5b1bc');
+        valve.setAttribute('stroke', active ? '#28465b' : '#a5b1bc');
         waterLabel.textContent = 'WATER ' + (value ? active ? 'ON' : 'OFF' : '—');
       }
       const label = own.label + ': ' + (value ? own.kind === 'plug' ? active ? 'plugged' : 'unplugged' : active ? 'on' : 'off' : 'unrecorded');
