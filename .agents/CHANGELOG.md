@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.3
+
+- Make the whole water valve card prominent: light blue for ON, pale grey for OFF, with dark lettering and a contrasting valve outline. Unrecorded stays dark and dashed.
+
 ## 0.28.2
 
 - Arrange Setup equipment cards with dedicated left pictograms, middle labels and right controls. Add simple NI logger and Langmuir supply pictograms; retain the compact two-row grid.
