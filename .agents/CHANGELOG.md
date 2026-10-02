@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.1
+
+- Improve Power diagram contrast on its dark ground: lift cathode housing, restore readable assembly labels, and brighten the existing potential colours consistently across wires, electrodes, junctions and labels. Preserve all geometry and pictograms.
+
 ## 0.28.0
 
 - Withdraw Operations and Current guide from Vacuum; retain Practice, line configuration and predicted state.

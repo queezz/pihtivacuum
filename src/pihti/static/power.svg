@@ -7,13 +7,13 @@
     <style id="style1">
       text {font-family:Arial,sans-serif;fill:#24323f;font-size:18px}
       .heading {font-size:24px;font-weight:bold}
-      .small {font-size:15px;fill:#516273}
+      .small {font-size:15px;fill:#abb8c5}
       .label {font-weight:bold}
       .wire {fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
-      .cathode {stroke:#a74639}
-      .preanode {stroke:#b56297}
-      .anode {stroke:#008b78}
-      .target {stroke:#7056ae}
+      .cathode {stroke:#e78370}
+      .preanode {stroke:#d78fbd}
+      .anode {stroke:#29b9a6}
+      .target {stroke:#ad91ed}
       .signal {stroke:#52718d;stroke-dasharray:7 5}
       .device {fill:#fff;stroke:#627485;stroke-width:2}
       .terminal {fill:#fff;stroke:#24323f;stroke-width:2}
@@ -129,7 +129,7 @@
         <rect x="94.08" y="29" width="90" height="6" id="rect3" />
         <rect x="184.08" y="-35" width="3" height="70" id="rect4" />
       </g>
-      <g id="cathode-housing" fill="#3f4246">
+      <g id="cathode-housing" fill="#737f89">
         <rect x="5" y="-27.5" width="82.08" height="7.5" id="rect5" />
         <rect x="5" y="20" width="82.08" height="7.5" id="rect6" />
         <rect x="2" y="-40" width="3" height="20" id="rect7" />
@@ -145,8 +145,8 @@
         <rect x="93.08" y="-27.5" width="1" height="15" id="rect13" />
         <rect x="93.08" y="12.5" width="1" height="15" id="rect14" />
       </g>
-      <rect id="anode" x="163.08" y="-25" width="1" height="50" fill="#008b78" style="stroke-width:2.33333333;stroke-dasharray:none;stroke:#008b78;stroke-opacity:1" />
-      <g id="preanode" fill="#b56297" stroke="#b56297" stroke-width="0.65">
+      <rect id="anode" x="163.08" y="-25" width="1" height="50" fill="#29b9a6" style="stroke-width:2.33333333;stroke-dasharray:none;stroke:#29b9a6;stroke-opacity:1" />
+      <g id="preanode" fill="#d78fbd" stroke="#d78fbd" stroke-width="0.65">
         <rect x="85.63" y="-17.5" width="1.04" height="8.5" id="rect15" />
         <rect x="85.63" y="9" width="1.04" height="8.5" id="rect16" />
         <rect x="86.67" y="-10" width="7.96" height="1" id="rect17" />
@@ -160,12 +160,12 @@
       <!-- Diagram symbol: a hot zigzag joins both heater leads.
            Centre and radial extent retain the CAD-derived filament location. -->
       <g id="hot-cathode" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M54.92 -15L51.92 -12L57.92 -9L51.92 -6L57.92 -3L51.92 0L57.92 3L51.92 6L57.92 9L51.92 12L54.92 15" stroke="#a74639" stroke-width="1.5" id="path21" />
+        <path d="M54.92 -15L51.92 -12L57.92 -9L51.92 -6L57.92 -3L51.92 0L57.92 3L51.92 6L57.92 9L51.92 12L54.92 15" stroke="#e78370" stroke-width="1.5" id="path21" />
         <path d="M54.92 -15L51.92 -12L57.92 -9L51.92 -6L57.92 -3L51.92 0L57.92 3L51.92 6L57.92 9L51.92 12L54.92 15" stroke="#efac55" stroke-width="0.55" id="path22" />
       </g>
     </g>
-    <rect id="cathode-box-cap" x="625" y="145" width="9" height="240" fill="#3f4246" />
-    <path d="M475.24 220H510V265H690" class="wire cathode" id="path23" style="stroke:#cf7630" />
+    <rect id="cathode-box-cap" x="625" y="145" width="9" height="240" fill="#737f89" />
+    <path d="M475.24 220H510V265H690" class="wire cathode" id="path23" style="stroke:#eaa05c" />
     <path id="cathode-return-internal" d="M475.24 310H510V292H690" class="wire cathode" />
     <path d="M383.11 212.5H560V238H690" class="wire preanode" id="path24" />
     <path d="M150.76 265H40" class="wire anode" id="path25" />
@@ -186,16 +186,16 @@
       <path d="M609 226V304M670 226V304" stroke="#65717a" stroke-width="3" id="path29" />
       <path d="M598 292H690" class="wire cathode" id="path30" />
       <path d="M598 238H690" class="wire preanode" id="path31" />
-      <path id="heater-feedthrough-upper" d="M598 265H690" class="wire" style="stroke:#cf7630" />
+      <path id="heater-feedthrough-upper" d="M598 265H690" class="wire" style="stroke:#eaa05c" />
     </g>
-    <text x="140" y="416" class="label" id="text31" text-anchor="middle" style="fill:#008b78;font-size:18px;font-weight:bold">Anode</text>
-    <text x="360" y="416" class="label" id="text32" inkscape:label="Preanode label" text-anchor="middle" style="fill:#b56297;font-size:18px;font-weight:bold">Preanode</text>
-    <text x="485" y="416" class="label" id="text33" inkscape:label="filament label" style="fill:#a74639;font-size:18px;font-weight:bold" text-anchor="middle">Filament</text>
+    <text x="140" y="416" class="label" id="text31" text-anchor="middle" style="fill:#29b9a6;font-size:18px;font-weight:bold">Anode</text>
+    <text x="360" y="416" class="label" id="text32" inkscape:label="Preanode label" text-anchor="middle" style="fill:#d78fbd;font-size:18px;font-weight:bold">Preanode</text>
+    <text x="485" y="416" class="label" id="text33" inkscape:label="filament label" style="fill:#e78370;font-size:18px;font-weight:bold" text-anchor="middle">Filament</text>
     <text x="162.82921" y="130.28375" class="small" id="text34" inkscape:label="Plasma box label">Plasma box</text>
-    <text x="426.99725" y="130.28375" class="small" id="text35" style="-inkscape-font-specification:'Arial, sans-serif, Normal';font-family:Arial, sans-serif;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-size:15px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#516273" inkscape:label="Cathode box label">
+    <text x="426.99725" y="130.28375" class="small" id="text35" style="-inkscape-font-specification:'Arial, sans-serif, Normal';font-family:Arial, sans-serif;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-size:15px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#abb8c5" inkscape:label="Cathode box label">
       <tspan sodipodi:role="line" id="tspan66">Cathode box</tspan>
     </text>
-    <text x="403.34711" y="314.2562" class="small" id="text36" style="-inkscape-font-specification:'Arial, sans-serif, Normal';font-family:Arial, sans-serif;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-size:15px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#516273" inkscape:label="Baffle label">
+    <text x="403.34711" y="314.2562" class="small" id="text36" style="-inkscape-font-specification:'Arial, sans-serif, Normal';font-family:Arial, sans-serif;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-size:15px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#abb8c5" inkscape:label="Baffle label">
       <tspan sodipodi:role="line" id="tspan67">Baffle</tspan>
     </text>
   </g>
@@ -207,7 +207,7 @@
     <text x="930" y="195" class="small">PWR401L</text>
   </g>
   <path d="M690 442H700V495H770" class="wire cathode" id="path40" sodipodi:nodetypes="cccccccc" />
-  <path d="M700 495V570H770" class="wire cathode" id="path40-8-2" style="fill:none;stroke:#a74639;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" sodipodi:nodetypes="ccc" />
+  <path d="M700 495V570H770" class="wire cathode" id="path40-8-2" style="fill:none;stroke:#e78370;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" sodipodi:nodetypes="ccc" />
   <g id="preanode-psu" transform="translate(0,25)">
     <rect class="device" x="770" y="265" width="380" height="95" rx="8" id="rect41" />
     <text x="930" y="296" class="label" id="text41">Preanode</text>
@@ -216,7 +216,7 @@
     <text x="930" y="335" class="small">GP0110-5R</text>
   </g>
   <path d="M680 388H700V315H770" class="wire preanode" id="path44" sodipodi:nodetypes="cccc" />
-  <path d="M700 315V255H770" class="wire preanode" id="path44-5" sodipodi:nodetypes="ccc" style="fill:none;stroke:#b56297;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />
+  <path d="M700 315V255H770" class="wire preanode" id="path44-5" sodipodi:nodetypes="ccc" style="fill:none;stroke:#d78fbd;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />
   <g id="anode-psu" transform="translate(0,-220)">
     <rect class="device" x="770" y="400" width="380" height="95" rx="8" id="rect45" />
     <text x="930" y="431" class="label" id="text46">Anode</text>
@@ -242,10 +242,10 @@
     <rect x="212" y="387" width="22" height="15" fill="#e4dfcd" stroke="#65717a" stroke-width="2" id="rect56" />
   </g>
   <g id="sputtering-target" transform="translate(0 150)">
-    <path d="M201 353H245" stroke="#7056ae" stroke-width="6" id="path56" />
+    <path d="M201 353H245" stroke="#ad91ed" stroke-width="6" id="path56" />
     <path d="M223 356V418" class="wire target" id="path57" />
   </g>
-  <text x="165.39944" y="637.38293" class="label" id="text57" style="fill:#7056ae;font-size:18px;font-weight:bold">Sputtering target</text>
+  <text x="165.39944" y="637.38293" class="label" id="text57" style="fill:#ad91ed;font-size:18px;font-weight:bold">Sputtering target</text>
   <g xmlns="http://www.w3.org/2000/svg" id="terminals-and-polarities">
     <circle cx="770" cy="205" r="5" class="terminal" />
     <text x="750" y="196" text-anchor="middle" style="font-size:24px">+</text>
@@ -263,9 +263,9 @@
     <text x="750" y="561" text-anchor="middle" style="font-size:24px">+</text>
     <circle cx="770" cy="610" r="5" class="terminal" />
     <text x="750" y="601" text-anchor="middle" style="font-size:24px">−</text>
-    <circle cx="700" cy="315" r="5" fill="#b56297" />
-    <circle cx="740" cy="415" r="5" fill="#cf7630" />
-    <circle cx="700" cy="495" r="5" fill="#a74639" />
+    <circle cx="700" cy="315" r="5" fill="#d78fbd" />
+    <circle cx="740" cy="415" r="5" fill="#eaa05c" />
+    <circle cx="700" cy="495" r="5" fill="#e78370" />
   </g>
   <g xmlns="http://www.w3.org/2000/svg" id="power-controls">
     <g id="anode-power-switch" data-state="off" role="button" aria-label="anode power off" transform="translate(0,-1)">
@@ -310,8 +310,8 @@
     </g>
   </g>
   <g xmlns="http://www.w3.org/2000/svg" id="heater-positive-node">
-    <path d="M690 415H740V445H770M740 415V360H770" class="wire" style="stroke:#cf7630" />
-    <circle cx="740" cy="415" r="5" fill="#cf7630" />
+    <path d="M690 415H740V445H770M740 415V360H770" class="wire" style="stroke:#eaa05c" />
+    <circle cx="740" cy="415" r="5" fill="#eaa05c" />
   </g>
   <g xmlns="http://www.w3.org/2000/svg" id="vacuum-gauges" transform="translate(0,-55)">
     <text x="36" y="1010" class="label">Vacuum gauges</text>
