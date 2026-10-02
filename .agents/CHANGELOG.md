@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.2
+
+- Arrange Setup equipment cards with dedicated left pictograms, middle labels and right controls. Add simple NI logger and Langmuir supply pictograms; retain the compact two-row grid.
+
 ## 0.28.1
 
 - Improve Power diagram contrast on its dark ground: lift cathode housing, restore readable assembly labels, and brighten the existing potential colours consistently across wires, electrodes, junctions and labels. Preserve all geometry and pictograms.

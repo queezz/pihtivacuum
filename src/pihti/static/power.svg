@@ -117,6 +117,12 @@
         <circle cx="69" cy="44" r="3" />
       </g>
     </symbol>
+
+<symbol id="controlunit-icon" viewBox="0 0 64 52"><rect x="2" y="5" width="60" height="42" rx="3" fill="#7f878b"/><rect x="7" y="10" width="50" height="32" fill="#a6c4e1"/><path d="M12 19H34M38 14V37M42 24H52M42 32H52" stroke="#52799b" stroke-width="2"/></symbol>
+<symbol id="instrument-box-icon" viewBox="0 0 64 52"><rect x="2" y="5" width="60" height="42" rx="3" fill="#252c32" stroke="#65717a"/><rect x="9" y="12" width="25" height="12" fill="#141b20"/><path d="M12 18H30" stroke="#d75d62" stroke-width="3"/></symbol>
+<symbol id="ni-logger-icon" viewBox="0 0 64 52"><rect x="2" y="5" width="60" height="42" rx="3" fill="#b2b8b5" stroke="#65717a"/><rect x="9" y="12" width="46" height="14" rx="1" fill="#354149"/><path d="M13 19H19L23 15L28 22L33 17H50" fill="none" stroke="#83c7af" stroke-width="2"/><g fill="#354149"><circle cx="13" cy="36" r="3"/><circle cx="24" cy="36" r="3"/><circle cx="35" cy="36" r="3"/><circle cx="46" cy="36" r="3"/></g></symbol>
+<symbol id="langmuir-supplies-icon" viewBox="0 0 64 52"><g fill="#d8d0bd" stroke="#65717a"><rect x="5" y="2" width="24" height="48" rx="2"/><rect x="35" y="2" width="24" height="48" rx="2"/></g><g fill="#25352f"><rect x="9" y="8" width="16" height="12"/><rect x="39" y="8" width="16" height="12"/></g><path d="M12 13H22M42 13H52M9 27H25M39 27H55M9 32H25M39 32H55" stroke="#8b9d91" stroke-width="2"/><g fill="#bd4d40"><circle cx="22" cy="42" r="3"/><circle cx="52" cy="42" r="3"/></g><g fill="#fffdf4"><circle cx="12" cy="42" r="3"/><circle cx="42" cy="42" r="3"/></g></symbol>
+<symbol id="membrane-heater-icon" viewBox="0 0 40 60"><rect x="4" y="2" width="32" height="56" rx="7" fill="#b5b3a9" stroke="#c15242" stroke-width="3"/><path d="M10 32H30M10 37H30M10 42H30M10 47H30" stroke="#666e70" stroke-width="2"/></symbol>
   </defs>
   <rect width="1200" height="1200" fill="#1c2732" id="rect1" />
   <!-- CAD-derived proportions: x = 640 - 3*z_mm; y = 265 + 3*r_mm.
@@ -373,59 +379,35 @@
       </g>
     </g>
   </g>
-  <g xmlns="http://www.w3.org/2000/svg" id="setup-equipment">
-    <text x="36" y="710" class="label">Setup equipment</text>
-    <g xmlns="http://www.w3.org/2000/svg" id="controlunit">
-      <rect x="36.0" y="730.0" width="350" height="78" rx="8" class="device" />
-      <text x="50.0" y="757.0" class="label" style="font-size:17px">ControlUnit</text>
-      <g id="controlunit-power-switch">
-        <title>Power</title>
-        <rect x="332.0" y="762.0" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
-        <use href="#power-off-icon" x="336.0" y="764.0" width="32" height="32" color="#89939d" />
-      </g>
-      <rect x="50.0" y="768.0" width="51" height="30" rx="2" fill="#7f878b" />
-      <rect x="56.0" y="773.0" width="39" height="20" fill="#a6c4e1" />
-    </g>
-    
-    <g xmlns="http://www.w3.org/2000/svg" id="instrument-box">
-      <rect x="425.0" y="730.0" width="350" height="78" rx="8" class="device" />
-      <text x="439.0" y="757.0" class="label" style="font-size:17px">Baratrons / MFCs</text>
-      <g id="instrument-box-power-switch">
-        <title>Power</title>
-        <rect x="721.0" y="762.0" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
-        <use href="#power-off-icon" x="725.0" y="764.0" width="32" height="32" color="#89939d" />
-      </g>
-      <rect x="439.0" y="768.0" width="51" height="30" rx="2" fill="#252c32" />
-      <path d="M347 777H364" stroke="#d75d62" stroke-width="3" transform="translate(100,0)" />
-    </g>
-    
-    <g xmlns="http://www.w3.org/2000/svg" id="ni-logger">
-      <rect x="814.0" y="730.0" width="350" height="78" rx="8" class="device" />
-      <text x="828.0" y="757.0" class="label" style="font-size:17px">NI logger</text>
-      <g id="ni-logger-power-switch">
-        <title>Power</title>
-        <rect x="1110.0" y="762.0" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
-        <use href="#power-off-icon" x="1114.0" y="764.0" width="32" height="32" color="#89939d" />
-      </g>
-    </g>
-    
-    <g xmlns="http://www.w3.org/2000/svg" id="langmuir-supplies">
-      <rect x="36.0" y="835.0" width="350" height="78" rx="8" class="device" />
-      <text x="50.0" y="862.0" class="label" style="font-size:17px">Langmuir supplies</text>
-      <g id="langmuir-supplies-power-switch">
-        <title>Power</title>
-        <rect x="332.0" y="867.0" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af" />
-        <use href="#power-off-icon" x="336.0" y="869.0" width="32" height="32" color="#89939d" />
-      </g>
-    </g>
-  
-  </g>
-  <g id="membrane-heater" xmlns="http://www.w3.org/2000/svg">
-<rect x="425" y="835" width="350" height="78" rx="8" class="device"/>
-<text x="439" y="862" class="label" style="font-size:17px">Membrane heater</text>
-<g id="membrane-heater-icon"><rect x="439" y="873" width="25" height="30" rx="5" fill="#b5b3a9" stroke="#c15242" stroke-width="2"/><path d="M444 889H459M444 893H459M444 897H459" stroke="#666e70" stroke-width="1.5"/></g>
-<g id="membrane-heater-power-switch"><title>Power</title><rect x="647" y="867" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#power-off-icon" x="651" y="869" width="32" height="32" color="#89939d"/></g>
-<g id="membrane-heater-plug-switch"><title>Plug</title><rect x="697" y="867" width="64" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#plug-disconnected-icon" x="704" y="869" width="50" height="32" color="#89939d"/></g>
+<g id="setup-equipment"><text x="36" y="710" class="label">Setup equipment</text>
+<g id="controlunit"><rect x="36" y="730" width="350" height="78" rx="8" class="device"/>
+<use href="#controlunit-icon" x="48" y="739" width="64" height="60"/>
+<text x="126" y="775" class="label" style="font-size:17px">ControlUnit</text>
+<g id="controlunit-power-switch"><title>Power</title><rect x="332" y="751" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#power-off-icon" x="336" y="753" width="32" height="32" color="#89939d"/></g>
+</g>
+<g id="instrument-box"><rect x="425" y="730" width="350" height="78" rx="8" class="device"/>
+<use href="#instrument-box-icon" x="437" y="739" width="64" height="60"/>
+<text x="515" y="775" class="label" style="font-size:17px">Baratrons / MFCs</text>
+<g id="instrument-box-power-switch"><title>Power</title><rect x="721" y="751" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#power-off-icon" x="725" y="753" width="32" height="32" color="#89939d"/></g>
+</g>
+<g id="ni-logger"><rect x="814" y="730" width="350" height="78" rx="8" class="device"/>
+<use href="#ni-logger-icon" x="826" y="739" width="64" height="60"/>
+<text x="904" y="775" class="label" style="font-size:17px">NI logger</text>
+<g id="ni-logger-power-switch"><title>Power</title><rect x="1110" y="751" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#power-off-icon" x="1114" y="753" width="32" height="32" color="#89939d"/></g>
+</g>
+<g id="langmuir-supplies"><rect x="36" y="835" width="350" height="78" rx="8" class="device"/>
+<use href="#langmuir-supplies-icon" x="48" y="844" width="64" height="60"/>
+<text x="126" y="868" class="label" style="font-size:17px">Langmuir</text>
+<text x="126" y="890" class="label" style="font-size:17px">supplies</text>
+<g id="langmuir-supplies-power-switch"><title>Power</title><rect x="332" y="856" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#power-off-icon" x="336" y="858" width="32" height="32" color="#89939d"/></g>
+</g>
+<g id="membrane-heater"><rect x="425" y="835" width="350" height="78" rx="8" class="device"/>
+<use href="#membrane-heater-icon" x="437" y="844" width="64" height="60"/>
+<text x="515" y="868" class="label" style="font-size:17px">Membrane</text>
+<text x="515" y="890" class="label" style="font-size:17px">heater</text>
+<g id="membrane-heater-power-switch"><title>Power</title><rect x="647" y="856" width="40" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#power-off-icon" x="651" y="858" width="32" height="32" color="#89939d"/></g>
+<g id="membrane-heater-plug-switch"><title>Plug</title><rect x="697" y="856" width="64" height="36" rx="5" fill="#edf0f3" stroke="#a0a8af"/><use href="#plug-disconnected-icon" x="704" y="858" width="50" height="32" color="#89939d"/></g>
+</g>
 </g><g id="cathode-water-pipes" fill="#66727d" stroke="#a5b1bc" stroke-width="2">
 <circle cx="515" cy="320" r="12"/><circle cx="515" cy="510" r="12"/>
 </g>
