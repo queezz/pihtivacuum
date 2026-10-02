@@ -407,7 +407,7 @@
 </g><g id="cathode-water-pipes" fill="#66727d" stroke="#a5b1bc" stroke-width="2">
 <circle cx="515" cy="320" r="12"/><circle cx="515" cy="510" r="12"/>
 </g>
-<g id="cathode-water" transform="translate(-20,440)" role="button" tabindex="0">
+<g id="cathode-water" transform="translate(-20,424)" role="button" tabindex="0">
 <title>Cathode cooling water</title><rect x="385" y="218" width="300" height="54" rx="8" fill="#283440" stroke="#758797"/>
 <path id="water-valve" d="M405 237L421 248L405 259ZM437 237L421 248L437 259ZM421 248V228M411 228H431" fill="#66727d" stroke="#a5b1bc" stroke-width="2"/>
 <text id="water-label" x="455" y="257" class="label" style="font-size:22px">WATER —</text>

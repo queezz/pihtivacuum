@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.9
+
+- Nudge the standalone water valve upward to group with the diagram, retaining clear space from the target wire and equipment cards.
+
 ## 0.28.8
 
 - Give the water valve a larger standalone card centered beneath its tube circles, clear of the target wiring and equipment grid. Darken OFF to the equipment's off palette; keep ON light blue. 0.28.5–0.28.7 were local layout previews.
