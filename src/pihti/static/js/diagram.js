@@ -128,8 +128,12 @@
             )}, ${gauges.length > 1 ? "which are" : "which is"} switched on. Switch it off before admitting gas or air.`);
         }
         if (turbos.length) {
-            const states = new Set(turbos.map(item => item.state));
-            const exposure = states.has('air') && states.has('gas') ? 'air or unroughed gas' : states.has('air') ? 'air' : 'unroughed gas';
+            // Gas that skipped every needle valve and mass-flow controller is
+            // "unmetered"; gas held where no turbo was pumping it is "unroughed".
+            // Metered process gas never reaches this sentence (owner, 2026-10-07).
+            const kinds = new Set(turbos.map((item) => item.state === "air" ? "air"
+                : item.unmetered ? "unmetered gas" : "unroughed gas"));
+            const exposure = ["air", "unmetered gas", "unroughed gas"].filter((word) => kinds.has(word)).join(" or ");
             sentences.push(`Warning, predicted from the valve positions: ${exposure} reaches the ${joinWords(
                 turbos.map((item) => inSentence(displayName(item.id)))
             )}, ${turbos.length > 1 ? "which are" : "which is"} marked running.`);
@@ -1078,6 +1082,9 @@
 
     function connectionStateWord(item) {
         const word = stateWord(item.state);
+        // Gas let in through a needle valve or a mass-flow controller is the
+        // designed way to make plasma, and the readout says so in one word.
+        if (item.metered_only) return `${word} · metered`;
         return item.slow_route_only ? `${word} · slow route` : word;
     }
 

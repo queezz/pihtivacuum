@@ -99,6 +99,33 @@ def _components(volumes: list[str], edges: list[tuple[str, str]]) -> list[set[st
     return list(groups.values())
 
 
+def _reach(volumes: list[str], edges: list[tuple[str, str]]) -> dict[str, set[str]]:
+    """Each volume's continuous space, looked up by name."""
+    return {name: component for component in _components(volumes, edges) for name in component}
+
+
+def _joins_of(plumbing: dict, valve_ids) -> set[frozenset]:
+    """The pairs of volumes the named valves join, for leaving them out of a walk."""
+    wanted = set(valve_ids or ())
+    return {
+        frozenset(valve.get("joins") or ())
+        for valve in plumbing.get("valves") or []
+        if valve["id"] in wanted
+    }
+
+
+def _beside_meters(plumbing: dict, volumes: list[str], edges: list[tuple[str, str]]) -> dict[str, set[str]]:
+    """Each volume's space on its own side of every metered gas entry.
+
+    queezz, 2026-10-07: "We inject gas via precision needle valves or MFCs to
+    make plasma, which is the designed mode of operation." The real walk and
+    its colours are unchanged; this one only leaves the ``metered_gas`` valves
+    out, so it can say which gas got where without being metered first.
+    """
+    metered = _joins_of(plumbing, (plumbing.get("metered_gas") or {}).get("valves"))
+    return _reach(volumes, [edge for edge in edges if frozenset(edge) not in metered])
+
+
 def line_modes(plumbing: dict) -> list[str]:
     """The configurations the card offers, in the order queezz named them.
 
@@ -270,25 +297,16 @@ def _connections(
     volumes: dict = plumbing.get("volumes") or {}
     open_air = {name for name, volume in volumes.items() if volume.get("always") == "air"}
     plumbed = [edge for edge in edges if not (set(edge) & open_air)]
-    reach = {
-        name: component
-        for component in _components(names, plumbed)
-        for name in component
-    }
+    reach = _reach(names, plumbed)
     # Remove the authored narrow gas-line entries only for this route check.
     # The real connectivity and its colour remain unchanged. An alternative
     # unrestricted path means a pump is not limited to the slow route.
     slow = plumbing.get("slow_pumping") or {}
-    restricted = {
-        frozenset(valve.get("joins") or ())
-        for valve in plumbing.get("valves") or []
-        if valve["id"] in (slow.get("valves") or [])
-    }
-    direct = {
-        name: component
-        for component in _components(names, [edge for edge in plumbed if frozenset(edge) not in restricted])
-        for name in component
-    }
+    restricted = _joins_of(plumbing, slow.get("valves"))
+    direct = _reach(names, [edge for edge in plumbed if frozenset(edge) not in restricted])
+    # The same kind of check for gas: a bottle that reaches a vessel only
+    # through a needle valve or a mass-flow controller is metered process gas.
+    unmetered = _beside_meters(plumbing, names, plumbed)
     vessels = [name for name, volume in volumes.items() if volume.get("vessel")]
     answers = {}
     for name in vessels:
@@ -302,6 +320,7 @@ def _connections(
                     "id": source["id"],
                     "gas": source.get("gas", "gas"),
                     "symbol": source.get("symbol", ""),
+                    "metered": source["volume"] not in unmetered.get(name, {name}),
                 }
                 for source in plumbing.get("gas_sources") or []
                 if source["volume"] in space and _is(state, source["id"], "active")
@@ -325,6 +344,10 @@ def _connections(
                 pump["route_hint"] = slow.get("label", "slow gas-line route")
         pumps = answers[name]["pumps"]
         answers[name]["slow_route_only"] = bool(pumps) and all(pump.get("route_hint") for pump in pumps)
+        gases = answers[name]["gas"]
+        answers[name]["metered_only"] = (
+            answers[name]["state"] == GAS and bool(gases) and all(item["metered"] for item in gases)
+        )
     return answers
 
 
@@ -505,10 +528,17 @@ def update_memory(plumbing: dict, memory: dict | None, prediction: dict, now) ->
 
     A volume that is open to the room (``always: "air"``) has no memory: it is
     not holding anything, it *is* the room.
+
+    A gas entry also says whether a running turbo was pumping that volume, on
+    its own side of every metered entry, when it held the gas (0.30.0). That is
+    the difference between process gas at a few mTorr and an unroughed fill,
+    and it is what lets the turbo warning clear once the gas path is closed
+    (queezz, 2026-10-02: "Ha, gas is off, but the warning doesn't go").
     """
     volumes: dict = plumbing.get("volumes") or {}
     moment = now if isinstance(now, datetime) else _parse_moment(now)
     stamp = moment.strftime(TIME_FORMAT) if moment else None
+    pumped = set(prediction.get("turbo_pumped") or ())
     out = {
         name: dict(entry)
         for name, entry in (memory or {}).items()
@@ -525,12 +555,27 @@ def update_memory(plumbing: dict, memory: dict | None, prediction: dict, now) ->
             symbols = (prediction.get("gases") or {}).get(name) or []
             if symbols:
                 entry["symbols"] = list(symbols)
+            if verdict == GAS:
+                entry["turbo_pumped"] = name in pumped
             out[name] = entry
         else:
             entry = out.get(name)
             if entry and entry.get("state") and not entry.get("since") and stamp:
                 entry["since"] = stamp
     return out
+
+
+def memory_predates_metering(memory: dict | None) -> bool:
+    """A stored memory written before 0.30.0, whose gas cannot be told apart.
+
+    Such a memory says *gas* without saying whether a turbo was pumping it, so
+    read as it stands it would keep the banner that 0.30.0 exists to clear. The
+    server replays it from history instead, which marks every entry afresh.
+    """
+    return any(
+        entry.get("state") == GAS and "turbo_pumped" not in entry
+        for entry in (memory or {}).values()
+    )
 
 
 def duration_words(seconds: float) -> str:
@@ -1027,8 +1072,19 @@ def predict(
             component = next((part for part in _components(list(dict.fromkeys(names)), edges)
                               if warning["volume"] in part), [warning["volume"]])
             unroughed.update(component)
+    # What a running turbo is pumping right now, on its own side of every
+    # metered entry. The memory marks gas held there as pumped gas.
+    beside = _beside_meters(plumbing, list(dict.fromkeys(names)), edges)
+    turbo_pumped = {
+        name
+        for pump in plumbing.get("pumps") or []
+        if pump.get("kind") == TURBO and _is(state, pump["id"], "active")
+        for name in beside.get(pump["volume"], {pump["volume"]})
+        if name in volumes
+    }
     return {
         "unroughed": sorted(unroughed),
+        "turbo_pumped": sorted(turbo_pumped),
         "volumes": by_volume,
         "mixes": mix_of,
         "gases": gases_of,
@@ -1226,9 +1282,51 @@ def mass_flow_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict
     return found
 
 
+def _turbo_exposure(
+    plumbing: dict, state: dict, memory: dict, volume: str, verdict: str, reach: dict, beside: dict
+) -> tuple[str | None, dict]:
+    """What a running turbo is predicted to take in, and how to word it.
+
+    Vent air always counts, live or remembered anywhere the turbo reaches. Gas
+    counts when a bottle reaches the turbo without passing a ``metered_gas``
+    valve, or when gas is held on the turbo's side of those valves that no
+    turbo was pumping — an unroughed fill, which a reachable running rough pump
+    clears (0.28.0).
+
+    **Amended 2026-10-16** (queezz, journal 2026-10-07): "We inject gas via
+    precision needle valves or MFCs to make plasma, which is the designed mode
+    of operation." So process gas metered into a vessel its own turbo pumps is
+    an operating state rather than a warning, and gas the turbo was pumping when
+    last seen is not unroughed: on 2026-10-02 the banner outlived the discharge
+    ("Ha, gas is off, but the warning doesn't go") because the gas manifold
+    remembered argon it had only ever held under TMPU.
+    """
+    if verdict == AIR:
+        return AIR, {}
+    own_side = beside.get(volume, {volume})
+    if verdict == GAS and any(
+        source["volume"] in own_side and _is(state, source["id"], "active")
+        for source in plumbing.get("gas_sources") or []
+    ):
+        return GAS, {"unmetered": True}
+    component = reach.get(volume, {volume})
+    if any(pump.get("kind") != TURBO and pump.get("volume") in component
+           and _is(state, pump["id"], "active") for pump in plumbing.get("pumps") or []):
+        return None, {}
+    if any((memory.get(name) or {}).get("state") == AIR for name in component):
+        return AIR, {}
+    if any((memory.get(name) or {}).get("state") == GAS and not (memory.get(name) or {}).get("turbo_pumped")
+           for name in own_side):
+        return GAS, {}
+    return None, {}
+
+
 def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict, memory: dict, edges=(), names=()) -> list[dict]:
     """Standing advisories, shared by the drawing and press comparisons."""
     found = oil_warnings(plumbing, state, verdicts, sealed, memory)
+    names = list(dict.fromkeys(names))
+    reach = _reach(names, list(edges))
+    beside = _beside_meters(plumbing, names, list(edges))
     for kind, items, wanted in [("gauge", plumbing.get("gauges", []), IONIZATION),
                                 ("turbo", plumbing.get("pumps", []), TURBO)]:
         for item in items:
@@ -1238,17 +1336,13 @@ def equipment_warnings(plumbing: dict, state: dict, verdicts: dict, sealed: dict
             verdict = verdicts.get(volume, ISOLATED)
             if verdict == ISOLATED:
                 verdict = (sealed.get(volume) or {}).get("was", (memory.get(volume) or {}).get("state", ISOLATED))
-            if kind == "turbo" and verdict not in (AIR, GAS):
-                component = next((part for part in _components(list(dict.fromkeys(names)), edges) if volume in part), [volume])
-                roughing = any(pump.get("kind") != TURBO and pump.get("volume") in component
-                               and _is(state, pump["id"], "active") for pump in plumbing.get("pumps", []))
-                if not roughing:
-                    held = [(memory.get(name) or {}).get("state") for name in component]
-                    verdict = AIR if AIR in held else GAS if GAS in held else verdict
+            extra: dict = {}
+            if kind == "turbo":
+                verdict, extra = _turbo_exposure(plumbing, state, memory, volume, verdict, reach, beside)
             level = _exposure(verdict)
             if level:
                 found.append({"kind": kind, "id": item["id"], "volume": volume,
-                              "state": verdict, "level": level})
+                              "state": verdict, "level": level, **extra})
     return found
 
 

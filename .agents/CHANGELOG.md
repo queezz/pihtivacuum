@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.0
+
+- Making a plasma no longer raises the turbo warning. Gas let into a vessel its own running turbo pumps, through the argon needle valve or a mass-flow controller, is the designed mode of operation: no banner and no Practice, and the vessel reads "gas · metered".
+- The warning clears once the gas is closed. Gas the turbo was pumping is no longer remembered as unroughed; a state file saved by an earlier release is replayed from history once at start, so a banner already stuck on the rig goes away too.
+- Still warned as before: vent air through any valve, gas that reaches a running turbo without passing a needle valve or mass-flow controller (now worded "unmetered gas"), and a running turbo opened onto a volume that filled with gas while nothing pumped it.
+
 ## 0.29.0
 
 - Plot long recordings: the Pi now sends a recording's original files and the browser reads and plots them. A 39 MB, 86,667-row recording that took the Pi minutes (and became 104 MB of page) now draws in under a second on a laptop; the status line counts the megabytes as they arrive. Units, labels, gaps and conversions are unchanged, proved identical to the retired Python reader on real and synthetic files.

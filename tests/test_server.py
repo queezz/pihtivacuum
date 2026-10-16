@@ -140,9 +140,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.29.0"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.29.0"}
-    assert b"v0.29.0" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.30.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.30.0"}
+    assert b"v0.30.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -1584,6 +1584,203 @@ def test_gas_reaching_running_turbo_warns(client):
                for w in plumbing_map.press_warnings(mapping, state, 'GVU', 'active'))
 
 
+def argon_discharge(needle: bool = True) -> dict:
+    """queezz's rig during the 2026-10-02 argon discharge, read off its snapshot.
+
+    Argon through the big manual needle valve on the argon line and the main
+    gas line into the plasma vessel, with GVU open and TMPU running: "the
+    designed mode of operation" (his journal, 2026-10-07). ``needle=False`` is
+    the same rig at 17:56, after the gas was closed.
+    """
+    state = {
+        "TMPU": "active", "TMPD": "active", "RoughU": "active", "RoughD": "active",
+        "GVU": "active", "GVD": "active", "GVBU": "active", "bypass-l1": "active",
+        "bypass-vcr-u": "active", "valve_qms": "active", "gasline-main": "active",
+        "gaspanel-valve-ar": "active", "gaspanel-valve-o": "active",
+        "gaspanel-valve-h": "active", "gaspanel-pump-vent": "active",
+    }
+    if needle:
+        state.update({"argon-bottle": "active", "gasline-ar": "active"})
+    return state
+
+
+def turbo_warnings(prediction: dict) -> list[dict]:
+    return [item for item in prediction["warnings"] if item["kind"] == "turbo"]
+
+
+def test_metered_process_gas_into_a_turbo_pumped_vessel_is_an_operating_state(client):
+    """Opening the needle valve onto a pumped vessel is how a plasma is made.
+
+    queezz, 2026-10-07: "We inject gas via precision needle valves or MFCs to
+    make plasma, which is the designed mode of operation." No press warning, no
+    standing turbo warning, and the vessel readout says the gas is metered.
+    """
+    mapping = client.get("/plumbing").json
+    now = datetime.fromisoformat("2026-10-02T17:10:00")
+    before = {**argon_discharge(), "gasline-ar": "inactive"}
+    memory = plumbing_map.update_memory(mapping, {}, plumbing_map.predict(mapping, before, "open", now=now), now)
+    assert plumbing_map.press_warnings(
+        mapping, {**before, plumbing_map.MEMORY_KEY: memory}, "gasline-ar", "active", "open"
+    ) == []
+    for _ in range(3):  # the five-second poll, a few times over
+        prediction = plumbing_map.predict(mapping, argon_discharge(), "open", memory=memory, now=now)
+        assert turbo_warnings(prediction) == []
+        memory = plumbing_map.update_memory(mapping, memory, prediction, now)
+    vessel = prediction["connections"]["plasma-vessel"]
+    assert vessel["state"] == "gas" and vessel["metered_only"] is True
+    assert [(item["gas"], item["metered"]) for item in vessel["gas"]] == [("argon", True)]
+    # Gas held where the turbo pumps it is marked so; the argon line, behind
+    # the needle valve, holds its gas at line pressure and is not.
+    assert memory["gas-manifold"] == {"state": "gas", "since": None, "symbols": ["Ar"], "turbo_pumped": True}
+    assert memory["plasma-vessel"]["turbo_pumped"] is True
+    assert memory["argon-line"]["turbo_pumped"] is False
+    # Colours and connectivity are what they always were.
+    without = dict(mapping, metered_gas={})
+    plain = plumbing_map.predict(without, argon_discharge(), "open", memory=memory, now=now)
+    for key in ["volumes", "elements", "mixes", "gases", "gas_symbols"]:
+        assert prediction[key] == plain[key]
+
+
+@pytest.mark.parametrize("closing", ["gasline-ar", "argon-bottle", "gasline-main"])
+def test_closing_the_metered_gas_path_clears_the_turbo_banner(client, closing):
+    """queezz, 2026-10-02: "Ha, gas is off, but the warning doesn't go."
+
+    The gas manifold had only ever held argon under TMPU, so once the path is
+    closed nothing unroughed is left for the turbo. A memory written before
+    0.30.0 could not say that, which is why the server replays it.
+    """
+    mapping = client.get("/plumbing").json
+    now = datetime.fromisoformat("2026-10-02T17:54:00")
+    memory = {}
+    for state in (argon_discharge(), argon_discharge()):
+        memory = plumbing_map.update_memory(
+            mapping, memory, plumbing_map.predict(mapping, state, "open", memory=memory, now=now), now
+        )
+    closed = {**argon_discharge(), closing: "inactive"}
+    assert plumbing_map.press_warnings(
+        mapping, {**argon_discharge(), plumbing_map.MEMORY_KEY: memory}, closing, "inactive", "open"
+    ) == []
+    prediction = plumbing_map.predict(mapping, closed, "open", memory=memory, now=now)
+    assert turbo_warnings(prediction) == []
+    assert prediction["connections"]["plasma-vessel"]["state"] == "upstream-high-vacuum"
+    after = plumbing_map.update_memory(mapping, memory, prediction, now)
+    assert turbo_warnings(plumbing_map.predict(mapping, closed, "open", memory=after, now=now)) == []
+    # The 0.28.9 memory, which never said whether its gas was pumped, is the
+    # one that kept the banner up on the rig.
+    legacy = {name: {key: value for key, value in entry.items() if key != "turbo_pumped"}
+              for name, entry in memory.items()}
+    assert plumbing_map.memory_predates_metering(legacy)
+    assert not plumbing_map.memory_predates_metering(memory)
+    if closing != "gasline-main":
+        assert turbo_warnings(plumbing_map.predict(mapping, closed, "open", memory=legacy, now=now))
+
+
+@pytest.mark.parametrize("gas", ["hydrogen", "oxygen"])
+def test_gas_through_a_mass_flow_controller_into_a_pumped_vessel_is_metered(client, gas):
+    mapping = client.get("/plumbing").json
+    controller = {"hydrogen": "rect44907-1", "oxygen": "rect44907"}[gas]
+    cutoff = {"hydrogen": "gasline-h", "oxygen": "gasline-o"}[gas]
+    state = {"TMPU": "active", "RoughU": "active", "GVU": "active", "gasline-main": "active",
+             cutoff: "active", f"{gas}-bottle": "active"}
+    assert plumbing_map.press_warnings(mapping, state, controller, "active") == []
+    flowing = {**state, controller: "active"}
+    prediction = plumbing_map.predict(mapping, flowing)
+    assert turbo_warnings(prediction) == []
+    assert prediction["connections"]["plasma-vessel"]["metered_only"] is True
+    memory = plumbing_map.update_memory(mapping, {}, prediction, datetime.now())
+    for press in (controller, cutoff):
+        assert plumbing_map.press_warnings(
+            mapping, {**flowing, plumbing_map.MEMORY_KEY: memory}, press, "inactive"
+        ) == []
+
+
+def test_gas_that_skips_every_meter_still_warns_and_clears_when_shut(client):
+    """The flow calibration valve is not known to be a needle valve.
+
+    Argon through it reaches the plasma vessel by the probe line and the bypass,
+    so a running turbo is warned, worded as unmetered gas; closing the valve
+    ends it, because the turbo was pumping that gas all along.
+    """
+    mapping = client.get("/plumbing").json
+    state = {"TMPU": "active", "GVU": "active", "GVBU": "active", "bypass-l1": "active",
+             "argon-bottle": "active"}
+    warned = plumbing_map.press_warnings(mapping, state, "flow-calibration-valve", "active", "membrane")
+    assert warned == [{"kind": "turbo", "id": "TMPU", "volume": "plasma-turbo-line",
+                       "state": "gas", "level": 1, "unmetered": True}]
+    flowing = {**state, "flow-calibration-valve": "active"}
+    prediction = plumbing_map.predict(mapping, flowing, "membrane")
+    assert prediction["connections"]["plasma-vessel"]["metered_only"] is False
+    memory = plumbing_map.update_memory(mapping, {}, prediction, datetime.now())
+    memory = plumbing_map.update_memory(
+        mapping, memory, plumbing_map.predict(mapping, flowing, "membrane", memory=memory), datetime.now()
+    )
+    assert turbo_warnings(plumbing_map.predict(mapping, flowing, "membrane", memory=memory))
+    shut = {**flowing, "flow-calibration-valve": "inactive"}
+    assert turbo_warnings(plumbing_map.predict(mapping, shut, "membrane", memory=memory)) == []
+
+
+def test_a_vessel_filled_through_the_needle_valve_still_warns_its_turbo(client):
+    """An unpumped volume opened to a running turbo warns as before (0.28.0).
+
+    Nitrogen let in through the needle valve with GVU shut fills the vessel
+    with nobody pumping it. Opening GVU onto that is a slug of gas, metered or
+    not, and it stays a warning after the needle closes, until the vessel is
+    roughed or shut off again.
+    """
+    mapping = client.get("/plumbing").json
+    venting = {"TMPU": "active", **nitrogen_route()}
+    memory = plumbing_map.update_memory(mapping, {}, plumbing_map.predict(mapping, venting, "membrane"), datetime.now())
+    assert memory["plasma-vessel"]["turbo_pumped"] is False
+    warned = plumbing_map.press_warnings(
+        mapping, {**venting, plumbing_map.MEMORY_KEY: memory}, "GVU", "active", "membrane"
+    )
+    assert warned == [{"kind": "turbo", "id": "TMPU", "volume": "plasma-turbo-line",
+                       "state": "gas", "level": 1}]
+    opened = {**venting, "GVU": "active"}
+    memory = plumbing_map.update_memory(
+        mapping, memory, plumbing_map.predict(mapping, opened, "membrane", memory=memory), datetime.now()
+    )
+    assert memory["plasma-vessel"]["turbo_pumped"] is False
+    needle_shut = {**opened, "gasline-ar": "inactive"}
+    assert turbo_warnings(plumbing_map.predict(mapping, needle_shut, "membrane", memory=memory))
+    roughed = {**needle_shut, "Rough-Bypass": "active", "bypass-l2": "active", "GVBU": "active"}
+    assert turbo_warnings(plumbing_map.predict(mapping, roughed, "membrane", memory=memory)) == []
+
+
+def test_the_designed_discharge_records_without_practice_and_clears_after(app, client, tmp_path):
+    """The whole 2026-10-02 run through the real routes, then the 0.28.9 memory.
+
+    Every press records directly (no Practice deferral), the banner never
+    appears, and closing the gas leaves none. A state file written by 0.28.9
+    carries gas with no pumping mark; the server replays it from the log on
+    start so the deployed rig loses its stuck banner, and keeps it as it is
+    when there is no log to replay.
+    """
+    identify(client)
+    client.post("/operation-context", json={"line_mode": "open"})
+    for element_id in ["TMPU", "RoughU", "GVU", "gasline-main", "gaspanel-valve-ar",
+                       "argon-bottle", "gasline-ar"]:
+        response = client.post("/update", json={"id": element_id, "status": "active"})
+        assert response.status_code == 200, (element_id, response.json)
+        assert turbo_warnings(response.json["prediction"]) == []
+    assert client.get("/predicted-vacuum").json["connections"]["plasma-vessel"]["metered_only"] is True
+    response = client.post("/update", json={"id": "gasline-ar", "status": "inactive"})
+    assert response.status_code == 200
+    assert turbo_warnings(client.get("/predicted-vacuum").json) == []
+
+    state_file = Path(app.config["STATE_FILE"])
+    stored = json.loads(state_file.read_text(encoding="utf-8"))
+    assert stored[plumbing_map.MEMORY_KEY]["gas-manifold"]["state"] == "upstream-high-vacuum"
+    # What 0.28.9 left on the rig: the manifold remembered as unmarked argon.
+    stored[plumbing_map.MEMORY_KEY]["gas-manifold"] = {"state": "gas", "since": None, "symbols": ["Ar"]}
+    state_file.write_text(json.dumps(stored), encoding="utf-8")
+    replayed = make_app(tmp_path).test_client()
+    assert turbo_warnings(replayed.get("/predicted-vacuum").json) == []
+    Path(app.config["LOG_FILE"]).write_text("timestamp,id,status,user\n", encoding="utf-8")
+    kept = make_app(tmp_path).test_client()
+    assert [item["id"] for item in turbo_warnings(kept.get("/predicted-vacuum").json)] == ["TMPU"]
+
+
 def test_a_press_that_would_vent_a_running_turbo_warns(client):
     """queezz, 2026-09-08: "and when vent goes on to TMP".
 
@@ -2306,6 +2503,7 @@ def test_the_prediction_reaches_the_page_and_a_replayed_moment(client):
     assert live.status_code == 200
     assert set(live.json) == {
         "unroughed",
+        "turbo_pumped",
         "volumes",
         "mixes",
         "gases",

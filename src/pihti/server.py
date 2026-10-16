@@ -564,7 +564,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         {key: value for key, value in _stored_state.items() if key != plumbing_map.MEMORY_KEY}
     )
     volume_memory: dict = plumbing_map.read_memory(_stored_state)
-    memory_rebuilt = bool(volume_memory)
+    # A memory from before 0.30.0 cannot say whether its gas was being pumped,
+    # so it is replayed from history once, like a memory that is missing.
+    memory_rebuilt = bool(volume_memory) and not plumbing_map.memory_predates_metering(volume_memory)
     logs = load_logs_from_csv(Path(app.config["LOG_FILE"]))[-MAX_LOGS:]
     element_config = _load_json(Path(app.config["ELEMENTS_CONFIG_FILE"]), [])
     plumbing = plumbing_map.load_plumbing(app.static_folder)
@@ -947,7 +949,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         nonlocal volume_memory, memory_rebuilt
         if not memory_rebuilt:
             snapshots = replayed_memory()
-            if snapshots:
+            # A stored memory with no history beside it is kept as it is:
+            # replaying nothing would forget what it holds.
+            if len(snapshots) > 1 or not volume_memory:
                 volume_memory = snapshots[-1]
             memory_rebuilt = True
         return volume_memory
