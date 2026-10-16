@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const code = fs.readFileSync('src/pihti/static/js/plot-workspace.js', 'utf8');
+const reader = require('../src/pihti/static/js/recording-reader.js');
 function node() {
     return {children: [], clientWidth: 700, textContent: '', handlers: {},
         append(...items) { for (const item of items) { item.remove(); item.parent = this; this.children.push(item); } },
@@ -15,7 +16,7 @@ function node() {
         getContext() { return {measureText: t => ({width: t.length * 6})}; },
         on(name, callback) { this.handlers[name] = callback; }, click() {}};
 }
-async function workspace(file = 'cu_test.csv', storage = new Map()) {
+async function workspace(file = 'cu_test.csv', storage = new Map(), options = {}) {
     const root = node(), messages = [], graphs = new Set(), blobs = [];
     const sample = {file, series: [
         {id: 'cu:Bu_c', column: 'Bu_c', label: 'Baratron', unit: 'Torr', group: 'Pressure', source: 'cu', x: ['2026-09-15T12:00:00','2026-09-15T12:00:01','2026-09-15T12:00:02'], y: [-0.0003, 0.0007, null]},
@@ -28,7 +29,8 @@ async function workspace(file = 'cu_test.csv', storage = new Map()) {
     const draw = async (plot, data, layout) => { plot.data = data; plot.layout = layout; graphs.add(plot); };
     const Plotly = {newPlot: draw, react: draw, purge: plot => graphs.delete(plot), relayout: async () => {}};
     window.Plotly = Plotly;
-    vm.runInNewContext(code, {window, Plotly, console, document: {getElementById: id => id === 'charts' ? root : {textContent: JSON.stringify(sample)}, createElement: node}, localStorage: {getItem: k => storage.get(k), setItem: (k,v) => storage.set(k,v)}, Blob, URL: {createObjectURL: blob => {blobs.push(blob); return 'blob:test';}, revokeObjectURL() {}}, setTimeout() {}, clearTimeout() {}});
+    window.PihtiRecording = reader;
+    vm.runInNewContext(code, {window, Plotly, console, document: {getElementById: id => id === 'charts' ? root : {textContent: JSON.stringify(options.data || sample)}, createElement: node}, localStorage: {getItem: k => storage.get(k), setItem: (k,v) => storage.set(k,v)}, Blob, URL: {createObjectURL: blob => {blobs.push(blob); return 'blob:test';}, revokeObjectURL() {}}, setTimeout() {}, clearTimeout() {}, ...options.context});
     const settle = () => new Promise(resolve => setImmediate(resolve));
     await settle();
     return {sample, graphs, blobs, messages, storage, async command(action, values = {}) { listener({origin: 'http://test', source: parent, data: {type: 'pihti-plot-command', action, ...values}}); await settle(); }, latest: () => messages.at(-1), trace: id => [...graphs].flatMap(p => p.data).find(t => t.uid === id)};
@@ -72,3 +74,37 @@ test('pressure, MFC signal and setpoint share a chart with independent unit axes
     assert.equal([...w.graphs][0].layout.yaxis2.type, 'log');
 });
 
+test('the frame fetches the original files, reads them here and reports progress', async () => {
+    const files = {
+        'cu_20260915_120000.csv': '# Columns,date,Pu_c,Ip_c\n2026-09-15 12:00:00,1e-6,0.1\n2026-09-15 12:00:01,2e-6,0.2\n',
+        'kikusui_20260915_120000.csv': 'date,voltage_v,status\n2026-09-15T12:00:00+09:00,300,ok\n',
+    };
+    const requested = [];
+    const fetch = async url => {
+        requested.push(url);
+        const bytes = new TextEncoder().encode(files[url]);
+        const chunks = [bytes.subarray(0, 7), bytes.subarray(7)];
+        return {ok: true, status: 200, body: {getReader: () => ({read: async () => chunks.length ? {done: false, value: chunks.shift()} : {done: true}})}};
+    };
+    const data = {file: 'cu_20260915_120000.csv', sources: Object.keys(files).map(name => ({name, bytes: files[name].length, url: name}))};
+    const w = await workspace(data.file, new Map(), {data, context: {fetch, TextDecoder, setTimeout}});
+    for (let i = 0; i < 50 && !w.messages.some(m => m.type === 'pihti-plot-ready'); i++) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.deepEqual(requested, Object.keys(files));
+    const stages = w.messages.filter(m => m.type === 'pihti-plot-progress').map(m => m.stage);
+    assert.equal(stages[0], 'receiving');
+    assert.equal(stages.at(-1), 'drawing');
+    const ready = w.latest();
+    assert.equal(ready.type, 'pihti-plot-ready');
+    assert.equal(ready.file, data.file);
+    assert.deepEqual(ready.series.map(s => s.id).sort(), ['cu:Ip_c', 'cu:Pu_c', 'kikusui:voltage_v']);
+    assert.ok(ready.series.every(s => !('x' in s) && !('y' in s)));
+    assert.deepEqual(Array.from(w.trace('series-' + ready.series.findIndex(s => s.id === 'cu:Pu_c')).y), [1e-6, 2e-6]);
+    assert.equal(ready.sources[0].rows, 2);
+});
+test('an unreadable recording says why in the frame and to the page', async () => {
+    const fetch = async () => ({ok: true, status: 200, body: null, arrayBuffer: async () => new TextEncoder().encode('sample\n').buffer});
+    const data = {file: 'cu_20260101_120000.csv', sources: [{name: 'cu_20260101_120000.csv', bytes: 7, url: 'x'}]};
+    const w = await workspace(data.file, new Map(), {data, context: {fetch, TextDecoder, setTimeout}});
+    for (let i = 0; i < 50 && !w.messages.some(m => m.type === 'pihti-plot-error'); i++) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(w.latest().error, 'This recording could not be read. The recording needs a unique column header.');
+});

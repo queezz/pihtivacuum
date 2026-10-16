@@ -300,6 +300,21 @@ press newly creates the condition, including in Practice; History replays it.
   frame, because a browser stops handing frames to a tab nobody is looking at.
 - **Change a static file and you must bump the version**, or a browser that saw the previous release keeps the old copy for a year. Static files are cached by release, everything else is `no-store` (0.9.0). A template writes a static URL with `asset('css/styles.css')`, never `url_for('static', ...)`, and JavaScript that fetches a static file stamps it with `document.body.dataset.assetVersion`. An unstamped or stale-stamped static URL is deliberately uncacheable, so a stale asset cannot outlive its release.
 - The last control-unit plot is served as its own document (`/plot/last.html`) and framed, never injected into the page: Plotly's bundle is measured in megabytes and injecting it froze the tab. `X-Frame-Options` is `SAMEORIGIN` for that frame alone. The served document is prefixed with the frame's own reset, so a plot saved by an older release still fills the frame without white margins.
+- **The browser reads recordings; the Pi only sends them** (owner, 2026-10-16;
+  0.29.0). queezz: *"outsource the plotting to the browser client. First fetch
+  the data, then plot."* Parsed in Python, a 39 MB recording took the Pi
+  minutes and became 104 MB of page, because every channel carried its own
+  copy of the time column, so longer files never finished. The plot document
+  now names the recording's files and sizes; `/plot/source` serves each one
+  byte for byte (ETag, revalidated) and `static/js/recording-reader.js` decides
+  every unit, label, gap and conversion. Never parse or re-serialize samples
+  on the server. The reader's rules are the Python reader's, proved identical
+  on real and synthetic recordings before it was removed; change them only
+  with `node --test tests/recording-reader.test.cjs`. Curves stay SVG: WebGL
+  took a browser context per chart and per image export, and past the
+  browser's limit a live chart went blank. The frame is replaced with
+  `location.replace`, never navigated, so Back moves the page and its plot
+  together.
 - The recording archive travels one month at a time (`/plot/recordings?month=`), never as one payload in the page. A month that has passed does not change, so the answer carries an ETag and is revalidated rather than re-sent.
 
 ## Deployment

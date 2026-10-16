@@ -118,8 +118,15 @@
      * stay live. The stamp only makes the frame reload when the plot changed. */
     function showPlot(stamp) {
         if (!frame) return;
-        frame.src = `/plot/last.html?t=${encodeURIComponent(stamp || Date.now())}`;
+        loadFrame(`/plot/last.html?t=${encodeURIComponent(stamp || Date.now())}`);
+    }
+
+    /* The frame is replaced, never navigated. Setting its src gave the frame
+     * an entry of its own in the browser's history, so Back rewound the plot
+     * alone and the rail went on naming one recording over another's charts. */
+    function loadFrame(address) {
         frame.hidden = false;
+        frame.contentWindow.location.replace(address);
     }
 
     function showEmpty(text) {
@@ -272,8 +279,7 @@
         workspaceSignature = "";
         renderPanelControls();
         renderContext({file});
-        frame.hidden = false;
-        frame.src = `/plot/view?file=${encodeURIComponent(file)}`;
+        loadFrame(`/plot/view?file=${encodeURIComponent(file)}`);
         try { localStorage.setItem("pihti.plot.last-file", file); } catch (_) { /* Optional memory. */ }
     }
 
@@ -467,6 +473,13 @@
             comparing = false;
             document.getElementById("plot-compare-note").textContent = payload.error;
             showStatus(payload.error || "This recording could not be plotted.");
+        } else if (payload.type === "pihti-plot-progress" && !workspace) {
+            // The frame fetches the recording's files itself; a long one
+            // says how much has arrived rather than looking stuck.
+            const total = Math.max(Number(payload.total) || 0, Number(payload.loaded) || 0);
+            const mb = (bytes) => (bytes / 1e6).toFixed(1);
+            if (payload.stage === "drawing") showStatus(`Drawing ${payload.file}…`);
+            else if (total >= 1e6) showStatus(`Receiving ${payload.file} · ${mb(payload.loaded || 0)} of ${mb(total)} MB`);
         } else if (payload.type === "pihti-plot-ready") {
             workspace = payload;
             showStatus("");
@@ -486,7 +499,7 @@
         }
     });
     frame.addEventListener("load", () => {
-        if (frame.src.includes("/plot/view") && !frame.contentDocument?.getElementById("recording-data")) {
+        if (frame.contentWindow.location.pathname === "/plot/view" && !frame.contentDocument?.getElementById("recording-data")) {
             showStatus("That recording is unavailable. Choose another file.");
         }
     });

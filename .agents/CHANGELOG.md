@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.0
+
+- Plot long recordings: the Pi now sends a recording's original files and the browser reads and plots them. A 39 MB, 86,667-row recording that took the Pi minutes (and became 104 MB of page) now draws in under a second on a laptop; the status line counts the megabytes as they arrive. Units, labels, gaps and conversions are unchanged, proved identical to the retired Python reader on real and synthetic files.
+- A recording still being written plots up to its last complete row and says so in Data notes, instead of refusing the file.
+- Browser Back after choosing another recording now returns the page and its plot together; it used to rewind the plot alone, leaving the rail naming a different recording.
+
 ## 0.28.9
 
 - Nudge the standalone water valve upward to group with the diagram, retaining clear space from the target wire and equipment cards.

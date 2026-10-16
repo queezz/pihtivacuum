@@ -31,7 +31,7 @@ from flask import (
 from pihti import __version__
 from pihti import neighbours as ensemble
 from pihti import plumbing as plumbing_map
-from pihti.recordings import load_recording, companion_paths
+from pihti.recordings import companion_paths, recording_columns
 from plotly.offline import get_plotlyjs
 from pihti.roster import default_private_dir as _default_private_dir
 from pihti.roster import env_path as _env_path
@@ -665,10 +665,12 @@ def create_app(test_config: dict | None = None) -> Flask:
         )
         if versioned:
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        elif request.endpoint == "plot_recordings":
+        elif request.endpoint in {"plot_recordings", "plot_source"}:
             # A past month never changes, so this may be kept — but it is
             # always revalidated against its ETag, so a month that does gain a
-            # recording is never served stale.
+            # recording is never served stale. A recording's original file is
+            # the same: finished ones answer 304, the one still being written
+            # changes size and is sent again.
             response.headers["Cache-Control"] = "no-cache"
         else:
             response.headers["Cache-Control"] = "no-store"
@@ -1603,23 +1605,50 @@ def create_app(test_config: dict | None = None) -> Flask:
     PLOT_LINEAR_CHANNELS = ["Ip_c"]
     PLOT_LOG_CHANNELS = ["Pu_c", "Pd_c", "Bu_c"]
 
-    def recording_document(file_path):
-        recording = load_recording(file_path)
-        recording["file"] = file_path.name
-        return recording, render_template("plot_document.html", recording=recording)
+    def recording_manifest(file_path):
+        """Which original files make up one recording, and where to fetch them.
+
+        Names and sizes only: the browser reads the samples itself. Parsing a
+        long recording here and pasting it into the page took the Pi minutes
+        and a hundred megabytes for a 39 MB file (owner, 2026-10-16).
+        """
+        return {
+            "file": file_path.name,
+            "sources": [
+                {
+                    "name": path.name,
+                    "bytes": path.stat().st_size,
+                    "url": url_for("plot_source", file=file_path.name, source=path.name),
+                }
+                for path in companion_paths(file_path)
+            ],
+        }
 
     @app.route("/plot/view")
     def plot_view():
         """A file-specific, read-only plot; other readers cannot replace it."""
         file_path = resolve_cu_file(request.args.get("file"))
         try:
-            _, document = recording_document(file_path)
-            return Response(document, mimetype="text/html")
-        except (ValueError, UnicodeError, OSError):
+            recording = recording_manifest(file_path)
+        except (ValueError, OSError):
             return render_template("plot_document.html", recording={
                 "file": file_path.name,
                 "error": "This recording could not be read. Check its CSV header and rows.",
             }), 422
+        return render_template("plot_document.html", recording=recording)
+
+    @app.route("/plot/source")
+    def plot_source():
+        """One original file of a recording, byte for byte, for the browser to read."""
+        file_path = resolve_cu_file(request.args.get("file"))
+        try:
+            paths = {path.name: path for path in companion_paths(file_path)}
+        except (ValueError, OSError):
+            abort(404)
+        path = paths.get(request.args.get("source", ""))
+        if path is None:
+            abort(404)
+        return send_file(path, mimetype="text/csv", conditional=True)
 
     @app.route("/plot/plotly.js")
     def plotly_bundle():
@@ -1646,17 +1675,16 @@ def create_app(test_config: dict | None = None) -> Flask:
         file_name = request.form.get("file")
         file_path = resolve_cu_file(file_name)
         try:
-            recording, last_plot_html = recording_document(file_path)
+            columns = recording_columns(file_path)
+            recording = recording_manifest(file_path)
         except (ValueError, UnicodeError, OSError):
             return jsonify({"error": "This file is not a readable control-unit log."}), 422
-        columns = recording["sources"][0]["columns"]
+        last_plot_html = render_template("plot_document.html", recording=recording)
         last_plot_meta = {
             "file": file_name,
             "generated_at": datetime.now().strftime(TIMESTAMP_FORMAT),
             "linear": [name for name in PLOT_LINEAR_CHANNELS if name in columns],
             "log": [name for name in PLOT_LOG_CHANNELS if name in columns],
-            "sources": recording["sources"],
-            "notes": recording["notes"],
         }
         plot_path = Path(app.config["LAST_PLOT_FILE"])
         plot_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1664,8 +1692,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         Path(app.config["LAST_PLOT_META_FILE"]).write_text(
             json.dumps(last_plot_meta, indent=4) + "\n", encoding="utf-8"
         )
-        # The plot itself is not sent back here: it is megabytes of Plotly, and
-        # the page loads it into its own frame instead (see `/plot/last.html`).
+        # The plot itself is not sent back here: the page frames its document,
+        # which fetches the recording's files (see `/plot/last.html`).
         return jsonify(**last_plot_meta)
 
     @app.route("/get_last_plot")

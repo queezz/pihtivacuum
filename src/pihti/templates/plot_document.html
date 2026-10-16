@@ -8,8 +8,10 @@
 </head>
 <body>
     <div id="charts" aria-label="Recorded measurements"></div>
+    {# Which files to fetch, never the samples: the browser reads those itself. #}
     <script type="application/json" id="recording-data">{{ recording|tojson }}</script>
     <script src="{{ url_for('plotly_bundle', v=app_version) }}"></script>
+    <script src="{{ asset('js/recording-reader.js') }}"></script>
     <script src="{{ asset('js/plot-workspace.js') }}"></script>
 </body>
 </html>

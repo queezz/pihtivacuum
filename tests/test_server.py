@@ -140,9 +140,9 @@ def test_dark_svg_is_public_and_theme_reads_do_not_write(app, client):
 
 def test_release_version_is_single_sourced_and_visible(client):
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == __version__ == "0.28.9"
-    assert client.get("/version").json == {"name": "pihti", "version": "0.28.9"}
-    assert b"v0.28.9" in client.get("/").data
+    assert project["project"]["version"] == __version__ == "0.29.0"
+    assert client.get("/version").json == {"name": "pihti", "version": "0.29.0"}
+    assert b"v0.29.0" in client.get("/").data
 
 
 def test_session_signing_key_is_machine_private_and_persistent(monkeypatch, tmp_path):
@@ -3981,8 +3981,25 @@ def test_recording_view_is_file_specific_and_export_is_lossless(client, app):
     view = client.get('/plot/view?file=cu_20260915_120000.csv')
     assert view.status_code == 200
     assert view.headers['Cache-Control'] == 'no-store'
-    assert b'Cathode current (Ic)' in view.data
-    assert b'error_a' in view.data
+    # The document names the files and their sizes; the browser reads the
+    # samples itself (0.29.0), so no label, column or value is in it.
+    body = view.data.decode('utf-8')
+    manifest = json.loads(body.split('id="recording-data">', 1)[1].split('</script>', 1)[0])
+    assert [source['name'] for source in manifest['sources']] == list(files)
+    assert [source['bytes'] for source in manifest['sources']] == [len(content.encode()) for content in files.values()]
+    assert 'Cathode current' not in body and 'error_a' not in body and 'series' not in manifest
+    assert 'recording-reader.js' in body
+    for source in manifest['sources']:
+        original = client.get(source['url'])
+        assert original.status_code == 200
+        assert original.data == files[source['name']].encode()
+        assert original.mimetype == 'text/csv'
+        assert original.headers['Cache-Control'] == 'no-cache'
+        again = client.get(source['url'], headers={'If-None-Match': original.headers['ETag']})
+        assert again.status_code == 304
+    assert client.get('/plot/source?file=cu_20260915_120000.csv&source=kikusui_20260915_120001.csv').status_code == 404
+    assert client.get('/plot/source?file=cu_20260915_120000.csv&source=../cu_20260915_120000.csv').status_code == 404
+    assert client.get('/plot/source?file=kikusui_20260915_120000.csv&source=kikusui_20260915_120000.csv').status_code == 404
     assert not Path(app.config['LAST_PLOT_FILE']).exists()
     exported = client.get('/plot/export?file=cu_20260915_120000.csv')
     assert exported.status_code == 200
@@ -3992,7 +4009,8 @@ def test_recording_view_is_file_specific_and_export_is_lossless(client, app):
             assert archive.read(name) == content.encode()
     assert client.get('/plot/export?file=../cu_20260915_120000.csv').status_code == 404
     assert client.get('/plot/view?file=missing.csv').status_code == 404
-    assert client.get('/plot/view?file=cu_20260101_120000.csv').status_code == 422
+    # An unreadable recording is still only named here; the reader says what is wrong.
+    assert client.get('/plot/view?file=cu_20260101_120000.csv').status_code == 200
 
 
 def test_plot_bundle_uses_release_cache(client):

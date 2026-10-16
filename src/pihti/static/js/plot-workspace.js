@@ -1,5 +1,5 @@
 /* Recording-only Plotly workspace. Original samples never change when a view changes. */
-(function () {
+(async function () {
     "use strict";
     const root = document.getElementById("charts");
     if (!root) return;
@@ -12,7 +12,20 @@
     catch (_) { fail("This recording could not be read."); return; }
     if (recording.error) { fail(String(recording.error)); return; }
     if (!window.Plotly) { fail("The chart library could not be loaded."); return; }
-    const series = (recording.series || []).filter(s => s && Array.isArray(s.x) && Array.isArray(s.y));
+    // The document names the recording's files; a plot saved before 0.29.0
+    // carries its samples inline instead.
+    if (!Array.isArray(recording.series)) {
+        try { recording = await fetchRecording(recording); }
+        catch (error) {
+            const Unreadable = window.PihtiRecording && window.PihtiRecording.RecordingError;
+            if (error instanceof Problem) fail(error.message);
+            else if (Unreadable && error instanceof Unreadable) fail("This recording could not be read. " + error.message);
+            else { console.error("The recording could not be loaded", error); fail("This recording could not be loaded."); }
+            return;
+        }
+    }
+    const isList = value => Array.isArray(value) || ArrayBuffer.isView(value);
+    const series = (recording.series || []).filter(s => s && isList(s.x) && isList(s.y));
     const colors = ["#7eb8f7", "#66c2a5", "#d6ad63", "#c9796b", "#bd9ce8", "#83ced1", "#e5a3c7", "#b6c879"];
     const charts = new Map();
     const escape = value => String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -100,16 +113,23 @@
     function secondary(panel, s) { return panel.secondaryUnit !== undefined && panel.secondaryUnit === (s.unit || ""); }
     function scaleFor(panel, s) { return secondary(panel, s) ? panel.secondaryScale : panel.scale; }
     function notice(panel, node) {
-        const omitted = members(panel).filter(s => visible[s.id] && scaleFor(panel, s) === "log").reduce((n, s) => n + s.y.filter(y => adjusted(s, y) !== null && adjusted(s, y) <= 0).length, 0);
+        let omitted = 0;
+        for (const s of members(panel).filter(s => visible[s.id] && scaleFor(panel, s) === "log")) {
+            for (const y of s.y) { const value = adjusted(s, y); if (value !== null && value <= 0) omitted++; }
+        }
         node.textContent = omitted ? `${omitted.toLocaleString()} zero or negative samples omitted on log scale.` : "";
         node.hidden = !omitted;
     }
     function trace(s, panel) {
         const applied = Object.prototype.hasOwnProperty.call(offsets, s.id);
         const unit = s.unit ? " " + escape(s.unit) : "";
+        // SVG, not WebGL, however long the curve: each WebGL chart and each
+        // image export holds a browser context, and past the browser's limit
+        // the oldest chart went blank (measured 2026-10-16). SVG zooms four
+        // 250,000-point curves in under a tenth of a second.
         return {type: "scatter", mode: "lines", uid: "series-" + series.indexOf(s), name: escape(s.label) + (applied ? " (zero corrected)" : ""), x: s.x,
-            y: s.y.map(y => { const value = adjusted(s, y); return scaleFor(panel, s) === "log" && value <= 0 ? null : value; }),
-            ...(applied ? {customdata: s.y} : {}),
+            y: Array.from(s.y, y => { const value = adjusted(s, y); return scaleFor(panel, s) === "log" && value <= 0 ? null : value; }),
+            ...(applied ? {customdata: Array.from(s.y, y => Number.isFinite(y) ? y : null)} : {}),
             yaxis: secondary(panel, s) ? "y2" : "y",
             visible: visible[s.id] ? true : "legendonly", connectgaps: false,
             line: {color: colors[series.indexOf(s) % colors.length], width: 1.6},
@@ -241,7 +261,7 @@
         setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
     function exportCurves() {
-        const cell = value => value == null ? "" : '"' + String(value).replace(/"/g, '""') + '"';
+        const cell = value => value == null || Number.isNaN(value) ? "" : '"' + String(value).replace(/"/g, '""') + '"';
         const rows = ["recorder_local_time,source,column,unit,uncorrected_value,zero_offset,value\r\n"];
         for (const s of series.filter(s => visible[s.id])) {
             for (let i = 0; i < Math.max(s.x.length, s.y.length); i++) {
@@ -331,4 +351,57 @@
             resizeTimer = setTimeout(() => schedule(render), 100);
         } else if (Math.ceil(root.getBoundingClientRect().height + 16) !== lastHeight) send();
     }).observe(root);
+
+    /* A sentence for the reader about why the recording did not arrive. */
+    function Problem(message) { this.message = message; }
+
+    /* The Pi sends the recording's original files and nothing else; reading
+     * them is this browser's work (0.29.0). Parsed on the Pi, a 39 MB
+     * recording took minutes and became a hundred megabytes of page. Progress
+     * goes to the Plot tab so a long file says how far it has come. */
+    async function fetchRecording(manifest) {
+        const sources = Array.isArray(manifest.sources) ? manifest.sources : [];
+        if (!window.PihtiRecording) throw new Problem("The recording reader could not be loaded.");
+        if (!sources.length) throw new Problem("This recording has no files to read.");
+        const total = sources.reduce((sum, source) => sum + (Number(source.bytes) || 0), 0);
+        let loaded = 0, reported = 0;
+        const progress = stage => window.parent.postMessage({type: "pihti-plot-progress", file: manifest.file,
+            stage, loaded, total}, window.location.origin);
+        progress("receiving");
+        const texts = await Promise.all(sources.map(async source => {
+            let response;
+            try { response = await fetch(source.url); }
+            catch (_) { throw new Problem("The recording could not be fetched. Check the connection and choose it again."); }
+            if (!response.ok) {
+                throw new Problem(response.status === 404 ? "That recording is not on this machine." : `The server answered ${response.status}.`);
+            }
+            const decoder = new TextDecoder("utf-8", {fatal: true});
+            try {
+                if (!response.body || !response.body.getReader) {
+                    const buffer = await response.arrayBuffer();
+                    loaded += buffer.byteLength;
+                    return decoder.decode(buffer);
+                }
+                const reader = response.body.getReader(), parts = [];
+                for (;;) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    parts.push(decoder.decode(value, {stream: true}));
+                    loaded += value.byteLength;
+                    if (loaded - reported > total / 50) { reported = loaded; progress("receiving"); }
+                }
+                parts.push(decoder.decode());
+                return parts.join("");
+            } catch (error) {
+                if (error instanceof TypeError) throw new Problem("This recording could not be read. Its files are not UTF-8 text.");
+                throw error;
+            }
+        }));
+        progress("drawing");
+        // Let the Plot tab paint "drawing" before reading holds the thread.
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const result = window.PihtiRecording.read(sources.map((source, i) => ({name: source.name, text: texts[i]})));
+        result.file = manifest.file;
+        return result;
+    }
 }());
