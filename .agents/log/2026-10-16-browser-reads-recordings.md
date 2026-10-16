@@ -100,3 +100,9 @@ export of four charts takes 1.9 s.
   0.22.0, `/api/health` carries `detail`; no `/api/neighbours` or Services tab
   there yet; this diagram's permalink and `/state.svg` recorded there as ready
   but not wired in. Nothing asked of this repository; collected.
+
+## Push
+
+On queezz's go-ahead, pushed exactly `5b9e31d` and `e092d55` to GitHub
+`master` (884b2bb..e092d55). Pi deployment is his: pull and restart in
+`/home/pi/pihtivacuum`, then confirm `/version` reads 0.29.0.
