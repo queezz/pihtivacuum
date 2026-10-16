@@ -3,6 +3,9 @@ build/
 # queezz's own drop folder for drawings in progress; Dropbox carries it, git
 # does not (Fleet RULES.md §7 keeps `local/` out of every repository here).
 local/
+# Images attached to Codex remote sessions; the app keeps them here. Fleet,
+# photoarchive and proseaudio ignore the same folder.
+.codex-remote-attachments/
 
 elements_state.json
 logs.json
